@@ -155,9 +155,14 @@ namespace FCFW
 		return m_rotationTrack.ExportPath(a_file, a_conversionFactor);
 	}
 
-	RE::NiPoint3 Timeline::GetTranslationPointPosition(size_t a_index) const
+	RE::NiPoint3 Timeline::GetTranslationPoint(size_t a_index) const
 	{
 		return m_translationTrack.GetPoint(a_index).m_point;
+	}
+
+	RE::BSTPoint2<float> Timeline::GetRotationPoint(size_t a_index) const
+	{
+		return m_rotationTrack.GetPoint(a_index).m_point;
 	}
 
 }  // namespace FCFW

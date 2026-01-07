@@ -10,9 +10,6 @@ namespace FCFW {
 
     float CubicHermiteInterpolateAngular(float a0, float a1, float a2, float a3, float t);
 
-    void SetHUDMenuVisible(bool a_visible);
-
-    // Parse timeline file and call callback for each matching section
     bool ParseFCFWTimelineFileSections(
         std::ifstream& a_file,
         const std::string& a_sectionName,
@@ -21,7 +18,6 @@ namespace FCFW {
 
      RE::NiPointer<RE::NiAVObject> GetTargetPoint(RE::Actor* a_actor);
 
-    // Convert mod name (ESP/ESL) to plugin handle via TESDataHandler
     SKSE::PluginHandle ModNameToHandle(const char* a_modName);
 } // namespace FCFW
 

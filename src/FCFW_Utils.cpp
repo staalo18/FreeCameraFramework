@@ -1,5 +1,4 @@
 #include "FCFW_Utils.h"
-#include "APIManager.h"
 #include "Offsets.h"
 
 namespace FCFW {
@@ -74,20 +73,6 @@ namespace FCFW {
         // Convert back to angle
         return std::atan2(result_sin, result_cos);
     };
-
-    void SetHUDMenuVisible(bool a_visible) {
-        if (!APIs::TrueHUD) {
-            return;
-        }
-
-        auto* ui = RE::UI::GetSingleton();
-        if (ui) {
-            auto trueHUDMenu = ui->GetMenu<RE::IMenu>("TrueHUD");
-            if (trueHUDMenu && trueHUDMenu->uiMovie) {
-                trueHUDMenu->uiMovie->SetVisible(a_visible);
-            }
-        }        
-    }
 
     bool ParseFCFWTimelineFileSections(
         std::ifstream& a_file,

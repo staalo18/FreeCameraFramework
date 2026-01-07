@@ -45,9 +45,8 @@ namespace FCFW
 		bool ExportTranslationPath(std::ofstream& a_file, float a_conversionFactor = 1.0f) const;
 		bool ExportRotationPath(std::ofstream& a_file, float a_conversionFactor = 1.0f) const;
 
-		RE::NiPoint3 GetTranslationPointPosition(size_t a_index) const;  // For DrawTimeline
-
-		uint32_t GetTimelineID() const { return m_timelineID; }
+		RE::NiPoint3 GetTranslationPoint(size_t a_index) const;
+		RE::BSTPoint2<float> GetRotationPoint(size_t a_index) const;		uint32_t GetTimelineID() const { return m_timelineID; }
 		void SetTimelineID(uint32_t a_id) { m_timelineID = a_id; }
 
 		float GetPlaybackSpeed() const { return m_playbackSpeed; }

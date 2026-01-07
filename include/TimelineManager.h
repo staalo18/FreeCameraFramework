@@ -47,11 +47,11 @@ namespace FCFW {
             bool StopRecording(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID);
 
             int AddTranslationPointAtCamera(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, float a_time, bool a_easeIn, bool a_easeOut, InterpolationMode a_interpolationMode);
-            int AddTranslationPoint(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, float a_time, float a_posX, float a_posY, float a_posZ, bool a_easeIn, bool a_easeOut, InterpolationMode a_interpolationMode);
-            int AddTranslationPointAtRef(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, float a_time, RE::TESObjectREFR* a_reference, float a_offsetX, float a_offsetY, float a_offsetZ, bool a_isOffsetRelative, bool a_easeIn, bool a_easeOut, InterpolationMode a_interpolationMode);
+            int AddTranslationPoint(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, float a_time, const RE::NiPoint3& a_position, bool a_easeIn, bool a_easeOut, InterpolationMode a_interpolationMode);
+            int AddTranslationPointAtRef(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, float a_time, RE::TESObjectREFR* a_reference, const RE::NiPoint3& a_offset, bool a_isOffsetRelative, bool a_easeIn, bool a_easeOut, InterpolationMode a_interpolationMode);
             int AddRotationPointAtCamera(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, float a_time, bool a_easeIn, bool a_easeOut, InterpolationMode a_interpolationMode);
-            int AddRotationPoint(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, float a_time, float a_pitch, float a_yaw, bool a_easeIn, bool a_easeOut, InterpolationMode a_interpolationMode);
-            int AddRotationPointAtRef(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, float a_time, RE::TESObjectREFR* a_reference, float a_offsetPitch, float a_offsetYaw, bool a_isOffsetRelative, bool a_easeIn, bool a_easeOut, InterpolationMode a_interpolationMode);
+            int AddRotationPoint(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, float a_time, const RE::BSTPoint2<float>& a_rotation, bool a_easeIn, bool a_easeOut, InterpolationMode a_interpolationMode);
+            int AddRotationPointAtRef(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, float a_time, RE::TESObjectREFR* a_reference, const RE::BSTPoint2<float>& a_offset, bool a_isOffsetRelative, bool a_easeIn, bool a_easeOut, InterpolationMode a_interpolationMode);
             
             bool RemoveTranslationPoint(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, size_t a_index);
             bool RemoveRotationPoint(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, size_t a_index);
@@ -60,6 +60,9 @@ namespace FCFW {
             
             int GetTranslationPointCount(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID) const;
             int GetRotationPointCount(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID) const;
+            
+            RE::NiPoint3 GetTranslationPoint(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, size_t a_index) const;
+            RE::BSTPoint2<float> GetRotationPoint(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, size_t a_index) const;
             
             bool StartPlayback(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, float a_speed = 1.0f, bool a_globalEaseIn = false, bool a_globalEaseOut = false, bool a_useDuration = false, float a_duration = 0.0f);
             bool StopPlayback(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID);
@@ -96,7 +99,6 @@ namespace FCFW {
            void DispatchTimelineEvent(uint32_t a_messageType, size_t a_timelineID);
            void DispatchTimelineEventPapyrus(const char* a_eventName, size_t a_timelineID);
 
-            void DrawTimeline(const TimelineState* a_state);
             void RecordTimeline(TimelineState* a_state);
             void PlayTimeline(TimelineState* a_state);
 

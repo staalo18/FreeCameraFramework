@@ -1,5 +1,4 @@
 #include "TimelineManager.h"
-#include "APIManager.h"
 #include "FCFW_Utils.h"
 
 namespace FCFW {
@@ -92,24 +91,8 @@ log::info("{}: Sent Papyrus event '{}' for timeline {} to {} receivers", __FUNCT
             return;
         }
         TimelineState* activeState = &it->second;
-        
-        auto* ui = RE::UI::GetSingleton();
-        
-        // Handle game pause
-        if (ui && ui->GameIsPaused()) {
-            if (activeState->m_isPlaybackRunning) {
-                ui->ShowMenus(m_isShowingMenus);
-            }
-            return;
-        }
-        
-        // Update UI visibility during playback
-        if (activeState->m_isPlaybackRunning) {
-            ui->ShowMenus(activeState->m_showMenusDuringPlayback);
-        }
-        
+ 
         // Execute timeline operations under lock protection
-        DrawTimeline(activeState);
         PlayTimeline(activeState);
         RecordTimeline(activeState);
     }
@@ -239,7 +222,7 @@ log::info("{}: Sent Papyrus event '{}' for timeline {} to {} receivers", __FUNCT
         return static_cast<int>(state->m_timeline.AddTranslationPoint(point));
     }
 
-    int TimelineManager::AddTranslationPoint(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, float a_time, float a_posX, float a_posY, float a_posZ, bool a_easeIn, bool a_easeOut, InterpolationMode a_interpolationMode) {
+    int TimelineManager::AddTranslationPoint(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, float a_time, const RE::NiPoint3& a_position, bool a_easeIn, bool a_easeOut, InterpolationMode a_interpolationMode) {
         std::lock_guard<std::recursive_mutex> lock(m_timelineMutex);
         
         TimelineState* state = GetTimeline(a_timelineID, a_pluginHandle);
@@ -253,12 +236,12 @@ log::info("{}: Sent Papyrus event '{}' for timeline {} to {} receivers", __FUNCT
         }
         
         Transition transition(a_time, a_interpolationMode, a_easeIn, a_easeOut);
-        TranslationPoint point(transition, PointType::kWorld, RE::NiPoint3(a_posX, a_posY, a_posZ));
+        TranslationPoint point(transition, PointType::kWorld, a_position);
         
         return static_cast<int>(state->m_timeline.AddTranslationPoint(point));
     }
 
-    int TimelineManager::AddTranslationPointAtRef(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, float a_time, RE::TESObjectREFR* a_reference, float a_offsetX, float a_offsetY, float a_offsetZ, bool a_isOffsetRelative, bool a_easeIn, bool a_easeOut, InterpolationMode a_interpolationMode) {
+    int TimelineManager::AddTranslationPointAtRef(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, float a_time, RE::TESObjectREFR* a_reference, const RE::NiPoint3& a_offset, bool a_isOffsetRelative, bool a_easeIn, bool a_easeOut, InterpolationMode a_interpolationMode) {
         std::lock_guard<std::recursive_mutex> lock(m_timelineMutex);
         
         TimelineState* state = GetTimeline(a_timelineID, a_pluginHandle);
@@ -277,8 +260,7 @@ log::info("{}: Sent Papyrus event '{}' for timeline {} to {} receivers", __FUNCT
         }
         
         Transition transition(a_time, a_interpolationMode, a_easeIn, a_easeOut);
-        RE::NiPoint3 offset(a_offsetX, a_offsetY, a_offsetZ);
-        TranslationPoint point(transition, PointType::kReference, RE::NiPoint3{}, offset, a_reference, a_isOffsetRelative);
+        TranslationPoint point(transition, PointType::kReference, RE::NiPoint3{}, a_offset, a_reference, a_isOffsetRelative);
         
         return static_cast<int>(state->m_timeline.AddTranslationPoint(point));
     }
@@ -303,7 +285,7 @@ log::info("{}: Sent Papyrus event '{}' for timeline {} to {} receivers", __FUNCT
         return static_cast<int>(state->m_timeline.AddRotationPoint(point));
     }
 
-    int TimelineManager::AddRotationPoint(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, float a_time, float a_pitch, float a_yaw, bool a_easeIn, bool a_easeOut, InterpolationMode a_interpolationMode) {
+    int TimelineManager::AddRotationPoint(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, float a_time, const RE::BSTPoint2<float>& a_rotation, bool a_easeIn, bool a_easeOut, InterpolationMode a_interpolationMode) {
         std::lock_guard<std::recursive_mutex> lock(m_timelineMutex);
         
         TimelineState* state = GetTimeline(a_timelineID, a_pluginHandle);
@@ -317,12 +299,12 @@ log::info("{}: Sent Papyrus event '{}' for timeline {} to {} receivers", __FUNCT
         }
         
         Transition transition(a_time, a_interpolationMode, a_easeIn, a_easeOut);
-        RotationPoint point(transition, PointType::kWorld, RE::BSTPoint2<float>({a_pitch, a_yaw}));
+        RotationPoint point(transition, PointType::kWorld, a_rotation);
         
         return static_cast<int>(state->m_timeline.AddRotationPoint(point));
     }
 
-    int TimelineManager::AddRotationPointAtRef(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, float a_time, RE::TESObjectREFR* a_reference, float a_offsetPitch, float a_offsetYaw, bool a_isOffsetRelative, bool a_easeIn, bool a_easeOut, InterpolationMode a_interpolationMode) {
+    int TimelineManager::AddRotationPointAtRef(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, float a_time, RE::TESObjectREFR* a_reference, const RE::BSTPoint2<float>& a_offset, bool a_isOffsetRelative, bool a_easeIn, bool a_easeOut, InterpolationMode a_interpolationMode) {
         std::lock_guard<std::recursive_mutex> lock(m_timelineMutex);
         
         TimelineState* state = GetTimeline(a_timelineID, a_pluginHandle);
@@ -341,8 +323,7 @@ log::info("{}: Sent Papyrus event '{}' for timeline {} to {} receivers", __FUNCT
         }
         
         Transition transition(a_time, a_interpolationMode, a_easeIn, a_easeOut);
-        RE::BSTPoint2<float> offset({a_offsetPitch, a_offsetYaw});
-        RotationPoint point(transition, PointType::kReference, RE::BSTPoint2<float>{}, offset, a_reference, a_isOffsetRelative);
+        RotationPoint point(transition, PointType::kReference, RE::BSTPoint2<float>{}, a_offset, a_reference, a_isOffsetRelative);
         
         return static_cast<int>(state->m_timeline.AddRotationPoint(point));
     }
@@ -417,7 +398,15 @@ log::info("{}: Sent Papyrus event '{}' for timeline {} to {} receivers", __FUNCT
             a_state->m_isPlaybackRunning = false;
             return;
         }
-        
+
+        // Update UI visibility
+        auto* ui = RE::UI::GetSingleton();        
+        if (ui && ui->GameIsPaused()) {
+            ui->ShowMenus(m_isShowingMenus);
+            return;
+        }        
+        ui->ShowMenus(a_state->m_showMenusDuringPlayback);
+
         float deltaTime = _ts_SKSEFunctions::GetRealTimeDeltaTime() * a_state->m_playbackSpeed;
         a_state->m_timeline.UpdatePlayback(deltaTime);
         
@@ -437,7 +426,7 @@ log::info("{}: Sent Papyrus event '{}' for timeline {} to {} receivers", __FUNCT
         cameraState->translation = a_state->m_timeline.GetTranslation(sampleTime);
         RE::BSTPoint2<float> rotation = a_state->m_timeline.GetRotation(sampleTime);
         
-        // Handle user rotation (uses per-timeline m_allowUserRotation and global m_rotationOffset/m_userTurning)
+        // Handle user rotation
         if (m_userTurning && a_state->m_allowUserRotation) {
             a_state->m_rotationOffset.x = _ts_SKSEFunctions::NormalRelativeAngle(cameraState->rotation.x - rotation.x);
             a_state->m_rotationOffset.y = _ts_SKSEFunctions::NormalRelativeAngle(cameraState->rotation.y - rotation.y);
@@ -844,6 +833,40 @@ log::info("{}: Sent Papyrus event '{}' for timeline {} to {} receivers", __FUNCT
         return state->m_timeline.IsPaused();
     }
 
+    RE::NiPoint3 TimelineManager::GetTranslationPoint(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, size_t a_index) const {
+        std::lock_guard<std::recursive_mutex> lock(m_timelineMutex);
+        
+        const TimelineState* state = GetTimeline(a_timelineID, a_pluginHandle);
+        if (!state) {
+            log::error("{}: Timeline {} not found or not owned by plugin handle {}", __FUNCTION__, a_timelineID, a_pluginHandle);
+            return RE::NiPoint3(0.0f, 0.0f, 0.0f);
+        }
+        
+        if (a_index >= state->m_timeline.GetTranslationPointCount()) {
+            log::error("{}: Index {} out of range (timeline {} has {} translation points)", __FUNCTION__, a_index, a_timelineID, state->m_timeline.GetTranslationPointCount());
+            return RE::NiPoint3(0.0f, 0.0f, 0.0f);
+        }
+        
+        return state->m_timeline.GetTranslationPoint(a_index);
+    }
+
+    RE::BSTPoint2<float> TimelineManager::GetRotationPoint(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, size_t a_index) const {
+        std::lock_guard<std::recursive_mutex> lock(m_timelineMutex);
+        
+        const TimelineState* state = GetTimeline(a_timelineID, a_pluginHandle);
+        if (!state) {
+            log::error("{}: Timeline {} not found or not owned by plugin handle {}", __FUNCTION__, a_timelineID, a_pluginHandle);
+            return RE::BSTPoint2<float>{0.0f, 0.0f};
+        }
+        
+        if (a_index >= state->m_timeline.GetRotationPointCount()) {
+            log::error("{}: Index {} out of range (timeline {} has {} rotation points)", __FUNCTION__, a_index, a_timelineID, state->m_timeline.GetRotationPointCount());
+            return RE::BSTPoint2<float>{0.0f, 0.0f};
+        }
+        
+        return state->m_timeline.GetRotationPoint(a_index);
+    }
+
     bool TimelineManager::AllowUserRotation(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, bool a_allow) {
         std::lock_guard<std::recursive_mutex> lock(m_timelineMutex);
         
@@ -1165,39 +1188,6 @@ log::info("{}: Sent Papyrus event '{}' for timeline {} to {} receivers", __FUNCT
             a_state->m_timeline.AddRotationPoint(rotationPoint);
             
             a_state->m_lastRecordedPointTime = a_state->m_currentRecordingTime;
-        }
-    }
-
-    void TimelineManager::DrawTimeline(const TimelineState* a_state) {
-        if (!a_state || !APIs::TrueHUD) {
-            return;
-        }
-        
-        if (a_state->m_timeline.GetTranslationPointCount() == 0 && a_state->m_timeline.GetRotationPointCount() == 0) {
-            return;
-        }
-        
-        if (a_state->m_isPlaybackRunning || a_state->m_isRecording) {
-            return;
-        }
-        
-        auto* playerCamera = RE::PlayerCamera::GetSingleton();
-        if (!playerCamera) {
-            return;
-        }
-        
-        if (!(playerCamera->currentState && (playerCamera->currentState->id == RE::CameraState::kFree))) {
-            return;
-        }
-        
-        SetHUDMenuVisible(true);
-        
-        // Draw lines between translation points
-        size_t pointCount = a_state->m_timeline.GetTranslationPointCount();
-        for (size_t i = 0; i < pointCount - 1; ++i) {
-            RE::NiPoint3 point1 = a_state->m_timeline.GetTranslationPointPosition(i);
-            RE::NiPoint3 point2 = a_state->m_timeline.GetTranslationPointPosition(i + 1);
-            APIs::TrueHUD->DrawLine(point1, point2);
         }
     }
 

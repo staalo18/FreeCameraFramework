@@ -27,8 +27,7 @@ FreeCameraFramework (FCFW) is an SKSE plugin for Skyrim Anniversary Edition that
 - **Three API Surfaces**:
   - **Papyrus Scripts**: Full scripting integration with mod name + timeline ID parameters
   - **C++ Mod API**: Native plugin-to-plugin communication with SKSE plugin handle validation
-  - **Debug Hotkeys**: 8 keyboard shortcuts for testing (operates on most recently used timeline)
-- **Optional TrueHUD Integration**: Real-time 3D path visualization during playback
+- **Point Query API**: Query translation and rotation points for external visualization
 
 **Target Users:**
 - Skyrim machinima creators needing cinematic camera control
@@ -42,7 +41,7 @@ FreeCameraFramework (FCFW) is an SKSE plugin for Skyrim Anniversary Edition that
 
 ### **Project Architecture Summary**
 FCFW follows a **singleton manager pattern** with **multi-timeline storage** and **template-based timeline engines**. The core design separates concerns into:
-1. **API Layer**: Three entry points (Papyrus, C++ Mod API, Keyboard) → all funnel into `TimelineManager`
+1. **API Layer**: Two entry points (Papyrus, C++ Mod API) → all funnel into `TimelineManager`
 2. **Orchestration Layer**: `TimelineManager` singleton manages timeline map and coordinates recording/playback state
    - Stores `std::unordered_map<size_t, TimelineState>` for multi-timeline support
    - Tracks ownership via SKSE plugin handles
@@ -52,12 +51,12 @@ FCFW follows a **singleton manager pattern** with **multi-timeline storage** and
 5. **Storage Layer**: `CameraPath<T>` template manages point collections and file I/O
 
 **Key Design Patterns:**
-- **Singleton**: `TimelineManager`, `APIManager`, `ControlsManager` (thread-safe Meyer's singleton)
+- **Singleton**: `TimelineManager` (thread-safe Meyer's singleton)
 - **Multi-Timeline Storage**: `std::unordered_map<size_t, TimelineState>` with atomic ID generation
   - Thread-safe access via `std::mutex m_timelineMutex`
   - Each `TimelineState` contains: `Timeline`, ownership info, recording/playback state
 - **Ownership Validation**: Two-tier system for external API vs internal operations
-  - **External API (C++, Papyrus, Keyboard):** `GetTimeline(timelineID, pluginHandle)` validates ownership for ALL modification and query operations
+  - **External API (C++, Papyrus):** `GetTimeline(timelineID, pluginHandle)` validates ownership for ALL modification and query operations
     - Returns nullptr if timeline not found OR not owned by calling plugin
     - Security model: Prevents plugins from accessing/modifying each other's timelines
   - **Internal Operations (Hooks, Update Loop):** Bypass ownership validation
@@ -83,9 +82,7 @@ src/
   ├─ TimelineManager.cpp  # Recording/playback orchestration (singleton)
   ├─ Timeline.cpp         # Timeline class implementations (paired track coordination)
   ├─ CameraPath.cpp       # Point storage + import/export (.fcfw file format)
-  ├─ ControlsManager.cpp  # Keyboard input handling (8 debug hotkeys)
   ├─ Hooks.cpp            # Game loop interception (MainUpdateHook)
-  ├─ APIManager.cpp       # External API requests (TrueHUD integration)
   └─ FCFW_Utils.cpp       # Hermite interpolation + file parsing helpers
 
 include/
@@ -94,13 +91,12 @@ include/
   ├─ CameraPath.h         # Point storage templates (TranslationPath, RotationPath)
   ├─ CameraTypes.h        # Core enums (InterpolationMode, PointType, PlaybackMode)
   ├─ TimelineManager.h    # Main orchestrator interface
-  ├─ FCFW_API.h           # C++ Mod API + event messaging interface definition
-  └─ API/TrueHUDAPI.h     # External API header (v3)
+  └─ FCFW_API.h           # C++ Mod API + event messaging interface definition
 ```
 
 **Data Flow:**
 ```
-User Input (Papyrus/Hotkey/ModAPI)
+User Input (Papyrus/ModAPI)
   ↓
 TimelineManager (validate timeline ID + ownership, orchestrate)
   ↓
@@ -118,7 +114,7 @@ TimelineManager::Update()
   │                 → Timeline::GetTranslation/Rotation(time)
   │                 → TimelineTrack::GetPointAtTime(t)
   │                 → (internal: m_path access for interpolation)
-  └─ DrawTimeline(const TimelineState*) → TrueHUD->DrawLine() (if available)
+  └─ Point queries available via GetTranslationPoint/GetRotationPoint API
   ↓
 Apply to RE::FreeCameraState (position/rotation)
 ```
@@ -129,10 +125,11 @@ Apply to RE::FreeCameraState (position/rotation)
 - **TimelineTrack** → directly accesses m_path member (Path fully encapsulated)
 
 **Common Tasks:**
-- **Adding New API Functions**: Bind in `plugin.cpp` (Papyrus), implement in `TimelineManager`, expose in `FCFW_API.h` (Mod API)
+- **Adding New API Functions**: Bind in `plugin.cpp` (Papyrus), implement in `TimelineManager`, expose in `FCFW_API.h` (Mod API), add to `ModAPI.h` overrides
 - **Changing Interpolation**: Modify `TimelineTrack<T>::GetPointAtTime()` in `Timeline.inl` (calls interpolation helpers)
 - **File Format Changes**: Update `CameraPath::ExportPath()` and `AddPathFromFile()` in `CameraPath.cpp`
 - **New Point Types**: Extend `PointType` enum in `CameraTypes.h`, add cases in `TranslationPoint::GetPoint()` / `RotationPoint::GetPoint()` methods
+- **Querying Timeline Data**: Use `GetTranslationPointCount()`/`GetRotationPointCount()` to get point counts, then `GetTranslationPoint()`/`GetRotationPoint()` (C++) or individual coordinate functions (Papyrus) to iterate through points by index
 
 **Build Dependencies:**
 - **CommonLibSSE-NG**: SKSE plugin framework (set `COMMONLIBSSE_PATH` env var)
@@ -144,12 +141,10 @@ Apply to RE::FreeCameraState (position/rotation)
 1. Launch Skyrim AE with SKSE
 2. Open console: `tfc` (enable free camera)
 3. From Papyrus: Call `FCFW_RegisterTimeline("YourMod.esp")` to get a timeline ID
-4. Press `8` to start recording (or call `FCFW_StartRecording("YourMod.esp", timelineID)`)
-5. Move camera, then press `9` to stop
-6. Exit free camera (`tfc`), then press `7` to play timeline
+4. Call `FCFW_StartRecording("YourMod.esp", timelineID)` to begin recording
+5. Move camera, then call `FCFW_StopRecording("YourMod.esp", timelineID)` to stop
+6. Exit free camera (`tfc`), then call `FCFW_StartPlayback("YourMod.esp", timelineID, ...)` to play timeline
 7. Check logs: `Documents/My Games/Skyrim Special Edition/SKSE/FreeCameraFramework.log`
-
-**Note**: Keyboard controls operate on the most recently used timeline ID (stored in `ControlsManager`)
 
 **Common Pitfalls & Debugging:**
 - **C++ API Returns 0 or -1**: Check that `RegisterTimeline()` succeeded before using returned ID. ID of 0 indicates registration failure (check logs for errors).
@@ -163,13 +158,11 @@ Apply to RE::FreeCameraState (position/rotation)
 
 ### **Architecture at a Glance:**
 ```
-Entry Points (3 surfaces):
+Entry Points (2 surfaces):
   ├─ Papyrus API (plugin.cpp) → FCFW_SKSEFunctions script
   │   └─ Parameters: string modName, int timelineID, ...
-  ├─ Mod API (ModAPI.h) → FCFW_API::IVFCFW1 interface
-  │   └─ Parameters: size_t timelineID, SKSE::PluginHandle, ...
-  └─ Keyboard (ControlsManager.cpp) → Hardcoded DXScanCode handlers
-      └─ Operates on m_lastUsedTimelineID (most recent timeline)
+  └─ Mod API (ModAPI.h) → FCFW_API::IVFCFW1 interface
+      └─ Parameters: size_t timelineID, SKSE::PluginHandle, ...
 
 Core Engine:
   ├─ TimelineManager (singleton) → Multi-timeline orchestration
@@ -190,7 +183,6 @@ Core Engine:
 
 Update Loop (Hooks.cpp):
   MainUpdateHook → TimelineManager::Update() every frame
-    ├─ DrawTimeline(activeState) → TrueHUD visualization
     ├─ PlayTimeline(activeState) → Apply interpolated camera state
     └─ RecordTimeline(activeState) → Sample camera every 1 second
 ```
@@ -217,12 +209,11 @@ Update Loop (Hooks.cpp):
 - **Purpose**: Skyrim Special Edition SKSE plugin for cinematographic camera control
 - **Core Feature**: Multi-timeline camera movement system with keyframe interpolation
 - **Language**: C++ (SKSE CommonLibSSE-NG framework)
-- **Current State**: ✅ **Multi-timeline implementation complete (Phase 4 finished January 1, 2026)**
-  - Unlimited independent timelines per mod/plugin
+- **Architecture**: Multi-timeline system with unlimited independent timelines per mod/plugin
   - Ownership validation via SKSE plugin handles
   - Timeline ID + mod name/plugin handle required for all API calls
   - Exclusive playback/recording enforcement (one active timeline at a time)
-  - Papyrus API, C++ Mod API, and keyboard controls all migrated
+  - Full API support: Papyrus scripts and C++ plugins
 
 ---
 
@@ -238,9 +229,7 @@ SKSEPlugin_Load()
 
 MessageHandler() [SKSE lifecycle events]
 ├─> kDataLoaded/kPostLoad/kPostPostLoad: APIs::RequestAPIs()
-└─> kPostLoadGame/kNewGame:
-    ├─> APIs::RequestAPIs()
-    └─> Register ControlsManager as input event sink
+└─> kPostLoadGame/kNewGame: APIs::RequestAPIs()
 
 RequestPluginAPI(InterfaceVersion) [Mod API entry]
 └─> Returns FCFWInterface singleton for V1
@@ -272,16 +261,21 @@ RequestPluginAPI(InterfaceVersion) [Mod API entry]
 | Papyrus Function | Return | Parameters | Notes |
 |-----------------|--------|------------|-------|
 | `FCFW_AddTranslationPointAtCamera` | int | **modName, timelineID**, time, easeIn, easeOut, interpolationMode | Captures camera position |
-| `FCFW_AddTranslationPoint` | int | **modName, timelineID**, time, posX, posY, posZ, easeIn, easeOut, interpolationMode | Absolute world position |
+| `FCFW_AddTranslationPoint` | int | **modName, timelineID**, time, posX, posY, posZ, easeIn, easeOut, interpolationMode | Absolute world position (Papyrus accepts individual coordinates) |
 | `FCFW_AddTranslationPointAtRef` | int | **modName, timelineID**, time, ref, offsetX/Y/Z, isOffsetRelative, easeIn, easeOut, interpolationMode | Ref-based position |
 | `FCFW_AddRotationPointAtCamera` | int | **modName, timelineID**, time, easeIn, easeOut, interpolationMode | Captures camera rotation |
-| `FCFW_AddRotationPoint` | int | **modName, timelineID**, time, pitch, yaw, easeIn, easeOut, interpolationMode | Absolute world rotation |
+| `FCFW_AddRotationPoint` | int | **modName, timelineID**, time, pitch, yaw, easeIn, easeOut, interpolationMode | Absolute world rotation (Papyrus accepts individual pitch/yaw) |
 | `FCFW_AddRotationPointAtRef` | int | **modName, timelineID**, time, ref, offsetPitch/Yaw, isOffsetRelative, easeIn, easeOut, interpolationMode | Ref-based rotation |
 | `FCFW_RemoveTranslationPoint` | bool | **modName, timelineID**, index | Remove by index (requires ownership) |
 | `FCFW_RemoveRotationPoint` | bool | **modName, timelineID**, index | Remove by index (requires ownership) |
 | `FCFW_ClearTimeline` | bool | **modName, timelineID**, notifyUser | Clear all points (requires ownership) |
 | `FCFW_GetTranslationPointCount` | int | **modName, timelineID** | Query point count (-1 if timeline not found) |
 | `FCFW_GetRotationPointCount` | int | **modName, timelineID** | Query point count (-1 if timeline not found) |
+| `FCFW_GetTranslationPointX` | float | **modName, timelineID**, index | Get X coordinate of translation point. Returns 0.0 on error. |
+| `FCFW_GetTranslationPointY` | float | **modName, timelineID**, index | Get Y coordinate of translation point. Returns 0.0 on error. |
+| `FCFW_GetTranslationPointZ` | float | **modName, timelineID**, index | Get Z coordinate of translation point. Returns 0.0 on error. |
+| `FCFW_GetRotationPointPitch` | float | **modName, timelineID**, index | Get pitch (radians) of rotation point. Returns 0.0 on error. |
+| `FCFW_GetRotationPointYaw` | float | **modName, timelineID**, index | Get yaw (radians) of rotation point. Returns 0.0 on error. |
 
 **Recording Functions:**
 | Papyrus Function | Return | Parameters | Notes |
@@ -315,6 +309,7 @@ RequestPluginAPI(InterfaceVersion) [Mod API entry]
 - **modName**: Your mod's ESP/ESL filename (e.g., `"MyMod.esp"`), case-sensitive. Required for ALL timeline operations to validate that the calling plugin has access to the specified timeline.
 - **timelineID**: Integer ID returned by `RegisterTimeline()`, must be > 0
 - **playbackMode**: Integer value for PlaybackMode enum (0=kEnd, 1=kLoop, 2=kWait)
+- **index**: 0-based index for point queries. Functions return 0.0 if index is out of range or timeline not found.
 - **Ownership Validation**: Applied universally to all timeline API calls. The pluginHandle/modName parameter is required as the FIRST parameter and is always validated - operations fail if the timeline doesn't exist or doesn't belong to the calling plugin.
 - **Return Values**: `-1` for query functions on error, `false` for boolean functions on error
 
@@ -431,16 +426,52 @@ SKSE::GetMessagingInterface()->RegisterListener(MessageHandler);
 - **Multi-Timeline API:** All functions require `size_t timelineID` and `SKSE::PluginHandle` parameters
   - External plugins pass their own plugin handle (via `SKSE::GetPluginHandle()` in their code)
   - Timeline manipulation requires ownership validation (Register/Unregister/Add/Remove/Clear/SetPlaybackMode)
-  - Query/playback operations don't require ownership validation
+- **Point Addition Functions:** Accept point structs directly (C++ API only)
+  - `AddTranslationPoint(pluginHandle, timelineID, time, const RE::NiPoint3& position, ...)` - Pass position as struct
+  - `AddRotationPoint(pluginHandle, timelineID, time, const RE::BSTPoint2<float>& rotation, ...)` - Pass rotation as struct (x=pitch, y=yaw)
+  - Note: Papyrus API continues to accept individual coordinates (posX/Y/Z or pitch/yaw) for script convenience
+- **Point Query Functions:** Returns point data directly with zero sentinel values on error (matches Papyrus pattern)
+  - `RE::NiPoint3 GetTranslationPoint(pluginHandle, timelineID, index)` - Returns (0,0,0) on error
+  - `RE::BSTPoint2<float> GetRotationPoint(pluginHandle, timelineID, index)` - Returns (0,0) on error
+  - Consistent with Papyrus API: error conditions return zero values, check `GetTranslationPointCount()` first to validate index
 - **Signatures:** Similar to Papyrus but with native C++ types (`size_t`, `SKSE::PluginHandle` instead of `string`, `int`)
   - All functions marked `const noexcept`
   - `SetPlaybackMode(timelineID, pluginHandle, playbackMode)` - playbackMode as int (0=kEnd, 1=kLoop, 2=kWait)
-  - All functions delegate to `TimelineManager::GetSingleton()`
-  - Query/playback operations don't require ownership validation
-- **Signatures:** Similar to Papyrus but with native C++ types (`size_t`, `SKSE::PluginHandle` instead of `string`, `int`)
-  - All functions marked `const noexcept`
   - `int interpolationMode` converted via `ToInterpolationMode()` at API boundary
   - All functions delegate to `TimelineManager::GetSingleton()`
+
+**Example: Building a Camera Path (C++ API):**
+```cpp
+auto api = reinterpret_cast<FCFW_API::IVFCFW1*>(
+    FCFW_API::RequestPluginAPI(FCFW_API::InterfaceVersion::V1)
+);
+
+size_t timelineID = api->RegisterTimeline(SKSE::GetPluginHandle());
+
+// Add translation points using RE::NiPoint3
+RE::NiPoint3 pos1(100.0f, 200.0f, 300.0f);
+RE::NiPoint3 pos2(400.0f, 500.0f, 600.0f);
+api->AddTranslationPoint(SKSE::GetPluginHandle(), timelineID, 0.0f, pos1, false, false, 2);
+api->AddTranslationPoint(SKSE::GetPluginHandle(), timelineID, 5.0f, pos2, false, false, 2);
+
+// Add rotation points using RE::BSTPoint2<float> (x=pitch, y=yaw in radians)
+RE::BSTPoint2<float> rot1(0.0f, 1.57f);  // Looking east
+RE::BSTPoint2<float> rot2(0.5f, 3.14f);  // Looking south with slight pitch
+api->AddRotationPoint(SKSE::GetPluginHandle(), timelineID, 0.0f, rot1, false, false, 2);
+api->AddRotationPoint(SKSE::GetPluginHandle(), timelineID, 5.0f, rot2, false, false, 2);
+
+// Add reference-based point with offset struct
+RE::TESObjectREFR* target = RE::TESForm::LookupByID<RE::TESObjectREFR>(0x14);
+RE::NiPoint3 offset(50.0f, 0.0f, 100.0f);  // 50 units right, 100 units up
+api->AddTranslationPointAtRef(SKSE::GetPluginHandle(), timelineID, 10.0f, target, offset, false, false, false, 2);
+
+// Add rotation point looking at reference with pitch/yaw offset
+RE::BSTPoint2<float> rotOffset(0.1f, 0.0f);  // Slight pitch up, looking directly at target
+api->AddRotationPointAtRef(SKSE::GetPluginHandle(), timelineID, 10.0f, target, rotOffset, false, false, false, 2);
+
+// Start playback
+api->StartPlayback(SKSE::GetPluginHandle(), timelineID, 1.0f);
+```
 
 **Implementation: `FCFWInterface`** (in `ModAPI.h`, implemented in `Messaging` namespace)
 - Singleton pattern: `GetSingleton()` returns static instance
@@ -450,57 +481,7 @@ SKSE::GetMessagingInterface()->RegisterListener(MessageHandler);
 
 ---
 
-### **2.4 Keyboard Controls (`ControlsManager.cpp`)**
-**Integration:** Registered as `RE::BSTEventSink<RE::InputEvent*>` on game load
-
-**Multi-Timeline Context:**
-- All operations use a static `timelineID` variable (declared in ControlsManager.cpp namespace scope)
-- Timeline ID is passed to all TimelineManager calls (with SKSE::GetPluginHandle())
-- Timeline is registered on first keypress (lazy initialization)
-- Once registered, the same timeline ID is used for all keyboard operations
-
-**Hardcoded Keybindings** (DXScanCode values):
-| Key | Action | TimelineManager Call |
-|-----|--------|----------------------|
-| 2 | Toggle Pause | `PausePlayback(timelineID)` / `ResumePlayback(timelineID)` |
-| 3 | Stop Playback | `StopPlayback(timelineID)` |
-| 4 | Toggle User Rotation | `AllowUserRotation(timelineID, !IsUserRotationAllowed(timelineID))` |
-| 5 | **Debug Scene** | Complex hardcoded camera path demo (uses timelineID) |
-| 6 | Clear Timeline | `ClearTimeline(timelineID)` |
-| 7 | Start Playback | `StartPlayback(timelineID, ...)` |
-| 8 | Start Recording | `StartRecording(timelineID, ...)` |
-| 9 | Stop Recording | `StopRecording(timelineID)` |
-| 10 | Export | `ExportTimeline(timelineID, "SKSE/Plugins/FCFW_CameraPath.ini")` |
-| 11 | Import | `AddTimelineFromFile(timelineID, "SKSE/Plugins/FCFW_CameraPath.ini")` |
-
-**Key 5 Scene Details:**
-- Looks up FormID `0xd8c56` as `RE::TESObjectREFR` (must be an actor)
-- Builds 11-point camera path: camera → actor tracking → player → camera
-- Uses `GetTargetPoint()` to calculate head bone offset from actor's position
-- Adds +20 units to Y offset (forward direction, not upward)
-- Demonstrates all point types: kCamera, kReference (world-space and local-space)
-
-**Input Filtering:**
-- Ignores input when `RE::UI::GetSingleton()->GameIsPaused()` is true
-- Only processes `kButton` events with `IsDown()` state
-
----
-
-### **2.5 External APIs (`APIManager.h/cpp`)**
-**Purpose:** Request APIs from other SKSE plugins
-
-**Currently Integrated:**
-- **TrueHUD API v3** (`TRUEHUD_API::IVTrueHUD3`)
-  - Requested at multiple SKSE lifecycle stages (workaround for messaging bug)
-  - Stored in static inline pointer: `APIs::TrueHUD`
-  - **Usage:**
-    - `TimelineManager::DrawTimeline()` (line 286): Calls `DrawLine(point1, point2)` to visualize camera path in 3D world space
-    - `FCFW_Utils::SetHUDMenuVisible()` (line 52): Calls `SetHUDMenuVisible()` to control menu visibility
-  - Optional: Functions only execute if TrueHUD is installed and API is available
-
----
-
-### **2.6 Hooks (`Hooks.h/cpp`)**
+### **2.5 Hooks (`Hooks.h/cpp`)**
 **Purpose:** Intercept Skyrim game loop and input handling
 
 **Installed Hooks:**
@@ -586,7 +567,7 @@ enum class PlaybackMode : int {
 - **Error Handling:** Return error codes (negative `int`) or `false`, log errors to file
 
 ### **3.3 Singleton Pattern**
-- **TimelineManager**, **ControlsManager**, **FCFWInterface**, **APIManager**
+- **TimelineManager**, **FCFWInterface**
 - All use `GetSingleton()` returning static instance reference
 
 ---
@@ -704,7 +685,6 @@ void TimelineManager::Update() {
         ui->ShowMenus(state->showMenusDuringPlayback);
     }
     
-    DrawTimeline(state);     // Visualize path via TrueHUD (if available)
     PlayTimeline(state);     // Update camera from interpolated points
     RecordTimeline(state);   // Sample camera position if recording
 }
@@ -716,10 +696,9 @@ void TimelineManager::Update() {
 - Passes `TimelineState*` to all helper functions
 - Only ONE timeline can be active (recording or playing) at a time
 
-**Critical Insight:** All three operations coexist in the loop, but guards prevent conflicts:
+**Critical Insight:** All operations coexist in the loop, but guards prevent conflicts:
 - `PlayTimeline(state)` checks `state->isPlaybackRunning && !state->isRecording`
 - `RecordTimeline(state)` checks `state->isRecording`
-- `DrawTimeline(state)` only draws when `!state->isPlaybackRunning && !state->isRecording`
 
 ---
 
@@ -997,9 +976,10 @@ bool ExportTranslationPath(std::ofstream& a_file, float a_conversionFactor = 1.0
 bool ExportRotationPath(std::ofstream& a_file, float a_conversionFactor = 1.0f) const;
 ```
 
-**Visualization:**
+**Point Position Queries:**
 ```cpp
-RE::NiPoint3 GetTranslationPointPosition(size_t a_index) const;  // For DrawTimeline visualization
+RE::NiPoint3 GetTranslationPoint(size_t a_index) const;        // Get world position of translation point
+RE::BSTPoint2<float> GetRotationPoint(size_t a_index) const;   // Get rotation (pitch, yaw in radians)
 ```
 
 **Private Track Access:**
@@ -1284,36 +1264,21 @@ ExportTimeline(timelineID, pluginHandle, path)
 
 ---
 
-### **5.9 DrawTimeline() Visualization**
+### **5.9 Point Query API**
 
-**Conditions:**
-- `APIs::TrueHUD != nullptr` (TrueHUD plugin loaded)
-- Active timeline exists (`m_activeTimelineID != 0`)
-- `TimelineState* state` fetched successfully
-- Points exist (translation or rotation)
-- `!state->isPlaybackRunning && !state->isRecording`
-- Free camera mode active
+**Purpose:** Allow external plugins to query timeline point data for custom visualization or analysis.
 
-**Behavior (TimelineManager.cpp):**
-```cpp
-void TimelineManager::DrawTimeline(TimelineState* state) {
-    if (!APIs::TrueHUD || !state) return;
-    if (state->isPlaybackRunning || state->isRecording) return;
-    
-    for (i = 0; i < state->timeline.GetTranslationPointCount() - 1; ++i) {
-        auto& point1 = state->timeline.GetTranslationTrack().GetPath().GetPoint(i).m_point;
-        auto& point2 = state->timeline.GetTranslationTrack().GetPath().GetPoint(i+1).m_point;
-        APIs::TrueHUD->DrawLine(point1, point2);
-    }
-}
-```
+**Available Functions:**
+- `GetTranslationPoint(pluginHandle, timelineID, index)` - Returns `RE::NiPoint3` with position data
+- `GetRotationPoint(pluginHandle, timelineID, index)` - Returns `RE::BSTPoint2<float>` with pitch/yaw data  
+- Both return zero sentinels `(0,0,0)` or `(0,0)` on error
+- Validate index with `GetTranslationPointCount()` / `GetRotationPointCount()` first
 
-**Multi-Timeline Changes:**
-- Operates on `TimelineState*` parameter (passed from Update() loop)
-- Only draws active timeline (m_activeTimelineID)
-- Per-timeline playback/recording checks
-
-**Visual Result:** Line segments connecting translation keyframes (visible in HUD)
+**Use Cases:**
+- Custom 3D visualization plugins
+- Path analysis tools
+- Timeline debugging utilities
+- Export to external formats
 
 ---
 
@@ -1618,13 +1583,6 @@ CubicHermiteInterpolateAngular(a0, a1, a2, a3, t)
   └─> Convert back via atan2(sin, cos)
 ```
 
-**HUD Control:**
-```cpp
-SetHUDMenuVisible(visible)
-  ├─> Requires TrueHUD API
-  └─> Sets TrueHUD menu visibility via uiMovie->SetVisible()
-```
-
 **GetTargetPoint(actor)** - Returns head bone position:
 ```cpp
 1. Get race->bodyPartData
@@ -1632,9 +1590,9 @@ SetHUDMenuVisible(visible)
 3. Lookup bone node: NiAVObject_LookupBoneNodeByName(actor3D, targetName)
 4. Returns NiPointer<RE::NiAVObject> (world transform)
 ```
-**Usage:** Calculate head bone offset in ControlsManager Key 5 demo
+**Usage:** Calculate head bone offset for reference-based camera tracking
 - Computes offset from actor's position to head bone world position
-- Adds +20 units to Y (forward direction relative to actor's heading)
+- Adds offset to Y (forward direction relative to actor's heading)
 - Used for local-space kReference translation points
 
 **ParseFCFWTimelineFileSections():**
@@ -1647,97 +1605,61 @@ SetHUDMenuVisible(visible)
 
 ## **7. Critical Implementation Details**
 
-### **Multi-Timeline Migration: ✅ COMPLETED (Phase 4 + Cleanup)**
+### **Multi-Timeline Architecture**
 
-**Migration Completion:** January 1, 2026  
-**Cleanup Completion:** January 2, 2026  
-**Final Status:** All 20 functions migrated, tested, and all old code removed
+**Current Architecture:**
+- **Timeline Storage:** `std::unordered_map<size_t, TimelineState> m_timelines` - unlimited independent timelines
+- **Per-timeline state:** TimelineState struct encapsulates timeline + all state variables (recording/playback flags, speeds, offsets)
+- **Ownership tracking:** `SKSE::PluginHandle ownerPluginHandle` per timeline for access control
+- **Active timeline:** `std::atomic<size_t> m_activeTimelineID` enforces exclusive playback/recording (only one timeline active at a time)
+- **API pattern:** All functions require `timelineID` + `modName`/`pluginHandle` parameters with ownership validation
 
-**Architecture Transformation:**
+**Key Implementation Details:**
 
-**BEFORE (Single-Timeline):**
-- Single Timeline: `m_timeline` (direct member)
-- Flat state: 12+ bool/float members (recording, playback, user rotation)
-- No timeline IDs - direct member access pattern
-- API functions: No parameters, operate on singleton state
-- Single camera state: One FreeCameraState updated per frame
-
-**AFTER (Multi-Timeline):**
-- Timeline Map: `std::unordered_map<size_t, TimelineState> m_timelines`
-- Per-timeline state: TimelineState struct encapsulates timeline + all state variables
-- Ownership tracking: `SKSE::PluginHandle ownerPluginHandle` per timeline
-- Active timeline: `std::atomic<size_t> m_activeTimelineID` (exclusive enforcement)
-- API functions: All require `timelineID` + `modName`/`pluginHandle` parameters
-
-**Key Migrations Completed:**
-
-1. **Update() Loop** - ✅ COMPLETE
+1. **Update() Loop:**
    - Gets active timeline ID from `m_activeTimelineID`
-   - Fetches `TimelineState*` via direct map access (no ownership check needed)
-   - Passes state to Play/Record/Draw helpers
+   - Fetches `TimelineState*` via direct map access (internal operation, no ownership check)
+   - Passes state pointer to Play/Record helper functions
 
-2. **Camera State Management** - ✅ COMPLETE
-   - Only ONE timeline can be active (recording OR playing)
+2. **Camera State Management:**
+   - Only ONE timeline can be active (recording OR playing) at any time
    - Enforced via `m_activeTimelineID` (atomic, thread-safe)
-   - PlayTimeline() checks `state->isPlaybackRunning`
+   - PlayTimeline() checks `state->isPlaybackRunning` to distinguish from recording
 
-3. **User Rotation Offset** - ✅ COMPLETE
-   - Per-timeline: `state->rotationOffset` in TimelineState
-   - Hooks pass timelineID: `SetUserTurning(timelineID, true)`
+3. **User Rotation Handling:**
+   - Per-timeline rotation offset: `state->rotationOffset` in TimelineState
+   - Hooks pass timelineID to SetUserTurning(timelineID, true)
+   - Allows user to look around during playback while maintaining timeline-relative rotation
 
-4. **Playback State Restoration** - ✅ COMPLETE
+4. **Playback State Restoration:**
    - Per-timeline snapshots: `state->lastFreeRotation`, `state->isShowingMenus`
-   - Restored on StopPlayback(timelineID, pluginHandle)
+   - Restored on StopPlayback(timelineID, pluginHandle) to return to pre-playback state
 
-5. **Point Baking** - ✅ COMPLETE
-   - Per-timeline: `UpdateCameraPoints(TimelineState* state)`
-   - Called on StartPlayback(timelineID, ...) for that timeline only
+5. **Point Baking (kCamera type):**
+   - Per-timeline: `UpdateCameraPoints(TimelineState* state)` bakes kCamera points to world coordinates
+   - Called on StartPlayback(timelineID, ...) before playback begins
+   - Ensures consistent camera-relative positions throughout playback
 
-6. **API Surface** - ✅ COMPLETE
-   - All 20 functions migrated with `timelineID` + `modName`/`pluginHandle` parameters
-   - Return bool/int instead of void for error handling
+6. **API Design:**
+   - All functions use `timelineID` + `modName`/`pluginHandle` parameters
+   - Return bool/int for error handling (not void)
    - Papyrus: modName (string) converted to pluginHandle via ModNameToHandle()
-   - C++ Mod API: Direct pluginHandle parameter
+   - C++ Mod API: Direct pluginHandle parameter from SKSE::GetPluginHandle()
 
-7. **Import/Export** - ✅ COMPLETE
+7. **File Operations:**
    - AddTimelineFromFile(timelineID, pluginHandle, filePath, timeOffset)
    - ExportTimeline(timelineID, pluginHandle, filePath)
-   - Timeline ownership tracked via pluginHandle
+   - Ownership validated before all file I/O operations
 
-8. **Ownership Validation** - ✅ COMPLETE
+8. **Ownership Validation Pattern:**
    - Helper function: `GetTimeline(timelineID, pluginHandle)` validates ownership
-   - Returns `nullptr` if timeline doesn't exist or pluginHandle mismatch
-   - All public API functions validate before operations
-
-**Bug Fixes Post-Migration:**
-- ✅ Fixed: AddTimelineFromFile missing pluginHandle parameter in C++ API
-- ✅ Fixed: ModAPI.h abstract class error (5 missing function declarations)
-- ✅ Fixed: Hook movement controls blocked during recording (now check IsPlaybackRunning())
-
-**Phase 4 Cleanup (January 2, 2026):**
-- ✅ Removed: Old `RecordTimeline()` function (no parameters version)
-- ✅ Removed: Old `DrawTimeline()` function (no parameters version)
-- ✅ Removed: Old `GetTimelineDuration()` function
-- ✅ Removed: Old `AddTranslationPoint(const TranslationPoint&)` helper
-- ✅ Removed: Old `AddRotationPoint(const RotationPoint&)` helper
-- ✅ Added: Missing `m_recordingInterval` member variable to TimelineManager
-- ✅ Verified: All member variables correctly categorized as global vs per-timeline
-
-**Reference Documents:**
-- TASK_MULTI_TIMELINE_SUPPORT.md: Design specification
-- PHASE4_FUNCTION_MIGRATION.md: Migration guide with all 20 functions
+   - Returns `nullptr` if timeline doesn't exist OR pluginHandle mismatch
+   - All public API functions call this validator before operations
+   - Internal overloads (no pluginHandle) available for FCFW-internal operations (hooks, Update loop)
 
 ---
 
-## **8. Known Limitations & Unimplemented Features**
-
-### **Implemented & Verified:**
-- ✅ **GetTargetPoint()** - Returns head bone's `NiAVObject` (world transform) via `NiAVObject_LookupBoneNodeByName`
-- ✅ **SetHUDMenuVisible()** - Controls TrueHUD menu visibility via `uiMovie->SetVisible()`
-- ✅ **ModAPI.cpp** - Simple pass-through to TimelineManager (converts `int` → `InterpolationMode`)
-- ✅ **Offsets.h** - Defines `NiAVObject_LookupBoneNodeByName` (RELOCATION_ID 74481/76207, from True Directional Movement)
-
-### **Known Limitations:**
+## **8. Known Limitations**
 - ⚠️ **Reference Deletion Safety:** No validation if `m_reference` becomes invalid during playback (dangling pointer risk)
   - `GetPoint()` will crash if reference deleted
   - No RefHandle tracking or validity checks
@@ -1755,7 +1677,6 @@ SetHUDMenuVisible(visible)
 - SimpleIni (INI parsing with comment support)
 
 **Optional:**
-- TrueHUD API v3 (for DrawTimeline visualization)
 - po3's Tweaks (for reliable EditorID in exports)
 
 **Build Tools:**

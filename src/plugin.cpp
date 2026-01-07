@@ -1,6 +1,4 @@
 #include "Hooks.h"
-#include "ControlsManager.h"
-#include "APIManager.h"
 #include "TimelineManager.h"
 #include "ModAPI.h"
 #include "CameraTypes.h"
@@ -68,7 +66,8 @@ namespace FCFW {
                 return -1;
             }
 
-            return FCFW::TimelineManager::GetSingleton().AddTranslationPoint(static_cast<size_t>(a_timelineID), handle, a_time, a_posX, a_posY, a_posZ, a_easeIn, a_easeOut, ToInterpolationMode(a_interpolationMode));
+            RE::NiPoint3 position(a_posX, a_posY, a_posZ);
+            return FCFW::TimelineManager::GetSingleton().AddTranslationPoint(handle, static_cast<size_t>(a_timelineID), a_time, position, a_easeIn, a_easeOut, ToInterpolationMode(a_interpolationMode));
         }
 
         int AddTranslationPointAtRef(RE::StaticFunctionTag*, RE::BSFixedString a_modName, int a_timelineID, float a_time, RE::TESObjectREFR* a_reference, float a_offsetX, float a_offsetY, float a_offsetZ, bool a_isOffsetRelative, bool a_easeIn, bool a_easeOut, int a_interpolationMode) {
@@ -82,7 +81,8 @@ namespace FCFW {
                 return -1;
             }
 
-            return FCFW::TimelineManager::GetSingleton().AddTranslationPointAtRef(static_cast<size_t>(a_timelineID), handle, a_time, a_reference, a_offsetX, a_offsetY, a_offsetZ, a_isOffsetRelative, a_easeIn, a_easeOut, ToInterpolationMode(a_interpolationMode));
+            RE::NiPoint3 offset(a_offsetX, a_offsetY, a_offsetZ);
+            return FCFW::TimelineManager::GetSingleton().AddTranslationPointAtRef(handle, static_cast<size_t>(a_timelineID), a_time, a_reference, offset, a_isOffsetRelative, a_easeIn, a_easeOut, ToInterpolationMode(a_interpolationMode));
         }
 
         int AddRotationPointAtCamera(RE::StaticFunctionTag*, RE::BSFixedString a_modName, int a_timelineID, float a_time, bool a_easeIn, bool a_easeOut, int a_interpolationMode) {
@@ -110,7 +110,8 @@ namespace FCFW {
                 return -1;
             }
 
-            return FCFW::TimelineManager::GetSingleton().AddRotationPoint(static_cast<size_t>(a_timelineID), handle, a_time, a_pitch, a_yaw, a_easeIn, a_easeOut, ToInterpolationMode(a_interpolationMode));
+            RE::BSTPoint2<float> rotation{a_pitch, a_yaw};
+            return FCFW::TimelineManager::GetSingleton().AddRotationPoint(handle, static_cast<size_t>(a_timelineID), a_time, rotation, a_easeIn, a_easeOut, ToInterpolationMode(a_interpolationMode));
         }
 
         int AddRotationPointAtRef(RE::StaticFunctionTag*, RE::BSFixedString a_modName, int a_timelineID, float a_time, RE::TESObjectREFR* a_reference, float a_offsetPitch, float a_offsetYaw, bool a_isOffsetRelative, bool a_easeIn, bool a_easeOut, int a_interpolationMode) {
@@ -124,7 +125,8 @@ namespace FCFW {
                 return -1;
             }
 
-            return FCFW::TimelineManager::GetSingleton().AddRotationPointAtRef(static_cast<size_t>(a_timelineID), handle, a_time, a_reference, a_offsetPitch, a_offsetYaw, a_isOffsetRelative, a_easeIn, a_easeOut, ToInterpolationMode(a_interpolationMode));
+            RE::BSTPoint2<float> offset{a_offsetPitch, a_offsetYaw};
+            return FCFW::TimelineManager::GetSingleton().AddRotationPointAtRef(handle, static_cast<size_t>(a_timelineID), a_time, a_reference, offset, a_isOffsetRelative, a_easeIn, a_easeOut, ToInterpolationMode(a_interpolationMode));
         }
 
         bool StartRecording(RE::StaticFunctionTag*, RE::BSFixedString a_modName, int a_timelineID) {
@@ -223,6 +225,81 @@ namespace FCFW {
             }
             
             return FCFW::TimelineManager::GetSingleton().GetRotationPointCount(handle, static_cast<size_t>(a_timelineID));
+        }
+
+        float GetTranslationPointX(RE::StaticFunctionTag*, RE::BSFixedString a_modName, int a_timelineID, int a_index) {
+            if (a_modName.empty() || a_timelineID <= 0 || a_index < 0) {
+                return 0.0f;
+            }
+
+            SKSE::PluginHandle handle = FCFW::ModNameToHandle(a_modName.c_str());
+            if (handle == 0) {
+                log::error("{}: Invalid mod name '{}' - mod not loaded or doesn't exist", __FUNCTION__, a_modName.c_str());
+                return 0.0f;
+            }
+
+            RE::NiPoint3 point = FCFW::TimelineManager::GetSingleton().GetTranslationPoint(handle, static_cast<size_t>(a_timelineID), static_cast<size_t>(a_index));
+            return point.x;
+        }
+
+        float GetTranslationPointY(RE::StaticFunctionTag*, RE::BSFixedString a_modName, int a_timelineID, int a_index) {
+            if (a_modName.empty() || a_timelineID <= 0 || a_index < 0) {
+                return 0.0f;
+            }
+
+            SKSE::PluginHandle handle = FCFW::ModNameToHandle(a_modName.c_str());
+            if (handle == 0) {
+                log::error("{}: Invalid mod name '{}' - mod not loaded or doesn't exist", __FUNCTION__, a_modName.c_str());
+                return 0.0f;
+            }
+
+            RE::NiPoint3 point = FCFW::TimelineManager::GetSingleton().GetTranslationPoint(handle, static_cast<size_t>(a_timelineID), static_cast<size_t>(a_index));
+            return point.y;
+        }
+
+        float GetTranslationPointZ(RE::StaticFunctionTag*, RE::BSFixedString a_modName, int a_timelineID, int a_index) {
+            if (a_modName.empty() || a_timelineID <= 0 || a_index < 0) {
+                return 0.0f;
+            }
+
+            SKSE::PluginHandle handle = FCFW::ModNameToHandle(a_modName.c_str());
+            if (handle == 0) {
+                log::error("{}: Invalid mod name '{}' - mod not loaded or doesn't exist", __FUNCTION__, a_modName.c_str());
+                return 0.0f;
+            }
+
+            RE::NiPoint3 point = FCFW::TimelineManager::GetSingleton().GetTranslationPoint(handle, static_cast<size_t>(a_timelineID), static_cast<size_t>(a_index));
+            return point.z;
+        }
+
+        float GetRotationPointPitch(RE::StaticFunctionTag*, RE::BSFixedString a_modName, int a_timelineID, int a_index) {
+            if (a_modName.empty() || a_timelineID <= 0 || a_index < 0) {
+                return 0.0f;
+            }
+
+            SKSE::PluginHandle handle = FCFW::ModNameToHandle(a_modName.c_str());
+            if (handle == 0) {
+                log::error("{}: Invalid mod name '{}' - mod not loaded or doesn't exist", __FUNCTION__, a_modName.c_str());
+                return 0.0f;
+            }
+
+            RE::BSTPoint2<float> point = FCFW::TimelineManager::GetSingleton().GetRotationPoint(handle, static_cast<size_t>(a_timelineID), static_cast<size_t>(a_index));
+            return point.x;
+        }
+
+        float GetRotationPointYaw(RE::StaticFunctionTag*, RE::BSFixedString a_modName, int a_timelineID, int a_index) {
+            if (a_modName.empty() || a_timelineID <= 0 || a_index < 0) {
+                return 0.0f;
+            }
+
+            SKSE::PluginHandle handle = FCFW::ModNameToHandle(a_modName.c_str());
+            if (handle == 0) {
+                log::error("{}: Invalid mod name '{}' - mod not loaded or doesn't exist", __FUNCTION__, a_modName.c_str());
+                return 0.0f;
+            }
+
+            RE::BSTPoint2<float> point = FCFW::TimelineManager::GetSingleton().GetRotationPoint(handle, static_cast<size_t>(a_timelineID), static_cast<size_t>(a_index));
+            return point.y;
         }
 
         bool StartPlayback(RE::StaticFunctionTag*, RE::BSFixedString a_modName, int a_timelineID, float a_speed, bool a_globalEaseIn, bool a_globalEaseOut, bool a_useDuration, float a_duration) {
@@ -446,6 +523,11 @@ namespace FCFW {
             a_vm->RegisterFunction("FCFW_ClearTimeline", "FCFW_SKSEFunctions", ClearTimeline);
             a_vm->RegisterFunction("FCFW_GetTranslationPointCount", "FCFW_SKSEFunctions", GetTranslationPointCount);
             a_vm->RegisterFunction("FCFW_GetRotationPointCount", "FCFW_SKSEFunctions", GetRotationPointCount);
+            a_vm->RegisterFunction("FCFW_GetTranslationPointX", "FCFW_SKSEFunctions", GetTranslationPointX);
+            a_vm->RegisterFunction("FCFW_GetTranslationPointY", "FCFW_SKSEFunctions", GetTranslationPointY);
+            a_vm->RegisterFunction("FCFW_GetTranslationPointZ", "FCFW_SKSEFunctions", GetTranslationPointZ);
+            a_vm->RegisterFunction("FCFW_GetRotationPointPitch", "FCFW_SKSEFunctions", GetRotationPointPitch);
+            a_vm->RegisterFunction("FCFW_GetRotationPointYaw", "FCFW_SKSEFunctions", GetRotationPointYaw);
             a_vm->RegisterFunction("FCFW_StartPlayback", "FCFW_SKSEFunctions", StartPlayback);
             a_vm->RegisterFunction("FCFW_StopPlayback", "FCFW_SKSEFunctions", StopPlayback);
             a_vm->RegisterFunction("FCFW_SwitchPlayback", "FCFW_SKSEFunctions", SwitchPlayback);
@@ -467,34 +549,6 @@ namespace FCFW {
     } // namespace Interface
 } // namespace FCFW
 
-/******************************************************************************************/
-void MessageHandler(SKSE::MessagingInterface::Message* a_msg)
-{
-	// Try requesting APIs at multiple steps to try to work around the SKSE messaging bug
-	switch (a_msg->type) {
-	case SKSE::MessagingInterface::kDataLoaded:
-		APIs::RequestAPIs();
-		break;
-	case SKSE::MessagingInterface::kPostLoad:
-		APIs::RequestAPIs();
-		break;
-	case SKSE::MessagingInterface::kPostPostLoad:
-		APIs::RequestAPIs();
-		break;
-	case SKSE::MessagingInterface::kPreLoadGame:
-		break;
-	case SKSE::MessagingInterface::kPostLoadGame:
-	case SKSE::MessagingInterface::kNewGame:
-		APIs::RequestAPIs();
-        if (auto input = RE::BSInputDeviceManager::GetSingleton()) {
-            input->AddEventSink(&FCFW::ControlsManager::GetSingleton());
-        } else {
-                log::warn("{}: BSInputDeviceManager not available", __FUNCTION__);
-        }   
-		break;
-	}
-}
-/******************************************************************************************/
 SKSEPluginInfo(
     .Version = Plugin::VERSION,
     .Name = Plugin::NAME,
@@ -514,10 +568,6 @@ extern "C" DLLEXPORT bool SKSEAPI SKSEPlugin_Load(const SKSE::LoadInterface* sks
 	_ts_SKSEFunctions::InitializeLogging(static_cast<spdlog::level::level_enum>(logLevel));
 
     Init(skse);
-    auto messaging = SKSE::GetMessagingInterface();
-	if (!messaging->RegisterListener("SKSE", MessageHandler)) {
-		return false;
-	}
 
     if (!isLogLevelValid) {
         log::warn("{}: LogLevel in INI file is invalid. Defaulting to info level.", __FUNCTION__);

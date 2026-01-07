@@ -142,6 +142,41 @@ int Function FCFW_GetTranslationPointCount(string modName, int timelineID) globa
 ; Returns: number of rotation points, or -1 if timeline not found
 int Function FCFW_GetRotationPointCount(string modName, int timelineID) global native
 
+; Get the X coordinate of a translation point by index
+; modName: name of your mod's ESP/ESL file (e.g., "MyMod.esp")
+; timelineID: timeline ID to query
+; index: 0-based index of the point
+; Returns: X coordinate, or 0.0 if timeline not found or index out of range
+float Function FCFW_GetTranslationPointX(string modName, int timelineID, int index) global native
+
+; Get the Y coordinate of a translation point by index
+; modName: name of your mod's ESP/ESL file (e.g., "MyMod.esp")
+; timelineID: timeline ID to query
+; index: 0-based index of the point
+; Returns: Y coordinate, or 0.0 if timeline not found or index out of range
+float Function FCFW_GetTranslationPointY(string modName, int timelineID, int index) global native
+
+; Get the Z coordinate of a translation point by index
+; modName: name of your mod's ESP/ESL file (e.g., "MyMod.esp")
+; timelineID: timeline ID to query
+; index: 0-based index of the point
+; Returns: Z coordinate, or 0.0 if timeline not found or index out of range
+float Function FCFW_GetTranslationPointZ(string modName, int timelineID, int index) global native
+
+; Get the pitch (in radians) of a rotation point by index
+; modName: name of your mod's ESP/ESL file (e.g., "MyMod.esp")
+; timelineID: timeline ID to query
+; index: 0-based index of the point
+; Returns: pitch in radians, or 0.0 if timeline not found or index out of range
+float Function FCFW_GetRotationPointPitch(string modName, int timelineID, int index) global native
+
+; Get the yaw (in radians) of a rotation point by index
+; modName: name of your mod's ESP/ESL file (e.g., "MyMod.esp")
+; timelineID: timeline ID to query
+; index: 0-based index of the point
+; Returns: yaw in radians, or 0.0 if timeline not found or index out of range
+float Function FCFW_GetRotationPointYaw(string modName, int timelineID, int index) global native
+
 ; Start playback with advanced options
 ; speed: playback speed multiplier (only used if useDuration=false)
 ; useDuration: if true, plays timeline over duration seconds

@@ -82,14 +82,12 @@ namespace FCFW_API {
 		/// <param name="a_pluginHandle">Plugin handle of the calling plugin (use SKSE::GetPluginHandle())</param>
 		/// <param name="a_timelineID">Timeline ID to add the point to</param>
 		/// <param name="a_time">Time in seconds when this point occurs</param>
-		/// <param name="a_posX">X position coordinate</param>
-		/// <param name="a_posY">Y position coordinate</param>
-		/// <param name="a_posZ">Z position coordinate</param>
+		/// <param name="a_position">3D position coordinates (RE::NiPoint3)</param>
 		/// <param name="a_easeIn">Apply ease-in at the start of interpolation (default: false)</param>
 		/// <param name="a_easeOut">Apply ease-out at the end of interpolation (default: false)</param>
 		/// <param name="a_interpolationMode">Interpolation mode: 0=None, 1=Linear, 2=CubicHermite (default)</param>
 		/// <returns>Index of the added point, or -1 on failure</returns>
-		[[nodiscard]] virtual int AddTranslationPoint(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, float a_time, float a_posX, float a_posY, float a_posZ, bool a_easeIn = false, bool a_easeOut = false, int a_interpolationMode = 2) const noexcept = 0;
+		[[nodiscard]] virtual int AddTranslationPoint(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, float a_time, const RE::NiPoint3& a_position, bool a_easeIn = false, bool a_easeOut = false, int a_interpolationMode = 2) const noexcept = 0;
 
 		/// <summary>
 		/// Add a translation point to the camera timeline relative to a reference object.
@@ -100,15 +98,13 @@ namespace FCFW_API {
 		/// <param name="a_timelineID">Timeline ID to add the point to</param>
 		/// <param name="a_time">Time in seconds when this point occurs</param>
 		/// <param name="a_reference">The object reference to track</param>
-		/// <param name="a_offsetX">X offset from reference position (default: 0.0)</param>
-		/// <param name="a_offsetY">Y offset from reference position (default: 0.0)</param>
-		/// <param name="a_offsetZ">Z offset from reference position (default: 0.0)</param>
+		/// <param name="a_offset">3D offset from reference position (RE::NiPoint3, default: (0,0,0))</param>
 		/// <param name="a_isOffsetRelative">If true, offset is relative to reference's heading (local space), otherwise world space (default: false)</param>
 		/// <param name="a_easeIn">Apply ease-in at the start of interpolation (default: false)</param>
 		/// <param name="a_easeOut">Apply ease-out at the end of interpolation (default: false)</param>
 		/// <param name="a_interpolationMode">Interpolation mode: 0=None, 1=Linear, 2=CubicHermite (default)</param>
 		/// <returns>Index of the added point, or -1 on failure</returns>
-		[[nodiscard]] virtual int AddTranslationPointAtRef(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, float a_time, RE::TESObjectREFR* a_reference, float a_offsetX = 0.0f, float a_offsetY = 0.0f, float a_offsetZ = 0.0f, bool a_isOffsetRelative = false, bool a_easeIn = false, bool a_easeOut = false, int a_interpolationMode = 2) const noexcept = 0;
+		[[nodiscard]] virtual int AddTranslationPointAtRef(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, float a_time, RE::TESObjectREFR* a_reference, const RE::NiPoint3& a_offset = RE::NiPoint3(), bool a_isOffsetRelative = false, bool a_easeIn = false, bool a_easeOut = false, int a_interpolationMode = 2) const noexcept = 0;
 
 		/// <summary>
 		/// Add a translation point that captures camera position at the start of playback.
@@ -129,33 +125,31 @@ namespace FCFW_API {
         /// <param name="a_pluginHandle">Plugin handle of the calling plugin (use SKSE::GetPluginHandle())</param>
         /// <param name="a_timelineID">Timeline ID to add the point to</param>
         /// <param name="a_time">Time in seconds when this point occurs</param>
-        /// <param name="a_pitch">Pitch rotation in radians (relative to world coordinates)</param>
-        /// <param name="a_yaw">Yaw rotation in radians (relative to world coordinates)</param>
+        /// <param name="a_rotation">Rotation in radians as RE::BSTPoint2&lt;float&gt; (x=pitch, y=yaw relative to world coordinates)</param>
         /// <param name="a_easeIn">Apply ease-in at the start of interpolation (default: false)</param>
         /// <param name="a_easeOut">Apply ease-out at the end of interpolation (default: false)</param>
         /// <param name="a_interpolationMode">Interpolation mode: 0=None, 1=Linear, 2=CubicHermite (default)</param>
         /// <returns>Index of the added point, or -1 on failure</returns>
-        [[nodiscard]] virtual int AddRotationPoint(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, float a_time, float a_pitch, float a_yaw, bool a_easeIn = false, bool a_easeOut = false, int a_interpolationMode = 2) const noexcept = 0;
+        [[nodiscard]] virtual int AddRotationPoint(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, float a_time, const RE::BSTPoint2<float>& a_rotation, bool a_easeIn = false, bool a_easeOut = false, int a_interpolationMode = 2) const noexcept = 0;
 		
 		/// <summary>
 		/// Add a rotation point that sets the rotation relative to camera-to-reference direction, or alternatively the ref's heading
 		/// </summary>
-        /// <param name="a_pluginHandle">Plugin handle of the calling plugin (use SKSE::GetPluginHandle())</param>
-        /// <param name="a_timelineID">Timeline ID to add the point to</param>
+		/// <param name="a_pluginHandle">Plugin handle of the calling plugin (use SKSE::GetPluginHandle())</param>
+		/// <param name="a_timelineID">Timeline ID to add the point to</param>
 		/// <param name="a_time">Time in seconds when this point occurs</param>
 		/// <param name="a_reference">The object reference to track</param>
-		/// <param name="a_offsetPitch">Pitch offset from camera-to-reference direction (a_isOffsetRelative == false) / the ref's heading (a_isOffsetRelative == true)</param>
-		/// <param name="a_offsetYaw">a_isOffsetRelative == false - yaw offset from camera-to-reference direction. A value of 0 means looking directly at the reference.
-		///            a_isOffsetRelative == true - yaw offset from reference's heading. A value of 0 means looking into the direction the ref is heading.</param>
-		/// <param name="a_isOffsetRelative">If true, offset is relative to reference's heading instead of camera-to-reference direction.</param>
-		/// <param name="a_easeIn">Ease in at the start of interpolation</param>
-		/// <param name="a_easeOut">Ease out at the end of interpolation</param>
+		/// <param name="a_offset">Rotation offset as RE::BSTPoint2&lt;float&gt; (x=pitch, y=yaw in radians). Meaning depends on a_isOffsetRelative:
+		///            a_isOffsetRelative == false - offset from camera-to-reference direction (0,0 means looking directly at reference)
+		///            a_isOffsetRelative == true - offset from reference's heading (0,0 means looking in direction ref is facing)</param>
+		/// <param name="a_isOffsetRelative">If true, offset is relative to reference's heading instead of camera-to-reference direction (default: false)</param>
+		/// <param name="a_easeIn">Ease in at the start of interpolation (default: false)</param>
+		/// <param name="a_easeOut">Ease out at the end of interpolation (default: false)</param>
 		/// <param name="a_interpolationMode">0=None, 1=Linear, 2=CubicHermite (default)</param>
 		/// <returns> Index of the added point on success, -1 on failure</returns>
-		[[nodiscard]] virtual int AddRotationPointAtRef(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, float a_time, RE::TESObjectREFR* a_reference, float a_offsetPitch, float a_offsetYaw, bool a_isOffsetRelative = false, bool a_easeIn = false, bool a_easeOut = false, int a_interpolationMode = 2) const noexcept = 0;
+		[[nodiscard]] virtual int AddRotationPointAtRef(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, float a_time, RE::TESObjectREFR* a_reference, const RE::BSTPoint2<float>& a_offset = RE::BSTPoint2<float>(), bool a_isOffsetRelative = false, bool a_easeIn = false, bool a_easeOut = false, int a_interpolationMode = 2) const noexcept = 0;        /// <summary>
 
-        /// <summary>
-        /// Add a rotation point that captures camera rotation at the start of playback.
+		/// Add a rotation point that captures camera rotation at the start of playback.
         /// This point can be used to start playback smoothly from the last camera rotation, and return to it later.
         /// </summary>
         /// <param name="a_pluginHandle">Plugin handle of the calling plugin (use SKSE::GetPluginHandle())</param>
@@ -228,6 +222,27 @@ namespace FCFW_API {
 		[[nodiscard]] virtual int GetRotationPointCount(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID) const noexcept = 0;
 
 		/// <summary>
+		/// Get the position of a translation point by index.
+		/// Returns the baked world position of the point (kWorld/kCamera points return absolute position,
+		/// kReference points are not evaluated - use during playback to get dynamic positions).
+		/// </summary>
+		/// <param name="a_pluginHandle">Plugin handle for ownership validation</param>
+		/// <param name="a_timelineID">Timeline ID to query</param>
+		/// <param name="a_index">Index of the translation point (0-based)</param>
+		/// <returns>RE::NiPoint3 with position coordinates, or (0,0,0) if timeline not found/owned or index out of range</returns>
+		[[nodiscard]] virtual RE::NiPoint3 GetTranslationPoint(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, size_t a_index) const noexcept = 0;
+
+		/// <summary>
+		/// Get the rotation of a rotation point by index.
+		/// Returns the rotation as pitch (x) and yaw (y) in radians.
+		/// </summary>
+		/// <param name="a_pluginHandle">Plugin handle for ownership validation</param>
+		/// <param name="a_timelineID">Timeline ID to query</param>
+		/// <param name="a_index">Index of the rotation point (0-based)</param>
+		/// <returns>RE::BSTPoint2&lt;float&gt; with rotation (x=pitch, y=yaw in radians), or (0,0) if timeline not found/owned or index out of range</returns>
+		[[nodiscard]] virtual RE::BSTPoint2<float> GetRotationPoint(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, size_t a_index) const noexcept = 0;
+
+		/// <summary>
 		/// Start playing the camera timeline.
 		/// If a_useDuration is true: 
         ///     plays complete timeline with total time a_duration seconds
@@ -242,7 +257,7 @@ namespace FCFW_API {
 		/// <param name="a_globalEaseOut">Apply ease-out at the end of entire playback (default: false)</param>
 		/// <param name="a_useDuration">If true, plays complete timeline with total time a_duration seconds; if false, uses a_speed multiplier (default: false)</param>
 		/// <param name="a_duration">Total duration in seconds for entire timeline, only used if a_useDuration is true (default: 0.0)</param>
-		virtual bool StartPlayback(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, float a_speed = 1.0f, bool a_globalEaseIn = false, bool a_globalEaseOut = false, bool a_useDuration = false, float a_duration = 0.0f) const noexcept = 0;
+		[[nodiscard]] virtual bool StartPlayback(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, float a_speed = 1.0f, bool a_globalEaseIn = false, bool a_globalEaseOut = false, bool a_useDuration = false, float a_duration = 0.0f) const noexcept = 0;
 
 		/// <summary>
 		/// Stop playback of a camera timeline.
