@@ -65,9 +65,9 @@ target_link_libraries(${PROJECT_NAME} PRIVATE spdlog::spdlog)
 # Link to CommonLibSSE (adjust the library name if needed)
 target_link_libraries(${PROJECT_NAME} PRIVATE CommonLibSSE::CommonLibSSE)
 
-# Include inih for .ini files
-find_path(SIMPLEINI_INCLUDE_DIRS "ConvertUTF.c")
-target_include_directories(${PROJECT_NAME} PUBLIC ${SIMPLEINI_INCLUDE_DIRS})
+# Link yaml-cpp for YAML timeline format
+find_package(yaml-cpp CONFIG REQUIRED)
+target_link_libraries(${PROJECT_NAME} PRIVATE yaml-cpp)
 
 # When your SKSE .dll is compiled, this will automatically copy the .dll into your mods folder.
 # Only works if you configure DEPLOY_ROOT above (or set the SKYRIM_MODS_FOLDER environment variable)

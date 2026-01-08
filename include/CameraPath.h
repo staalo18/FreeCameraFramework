@@ -293,6 +293,13 @@ namespace FCFW {
     template<typename TransitionPoint>
     class CameraPath {
     public:
+        // Friend declarations for YAML template helpers
+        template<typename PointType, typename PathType>
+        friend bool ImportPathFromYAML(PathType* path, const std::string& a_filePath, float a_timeOffset, float a_conversionFactor);
+        
+        template<typename PointType, typename PathType>
+        friend bool ExportPathToYAML(const PathType* path, std::ofstream& a_file, float a_conversionFactor);
+        
         virtual ~CameraPath() = default;
                 
         size_t AddPoint(const TransitionPoint& a_point) {
@@ -346,8 +353,6 @@ namespace FCFW {
             }
         }
 
-        virtual bool AddPathFromFile(std::ifstream& a_file, float a_timeOffset = 0.0f, float a_conversionFactor = 1.0f) = 0;
-        virtual bool ExportPath(std::ofstream& a_file, float a_conversionFactor = 1.0f) const = 0;
         virtual TransitionPoint GetPointAtCamera(float a_time, bool a_easeIn, bool a_easeOut) const = 0;
         
     protected:
@@ -360,8 +365,9 @@ namespace FCFW {
         using ValueType = RE::NiPoint3;  // Type returned by GetPoint()
         
         TranslationPoint GetPointAtCamera(float a_time, bool a_easeIn, bool a_easeOut) const override;
-        bool AddPathFromFile(std::ifstream& a_file, float a_timeOffset = 0.0f, float a_conversionFactor = 1.0f) override;
-        bool ExportPath(std::ofstream& a_file, float a_conversionFactor = 1.0f) const override;
+        
+        bool AddPathFromFile(const std::string& a_filePath, float a_timeOffset = 0.0f, float a_conversionFactor = 1.0f);
+        bool ExportPath(std::ofstream& a_file, float a_conversionFactor = 1.0f) const;
     };
 
     class RotationPath : public CameraPath<RotationPoint> {
@@ -370,8 +376,9 @@ namespace FCFW {
         using ValueType = RE::BSTPoint2<float>;  // Type returned by GetPoint()
         
         RotationPoint GetPointAtCamera(float a_time, bool a_easeIn, bool a_easeOut) const override;
-        bool AddPathFromFile(std::ifstream& a_file, float a_timeOffset = 0.0f, float a_conversionFactor = 1.0f) override;
-        bool ExportPath(std::ofstream& a_file, float a_conversionFactor = 1.0f) const override;
+        
+        bool AddPathFromFile(const std::string& a_filePath, float a_timeOffset = 0.0f, float a_conversionFactor = 1.0f);
+        bool ExportPath(std::ofstream& a_file, float a_conversionFactor = 1.0f) const;
     };
 
 } // namespace FCFW

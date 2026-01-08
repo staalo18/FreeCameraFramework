@@ -1,5 +1,6 @@
 #include "TimelineManager.h"
 #include "FCFW_Utils.h"
+#include <yaml-cpp/yaml.h>
 
 namespace FCFW {
 
@@ -178,10 +179,6 @@ log::info("{}: Sent Papyrus event '{}' for timeline {} to {} receivers", __FUNCT
             log::warn("{}: Not in free camera mode", __FUNCTION__);
         }
 
-        // Leave free camera mode
-        playerCamera->ToggleFreeCameraMode(false);
-        
-        // Add final point
         RE::NiPoint3 cameraPos = _ts_SKSEFunctions::GetCameraPos();
         RE::NiPoint3 cameraRot = _ts_SKSEFunctions::GetCameraRotation();
         
@@ -192,6 +189,8 @@ log::info("{}: Sent Papyrus event '{}' for timeline {} to {} receivers", __FUNCT
         Transition transRotation(state->m_currentRecordingTime, InterpolationMode::kCubicHermite, false, true);
         RotationPoint rotationPoint(transRotation, PointType::kWorld, RE::BSTPoint2<float>({cameraRot.x, cameraRot.z}));
         state->m_timeline.AddRotationPoint(rotationPoint);
+        
+        playerCamera->ToggleFreeCameraMode(false);
         
         // Clear recording state
         m_activeTimelineID = 0;
@@ -474,6 +473,14 @@ log::info("{}: Sent Papyrus event '{}' for timeline {} to {} receivers", __FUNCT
         }
         
         state->m_timeline.ClearPoints();
+        
+        // Reset timeline metadata to defaults
+        state->m_timeline.SetLoopTimeOffset(0.0f);
+        state->m_timeline.SetPlaybackMode(PlaybackMode::kEnd);
+        state->m_globalEaseIn = false;
+        state->m_globalEaseOut = false;
+        state->m_showMenusDuringPlayback = false;
+        state->m_allowUserRotation = false;
         
         return true;
     }
@@ -929,66 +936,69 @@ log::info("{}: Sent Papyrus event '{}' for timeline {} to {} receivers", __FUNCT
             return false;
         }
         
-        // Read General section
-        long fileVersion = _ts_SKSEFunctions::GetValueFromINI(nullptr, 0, "Version:General", a_filePath, 0L);
-        bool useDegrees = _ts_SKSEFunctions::GetValueFromINI(nullptr, 0, "UseDegrees:General", a_filePath, true);
-        long playbackModeValue = _ts_SKSEFunctions::GetValueFromINI(nullptr, 0, "PlaybackMode:General", a_filePath, 0L);  // Default to kEnd
-        float loopTimeOffset = static_cast<float>(_ts_SKSEFunctions::GetValueFromINI(nullptr, 0, "LoopTimeOffset:General", a_filePath, 0.0));  // Default to 0.0
+log::info("{}: Loading timeline from YAML file: {}", __FUNCTION__, a_filePath);
         
-        float degToRad = useDegrees ? (PI / 180.0f) : 1.0f;
-        PlaybackMode playbackMode = (playbackModeValue == 1) ? PlaybackMode::kLoop : PlaybackMode::kEnd;
+        YAML::Node root = YAML::LoadFile(fullPath.string());
         
-        // Calculate current plugin version
-        long pluginVersion = static_cast<long>(Plugin::VERSION[0]) * 10000 + 
-                            static_cast<long>(Plugin::VERSION[1]) * 100 + 
-                            static_cast<long>(Plugin::VERSION[2]);
-        
-        if (fileVersion != pluginVersion) {
-            log::info("{}: Importing timeline from {} - File version {} differs from plugin version {}", 
-                     __FUNCTION__, a_filePath, fileVersion, pluginVersion);
+        if (root["playbackMode"]) {
+            std::string modeStr = root["playbackMode"].as<std::string>();
+            PlaybackMode mode = StringToPlaybackMode(modeStr);
+            state->m_timeline.SetPlaybackMode(mode);
         }
-              
-        std::ifstream file(fullPath);
-        if (!file.is_open()) {
-            log::error("{}: Failed to open file for reading: {}", __FUNCTION__, fullPath.string());
-            return false;
+        
+        if (root["loopTimeOffset"]) {
+            float offset = root["loopTimeOffset"].as<float>();
+            state->m_timeline.SetLoopTimeOffset(offset);
+        }
+        
+        if (root["globalEaseIn"]) {
+            bool easeIn = root["globalEaseIn"].as<bool>();
+            state->m_globalEaseIn = easeIn;
+        }
+        
+        if (root["globalEaseOut"]) {
+            bool easeOut = root["globalEaseOut"].as<bool>();
+            state->m_globalEaseOut = easeOut;
+        }
+        
+        if (root["showMenusDuringPlayback"]) {
+            bool showMenus = root["showMenusDuringPlayback"].as<bool>();
+            state->m_showMenusDuringPlayback = showMenus;
+        }
+        
+        if (root["allowUserRotation"]) {
+            bool allowRotation = root["allowUserRotation"].as<bool>();
+            state->m_allowUserRotation = allowRotation;
+        }
+        
+        float rotationConversionFactor = 1.0f;  // Default: radians (no conversion)
+        
+        if (root["useDegrees"]) {
+            bool useDegrees = root["useDegrees"].as<bool>();
+            if (useDegrees) {
+                rotationConversionFactor = PI / 180.0f;  // Convert degrees to radians
+            }
         }
         
         size_t translationPointCount = state->m_timeline.GetTranslationPointCount();
         size_t rotationPointCount = state->m_timeline.GetRotationPointCount();
-
-        bool importTranslationSuccess = state->m_timeline.AddTranslationPathFromFile(file, a_timeOffset, 1.0f);
         
-        // Rewind file to beginning for rotation import
-        file.clear();  // Clear any error flags
-        file.seekg(0, std::ios::beg);
-        if (!file.good()) {
-            log::error("{}: Failed to rewind file: {}", __FUNCTION__, fullPath.string());
-            file.close();
-            return false;
-        }
-        
-        bool importRotationSuccess = state->m_timeline.AddRotationPathFromFile(file, a_timeOffset, degToRad);
-        
-        // Set playback mode and offset on timeline
-        state->m_timeline.SetPlaybackMode(playbackMode);
-        state->m_timeline.SetLoopTimeOffset(loopTimeOffset);
-        
-        file.close();
+        bool importTranslationSuccess = state->m_timeline.AddTranslationPathFromFile(fullPath.string(), a_timeOffset);
+        bool importRotationSuccess = state->m_timeline.AddRotationPathFromFile(fullPath.string(), a_timeOffset, rotationConversionFactor);
         
         if (!importTranslationSuccess) {
-            log::error("{}: Failed to import translation points from {}", __FUNCTION__, a_filePath);
+            log::error("{}: Failed to import translation points from YAML file: {}", __FUNCTION__, a_filePath);
             return false;
         }
         
         if (!importRotationSuccess) {
-            log::error("{}: Failed to import rotation points from {}", __FUNCTION__, a_filePath);
+            log::error("{}: Failed to import rotation points from YAML file: {}", __FUNCTION__, a_filePath);
             return false;
         }
-
-        log::info("{}: Loaded {} translation and {} rotation points from {} to timeline {}", 
-                  __FUNCTION__, state->m_timeline.GetTranslationPointCount() - translationPointCount, 
-                  state->m_timeline.GetRotationPointCount() - rotationPointCount, a_filePath, a_timelineID);
+        
+log::info("{}: Loaded {} translation and {} rotation points from {} to timeline {}", 
+__FUNCTION__, state->m_timeline.GetTranslationPointCount() - translationPointCount, 
+state->m_timeline.GetRotationPointCount() - rotationPointCount, a_filePath, a_timelineID);
 
         return true;
     }
@@ -1001,53 +1011,42 @@ log::info("{}: Sent Papyrus event '{}' for timeline {} to {} receivers", __FUNCT
             return false;
         }
         
-        // Convert relative path to absolute path from Data folder
         std::filesystem::path fullPath = std::filesystem::current_path() / "Data" / a_filePath;
         
-        std::ofstream file(fullPath);
-        if (!file.is_open()) {
-            log::error("{}: Failed to open file for writing: {}", __FUNCTION__, fullPath.string());
-            return false;
-        }
-        
-        // Write General section
-        // Encode version as: major * 10000 + minor * 100 + patch
-        int versionInt = static_cast<int>(Plugin::VERSION[0]) * 10000 + 
-                         static_cast<int>(Plugin::VERSION[1]) * 100 + 
-                         static_cast<int>(Plugin::VERSION[2]);
-        file << "[General]\n";
-        file << "Version=" << versionInt << "\n";
-        file << "UseDegrees=1\n";
-        
-        // Get playback mode and offset from timeline
-        int playbackModeInt = static_cast<int>(state->m_timeline.GetPlaybackMode());
-        float loopTimeOffset = state->m_timeline.GetLoopTimeOffset();
-        file << "PlaybackMode=" << playbackModeInt << "\n";
-        file << "LoopTimeOffset=" << loopTimeOffset << "\n";
-        file << "\n";
-        
-        float radToDeg = 180.0f / PI;
-
-        bool exportTranslationSuccess = state->m_timeline.ExportTranslationPath(file, 1.0f);
-        bool exportRotationSuccess = state->m_timeline.ExportRotationPath(file, radToDeg);
-                
-        file.close();
-
-        if (!exportTranslationSuccess || !exportRotationSuccess) {
-            log::error("{}: Failed to export points to {}", __FUNCTION__, a_filePath);
-            return false;
-        }
-                
-        if (!file.good()) {
-            log::error("{}: Error occurred while writing file: {}", __FUNCTION__, a_filePath);
-            return false;
-        }
-        
-        log::info("{}: Exported {} translation and {} rotation points from timeline {} to {}", 
-                  __FUNCTION__, state->m_timeline.GetTranslationPointCount(), 
-                  state->m_timeline.GetRotationPointCount(),
-                  a_timelineID,
-                  a_filePath);
+		log::info("{}: Exporting timeline to YAML file: {}", __FUNCTION__, a_filePath);
+		
+		std::ofstream file(fullPath);
+		if (!file.is_open()) {
+			log::error("{}: Failed to open file for writing: {}", __FUNCTION__, fullPath.string());
+			return false;
+		}
+		
+		file << "# FreeCameraFramework Timeline (YAML format)\n";
+		file << "formatVersion: 1\n\n";
+		
+    	file << "playbackMode: " << PlaybackModeToString(state->m_timeline.GetPlaybackMode()) << "  # end, loop, or wait\n";
+    	file << "loopTimeOffset: " << state->m_timeline.GetLoopTimeOffset() << "\n";
+    	file << "globalEaseIn: " << (state->m_globalEaseIn ? "true" : "false") << "\n";
+    	file << "globalEaseOut: " << (state->m_globalEaseOut ? "true" : "false") << "\n";
+		file << "showMenusDuringPlayback: " << (state->m_showMenusDuringPlayback ? "true" : "false") << "\n";
+		file << "allowUserRotation: " << (state->m_allowUserRotation ? "true" : "false") << "\n";
+		file << "useDegrees: true\n\n";
+		
+		// Export both translation and rotation paths to same file
+		bool exportTranslationSuccess = state->m_timeline.ExportTranslationPath(file);
+		file << "\n";  // Separate the two sections
+		bool exportRotationSuccess = state->m_timeline.ExportRotationPath(file, 180.0f / PI);
+		
+		file.close();
+		
+		if (!exportTranslationSuccess || !exportRotationSuccess) {
+			log::error("{}: Failed to export timeline to YAML file: {}", __FUNCTION__, a_filePath);
+			return false;
+		}
+		
+log::info("{}: Exported {} translation and {} rotation points from timeline {} to {}", 
+__FUNCTION__, state->m_timeline.GetTranslationPointCount(), 
+state->m_timeline.GetRotationPointCount(), a_timelineID, a_filePath);
         return true;
     }
 

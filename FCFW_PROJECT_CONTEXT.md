@@ -20,7 +20,7 @@ FreeCameraFramework (FCFW) is an SKSE plugin for Skyrim Anniversary Edition that
   - **Camera Points**: Capture current camera position/rotation during recording
 - **Flexible Recording**: Real-time camera path recording with 1-second sampling intervals
 - **Advanced Interpolation**: Support for linear and cubic Hermite interpolation with per-point and global easing
-- **Import/Export**: Save/load camera paths as `.fcfw` timeline files with load-order independent reference tracking
+- **Import/Export**: Save/load camera paths as `.yaml` timeline files with load-order independent reference tracking
 - **Event Callback System**: Notify consumers when timeline playback starts/stops/completes
   - **SKSE Messaging Interface**: C++ plugins receive events via SKSE messaging system
   - **Papyrus Events**: Scripts receive `OnTimelinePlaybackStarted`, `OnTimelinePlaybackStopped`, and `OnTimelinePlaybackCompleted` events with timeline ID
@@ -81,9 +81,9 @@ src/
   ├─ plugin.cpp           # SKSE entry point + Papyrus API bindings (20+ functions)
   ├─ TimelineManager.cpp  # Recording/playback orchestration (singleton)
   ├─ Timeline.cpp         # Timeline class implementations (paired track coordination)
-  ├─ CameraPath.cpp       # Point storage + import/export (.fcfw file format)
+  ├─ CameraPath.cpp       # Point storage + YAML import/export
   ├─ Hooks.cpp            # Game loop interception (MainUpdateHook)
-  └─ FCFW_Utils.cpp       # Hermite interpolation + file parsing helpers
+  └─ FCFW_Utils.cpp       # Hermite interpolation + file parsing + YAML enum converters
 
 include/
   ├─ TimelineTrack.h      # TimelineTrack<T> template (declaration + implementation)
@@ -134,7 +134,7 @@ Apply to RE::FreeCameraState (position/rotation)
 **Build Dependencies:**
 - **CommonLibSSE-NG**: SKSE plugin framework (set `COMMONLIBSSE_PATH` env var)
 - **_ts_SKSEFunctions**: Utility library (must be sibling directory) - provides interpolation/easing functions
-- **vcpkg**: Dependency manager (fmt, spdlog, rapidcsv, simpleini)
+- **vcpkg**: Dependency manager (fmt, spdlog, yaml-cpp)
 - **CMake 3.29+**: Build system with MSVC presets
 
 **Testing Entry Points:**
@@ -297,18 +297,18 @@ RequestPluginAPI(InterfaceVersion) [Mod API entry]
 | `FCFW_GetActiveTimelineID` | int | - | Get ID of currently active timeline (0 if none) |
 | `FCFW_AllowUserRotation` | void | **modName, timelineID**, allow | Enable/disable user camera control (validates ownership) |
 | `FCFW_IsUserRotationAllowed` | bool | **modName, timelineID** | Query user rotation state (validates ownership) |
-| `FCFW_SetPlaybackMode` | bool | **modName, timelineID**, playbackMode | Set playback mode (0=kEnd, 1=kLoop, 2=kWait) - requires ownership |
+| `FCFW_SetPlaybackMode` | bool | **modName, timelineID**, playbackMode | Set playback mode (0=kEnd, 1=kLoop, 2=kWait) via enum constants - requires ownership |
 
 **Import/Export Functions:**
 | Papyrus Function | Return | Parameters | Notes |
 |-----------------|--------|------------|-------|
-| `FCFW_AddTimelineFromFile` | bool | **modName, timelineID**, filePath, timeOffset | Import INI file (requires ownership) |
-| `FCFW_ExportTimeline` | bool | **modName, timelineID**, filePath | Export to INI file (validates ownership) |
+| `FCFW_AddTimelineFromFile` | bool | **modName, timelineID**, filePath, timeOffset | Import YAML file (requires ownership) |
+| `FCFW_ExportTimeline` | bool | **modName, timelineID**, filePath | Export to YAML file (validates ownership) |
 
 **Parameter Notes:**
 - **modName**: Your mod's ESP/ESL filename (e.g., `"MyMod.esp"`), case-sensitive. Required for ALL timeline operations to validate that the calling plugin has access to the specified timeline.
 - **timelineID**: Integer ID returned by `RegisterTimeline()`, must be > 0
-- **playbackMode**: Integer value for PlaybackMode enum (0=kEnd, 1=kLoop, 2=kWait)
+- **playbackMode**: Integer value for PlaybackMode enum (0=kEnd, 1=kLoop, 2=kWait) in API calls; strings ("end", "loop", "wait") in YAML files
 - **index**: 0-based index for point queries. Functions return 0.0 if index is out of range or timeline not found.
 - **Ownership Validation**: Applied universally to all timeline API calls. The pluginHandle/modName parameter is required as the FIRST parameter and is always validated - operations fail if the timeline doesn't exist or doesn't belong to the calling plugin.
 - **Return Values**: `-1` for query functions on error, `false` for boolean functions on error
@@ -436,7 +436,7 @@ SKSE::GetMessagingInterface()->RegisterListener(MessageHandler);
   - Consistent with Papyrus API: error conditions return zero values, check `GetTranslationPointCount()` first to validate index
 - **Signatures:** Similar to Papyrus but with native C++ types (`size_t`, `SKSE::PluginHandle` instead of `string`, `int`)
   - All functions marked `const noexcept`
-  - `SetPlaybackMode(timelineID, pluginHandle, playbackMode)` - playbackMode as int (0=kEnd, 1=kLoop, 2=kWait)
+  - `SetPlaybackMode(timelineID, pluginHandle, playbackMode)` - playbackMode as int (0=kEnd, 1=kLoop, 2=kWait) via enum constants
   - `int interpolationMode` converted via `ToInterpolationMode()` at API boundary
   - All functions delegate to `TimelineManager::GetSingleton()`
 
@@ -608,8 +608,7 @@ mutable std::recursive_mutex m_timelineMutex;           // Thread-safe access (r
 float m_recordingInterval{ 1.0f };                      // Sample rate (1 point per second)
 
 // Playback (global state shared across all timelines)
-bool m_isShowingMenus{ true };                          // Pre-playback UI state
-bool m_showMenusDuringPlayback{ false };                // UI visibility during playback
+bool m_isShowingMenus{ true };                          // Pre-playback UI state (captured before starting playback)
 bool m_userTurning{ false };                            // User camera control flag
 RE::NiPoint2 m_lastFreeRotation;                        // Third-person camera rotation snapshot
 
@@ -620,31 +619,38 @@ std::vector<RE::TESForm*> m_eventReceivers;             // Forms registered for 
 **TimelineState Structure** (per-timeline storage):
 ```cpp
 struct TimelineState {
-    // Timeline data
-    size_t m_id;                           // Unique timeline identifier
-    Timeline m_timeline;                   // Paired translation + rotation tracks
-    
-    // Recording state (per-timeline)
-    bool m_isRecording{ false };           // Currently capturing camera
-    float m_currentRecordingTime{ 0.0f };
-    float m_lastRecordedPointTime{ 0.0f };
-    
-    // Playback state (per-timeline)
-    bool m_isPlaybackRunning{ false };     // Active playback
-    float m_playbackSpeed{ 1.0f };
-    bool m_globalEaseIn{ false };
-    bool m_globalEaseOut{ false };
-    float m_playbackDuration{ 0.0f };
-    bool m_showMenusDuringPlayback{ false };
-    bool m_allowUserRotation{ false };     // Allow user to control rotation during playback
-    bool m_isCompletedAndWaiting{ false }; // Track if kTimelinePlaybackCompleted event was dispatched (for kWait mode)
-    RE::BSTPoint2<float> m_rotationOffset{ 0.0f, 0.0f }; // Per-timeline rotation offset from user input
-    
-    // Owner tracking
-    SKSE::PluginHandle m_ownerHandle;      // Plugin that registered this timeline
+    // ===== IDENTITY & OWNERSHIP (immutable after creation) =====
+    size_t m_id;                           // Timeline unique identifier
+    SKSE::PluginHandle m_ownerHandle;      // Plugin that owns this timeline
     std::string m_ownerName;               // Plugin name (for logging)
+    
+    // ===== TIMELINE DATA & STATIC CONFIGURATION (persisted in YAML) =====
+    Timeline m_timeline;                   // Paired translation + rotation tracks
+    bool m_globalEaseIn{ false };          // Apply easing to timeline start (user preference)
+    bool m_globalEaseOut{ false };         // Apply easing to timeline end (user preference)
+    bool m_showMenusDuringPlayback{ false }; // UI visibility during playback (user preference)
+    bool m_allowUserRotation{ false };     // Allow user camera control during playback (user preference)
+    
+    // ===== RECORDING STATE (runtime, reset on StopRecording) =====
+    bool m_isRecording{ false };           // Currently capturing camera
+    float m_currentRecordingTime{ 0.0f };  // Elapsed time during recording
+    float m_lastRecordedPointTime{ 0.0f }; // Last sample timestamp
+    
+    // ===== PLAYBACK STATE (runtime, reset on StopPlayback) =====
+    bool m_isPlaybackRunning{ false };     // Active playback
+    float m_playbackSpeed{ 1.0f };         // Computed time multiplier (runtime only, NOT persisted)
+    float m_playbackDuration{ 0.0f };      // Computed total duration (runtime only, NOT persisted)
+    bool m_isCompletedAndWaiting{ false }; // kWait mode completion flag (runtime only)
+    RE::BSTPoint2<float> m_rotationOffset{ 0.0f, 0.0f }; // Accumulated user rotation (runtime only)
 };
 ```
+
+**State Organization Notes:**
+- **Identity & Ownership:** Set once at RegisterTimeline(), never changes
+- **Static Configuration:** User preferences persisted in YAML files (exported/imported)
+- **Recording State:** Runtime variables, cleared when StopRecording() is called
+- **Playback State:** Runtime variables, cleared when StopPlayback() is called
+  - `m_playbackSpeed` and `m_playbackDuration` are **computed dynamically** in StartPlayback() based on parameters, NOT persisted
 
 **Architecture Changes:**
 - **Before Phase 4:** Single `Timeline m_timeline`, all state in TimelineManager
@@ -662,8 +668,11 @@ struct TimelineState {
   - SKSE Messaging: Broadcasts to all C++ plugins via `SKSE::GetMessagingInterface()->Dispatch()`
   - Papyrus Events: Queues events to registered forms via `SKSE::GetTaskInterface()->AddTask()`
 - **Global vs Per-Timeline State:**
-  - Global (shared): `m_recordingInterval`, `m_isShowingMenus`, `m_userTurning`, `m_lastFreeRotation`, `m_eventReceivers`
-  - Per-Timeline (in TimelineState): `m_isRecording`, `m_currentRecordingTime`, `m_lastRecordedPointTime`, `m_isPlaybackRunning`, `m_playbackSpeed`, `m_globalEaseIn`, `m_globalEaseOut`, `m_playbackDuration`, `m_showMenusDuringPlayback`, `m_allowUserRotation`, `m_isCompletedAndWaiting`, `m_rotationOffset`
+  - **Global (shared):** `m_recordingInterval`, `m_isShowingMenus`, `m_userTurning`, `m_lastFreeRotation`, `m_eventReceivers`
+  - **Per-Timeline (in TimelineState):**
+    - **Static config (persisted):** `m_globalEaseIn`, `m_globalEaseOut`, `m_showMenusDuringPlayback`, `m_allowUserRotation`
+    - **Runtime only (NOT persisted):** `m_isRecording`, `m_currentRecordingTime`, `m_lastRecordedPointTime`, `m_isPlaybackRunning`, `m_playbackSpeed`, `m_playbackDuration`, `m_isCompletedAndWaiting`, `m_rotationOffset`
+  - **Note:** `m_playbackSpeed` and `m_playbackDuration` are **computed at runtime** in `StartPlayback()` based on function parameters, and are intentionally NOT persisted to YAML files.
 
 ---
 
@@ -902,12 +911,9 @@ SwitchPlayback(fromTimelineID, toTimelineID, pluginHandle)
 ```cpp
 TranslationTrack m_translationTrack;  // Position keyframes
 RotationTrack m_rotationTrack;        // Rotation keyframes
-
-uint32_t m_timelineID{ 0 };           // Unique identifier (for future multi-timeline)
-float m_playbackSpeed{ 1.0f };        // Time multiplier
-bool m_globalEaseIn{ false };         // Apply easing to entire timeline
-bool m_globalEaseOut{ false };        // Apply easing to entire timeline
 ```
+
+**Note:** Timeline ID is managed externally by `TimelineState::m_id` (size_t), not stored in Timeline class. Playback settings (`m_playbackSpeed`, `m_globalEaseIn`, `m_globalEaseOut`) are also managed in `TimelineState`, not in Timeline.
 
 **Type Aliases:**
 ```cpp
@@ -1106,6 +1112,22 @@ ValueType GetInterpolatedPoint(index, progress) {
 **Purpose:** Point collection with type-specific I/O operations  
 **Location:** `CameraPath.h` (declaration), `CameraPath.cpp` (implementation)
 
+**Template Architecture:**
+```cpp
+template <typename T>
+class CameraPath {
+    // Friend declarations for template helper functions (allow access to protected m_points)
+    template <typename PointType, typename PathType>
+    friend bool ImportPathFromYAML(PathType& a_path, const YAML::Node& a_node, float a_timeOffset, float a_conversionFactor);
+    
+    template <typename PointType, typename PathType>
+    friend bool ExportPathToYAML(const PathType& a_path, YAML::Emitter& a_out, float a_conversionFactor);
+
+protected:
+    std::vector<T> m_points;  // Ordered point storage (accessible to template friends)
+};
+```
+
 **Concrete Implementations:**
 ```cpp
 class TranslationPath : public CameraPath<TranslationPoint> {
@@ -1114,8 +1136,8 @@ public:
     using ValueType = RE::NiPoint3;  // Type returned by GetPoint()
     
     TranslationPoint GetPointAtCamera(float a_time, bool a_easeIn, bool a_easeOut) const override;  // Creates kCamera point
-    bool AddPathFromFile(...) override;
-    bool ExportPath(...) const override;
+    bool AddPathFromFile(...) override;  // Delegates to ImportPathFromYAML<TranslationPoint, TranslationPath>
+    bool ExportPath(...) const override;  // Delegates to ExportPathToYAML<TranslationPoint, TranslationPath>
 };
 
 class RotationPath : public CameraPath<RotationPoint> {
@@ -1124,15 +1146,57 @@ public:
     using ValueType = RE::BSTPoint2<float>;  // Type returned by GetPoint()
     
     RotationPoint GetPointAtCamera(float a_time, bool a_easeIn, bool a_easeOut) const override;  // Creates kCamera point
-    bool AddPathFromFile(...) override;
-    bool ExportPath(...) const override;
+    bool AddPathFromFile(...) override;  // Delegates to ImportPathFromYAML<RotationPoint, RotationPath>
+    bool ExportPath(...) const override;  // Delegates to ExportPathToYAML<RotationPoint, RotationPath>
 };
 ```
+
+**Template-Based YAML I/O (CameraPath.cpp):**
+- **PointTraits Specialization:** Type-specific metadata for template logic
+  ```cpp
+  template<> struct PointTraits<TranslationPoint> {
+      using ValueType = RE::NiPoint3;
+      static constexpr size_t Dimensions = 3;
+      static constexpr const char* FieldName = "translationPoints";
+      static constexpr const char* ValueKey = "position";
+      // ReadValue/WriteValue methods with conversion factor support
+  };
+  
+  template<> struct PointTraits<RotationPoint> {
+      using ValueType = RE::BSTPoint2<float>;
+      static constexpr size_t Dimensions = 2;
+      static constexpr const char* FieldName = "rotationPoints";
+      static constexpr const char* ValueKey = "rotation";
+      // ReadValue/WriteValue methods with conversion factor support
+  };
+  ```
+
+- **ImportPathFromYAML Template:** Generic YAML→Points import (~130 lines)
+  - Handles all three point types (kWorld, kCamera, kReference)
+  - Reference resolution: EditorID lookup with FormID fallback
+  - Applies time offset and conversion factor
+  - Uses PointTraits for type-specific behavior
+
+- **ExportPathToYAML Template:** Generic Points→YAML export (~100 lines)
+  - Writes properly formatted YAML with array notation
+  - Applies conversion factor (e.g., radians→degrees for rotation)
+  - Uses PointTraits for field names and dimensions
+
+- **Code Consolidation:** Replaces ~440 lines of duplicated logic with ~238 lines of shared templates + 8 lines of wrappers (47% reduction)
 
 **Key Insights:** 
 - `ValueType` alias resolves naming conflict with `PointType` enum (kWorld/kReference/kCamera)
 - `GetPointAtCamera()` is const-correct: creates new point without modifying path state
 - Takes time/easing parameters, returns TransitionPoint with PointType::kCamera and transition metadata
+- **Friend Declarations:** Template helper functions granted access to protected `m_points` member for direct manipulation during I/O
+- **Angle Conversion:** RotationPath supports conversion via `a_conversionFactor` parameter
+  - Import: `AddPathFromFile(path, offset, conversionFactor)` - multiplies YAML angles by factor
+    * `conversionFactor = π/180` (≈ 0.0174533) converts degrees → radians
+    * `conversionFactor = 1.0` (default) for radians (no conversion)
+  - Export: `ExportPath(file, conversionFactor)` - multiplies internal angles by factor before writing
+    * `conversionFactor = 180/π` (≈ 57.2958) converts radians → degrees
+    * `conversionFactor = 1.0` (default) for radians (no conversion)
+  - TranslationPath has no conversion (world units remain unchanged)
 
 ---
 
@@ -1202,41 +1266,114 @@ RotationPoint(
 
 ### **5.8 Import/Export System**
 
-#### **INI File Format:**
-```ini
-[General]
-Version=10203           ; major*10000 + minor*100 + patch
-UseDegrees=1            ; Convert angles (always 1 for export)
-PlaybackMode=0          ; 0=kEnd, 1=kLoop
-LoopTimeOffset=0.0      ; Interpolation time for loop wrap
+#### **YAML File Format:**
+FreeCameraFramework uses YAML for timeline import/export, providing human-readable, compact camera path definitions.
 
-[TranslationPoints]
-; Point fields vary by PointType (see below)
+**File Structure:**
+```yaml
+# FreeCameraFramework Timeline (YAML format)
+formatVersion: 1
 
-[RotationPoints]
-; Point fields vary by PointType
+# Metadata section
+playbackMode: end  # end, loop, or wait
+loopTimeOffset: 0.0
+globalEaseIn: false
+globalEaseOut: false
+showMenusDuringPlayback: false
+allowUserRotation: true
+useDegrees: true  # Rotation angles in degrees (false=radians)
+
+# Translation points
+translationPoints:
+  - time: 0.0
+    pointType: world
+    position: [100.0, 200.0, 50.0]
+    interpolationMode: cubicHermite
+    easeIn: true
+    easeOut: false
+  
+  - time: 5.0
+    pointType: reference
+    offset: [0, 100, 50]
+    reference: "MyQuestMarkerRef"
+    isOffsetRelative: false
+    interpolationMode: linear
+
+# Rotation points  
+rotationPoints:
+  - time: 0.0
+    pointType: world
+    rotation: [0.0, 90.0]  # [pitch, yaw] in degrees
+    interpolationMode: cubicHermite
+    easeIn: true
+  
+  - time: 5.0
+    pointType: camera
+    offset: [5.7, 0.0]  # Slight upward pitch offset in degrees
+    interpolationMode: linear
+
+# Note: Points inherit hardcoded defaults (interpolationMode: cubicHermite, easeIn: false, easeOut: false)
+# Each point can override these individually. No separate "defaults" section needed.
 ```
 
-**Field Encoding by PointType:**
+**Key Features:**
+- **Format Versioning**: `formatVersion: 1` field enables backwards compatibility and future format evolution
+  - Current version: 1 (string-based enums, array notation, load-order independence)
+  - Legacy files without `formatVersion` default to version 1 for backwards compatibility
+  - Unknown versions log warning and attempt version 1 parser (graceful degradation)
+  - Export always writes current format version
+- **String Enums**: Human-readable values (`"world"`, `"cubicHermite"`, `"end"`) instead of magic numbers
+- **Array Notation**: Compact vectors `[x, y, z]` or `[pitch, yaw]` instead of separate fields
+- **Load-Order Independence**: EditorID-first reference resolution with FormID fallback
+- **Angle Units Control**: `useDegrees` flag determines rotation angle units
+  - `useDegrees: true` (default) - Rotation angles in **degrees** for human readability
+  - `useDegrees: false` - Rotation angles in **radians** (for backwards compatibility)
+  - Internal engine always uses radians; conversion happens during import/export
 
-| PointType | Translation Fields | Rotation Fields |
-|-----------|-------------------|-----------------|
-| **kWorld** | PositionX/Y/Z | Pitch, Yaw |
-| **kReference** | OffsetX/Y/Z, RefFormID, IsOffsetRelative | OffsetPitch/Yaw, RefFormID, IsOffsetRelative |
-| **kCamera** | OffsetX/Y/Z | OffsetPitch/Yaw |
+**PointType Values:**
+- `world`: Static world coordinates
+- `reference`: Dynamic position/rotation relative to a reference object
+- `camera`: Offset from camera position at playback start (baked once)
 
-**All Points Include:**
-- `Time`, `InterpolationMode` (0/1/2), `EaseIn` (0/1), `EaseOut` (0/1), `PointType` (0/1/2)
+**InterpolationMode Values:**
+- `none`: Jump to point (no interpolation)
+- `linear`: Linear interpolation
+- `cubicHermite`: Smooth cubic Hermite spline (default)
+
+**PlaybackMode Values:**
+- `end`: Stop at timeline end (default)
+- `loop`: Wrap back to start with optional time offset
+- `wait`: Stay at final position indefinitely (manual stop required)
+
+**Translation Point Fields:**
+
+| PointType | Required Fields | Optional Fields | Notes |
+|-----------|----------------|-----------------|-------|
+| **world** | `time`, `position: [x,y,z]` | `interpolationMode`, `easeIn`, `easeOut` | Static world coordinates |
+| **reference** | `time`, `offset: [x,y,z]`, `reference: "EditorID"` | `isOffsetRelative`, `interpolationMode`, `easeIn`, `easeOut` | Dynamic reference tracking |
+| **camera** | `time`, `offset: [x,y,z]` | `interpolationMode`, `easeIn`, `easeOut` | Baked at playback start |
+
+**Rotation Point Fields:**
+
+| PointType | Required Fields | Optional Fields | Notes |
+|-----------|----------------|-----------------|-------|
+| **world** | `time`, `rotation: [pitch,yaw]` | `interpolationMode`, `easeIn`, `easeOut` | Angles in degrees if `useDegrees: true`, radians if false |
+| **reference** | `time`, `offset: [pitch,yaw]`, `reference: "EditorID"` | `isOffsetRelative`, `interpolationMode`, `easeIn`, `easeOut` | Look at reference + offset (units match `useDegrees`) |
+| **camera** | `time`, `offset: [pitch,yaw]` | `interpolationMode`, `easeIn`, `easeOut` | Baked at playback start (units match `useDegrees`) |
 
 **Import Process (TimelineManager.cpp):**
 ```
 AddTimelineFromFile(timelineID, pluginHandle, path, timeOffset)
 ├─> Validate ownership: GetTimeline(timelineID, pluginHandle)
-├─> Read General section (version, degrees, playback mode, loop offset)
-├─> Import translation: state->timeline.GetTranslationTrack().GetPath().AddPathFromFile(stream, offset, 1.0f)
-├─> Rewind stream
-├─> Import rotation: state->timeline.GetRotationTrack().GetPath().AddPathFromFile(stream, offset, degToRad)
-├─> Set playback mode/offset: state->timeline.SetPlaybackMode(), SetLoopTimeOffset()
+├─> Load YAML file and parse metadata
+├─> Check formatVersion field (defaults to 1 if missing for legacy files)
+│   └─> Log warning if version != 1, attempt version 1 parser
+├─> Read useDegrees flag (default: false if missing)
+├─> Calculate rotation conversion factor:
+│   ├─> If useDegrees=true: conversionFactor = π/180 (degrees → radians)
+│   └─> If useDegrees=false: conversionFactor = 1.0 (radians, no conversion)
+├─> Import translation: state->timeline.AddTranslationPathFromFile(path, offset)
+├─> Import rotation: state->timeline.AddRotationPathFromFile(path, offset, conversionFactor)
 └─> Log point counts
 ```
 
@@ -1244,9 +1381,11 @@ AddTimelineFromFile(timelineID, pluginHandle, path, timeOffset)
 ```
 ExportTimeline(timelineID, pluginHandle, path)
 ├─> Validate ownership: GetTimeline(timelineID, pluginHandle)
-├─> Write General section (get mode from state->timeline.GetTranslationTrack().GetPlaybackMode())
-├─> Export translation: state->timeline.GetTranslationTrack().GetPath().ExportPath(stream, 1.0f)
-├─> Export rotation: state->timeline.GetRotationTrack().GetPath().ExportPath(stream, radToDeg)
+├─> Write formatVersion: 1
+├─> Write metadata section with useDegrees: true
+├─> Calculate rotation conversion factor: 180/π (radians → degrees)
+├─> Export translation: state->timeline.ExportTranslationPath(file)  // No conversion
+├─> Export rotation: state->timeline.ExportRotationPath(file, conversionFactor)
 └─> Log point counts
 ```
 
@@ -1256,11 +1395,20 @@ ExportTimeline(timelineID, pluginHandle, path)
 - Timeline ownership tracked via `state->ownerPluginHandle`
 
 **Critical Details:**
-- **Inline Comments:** Import supports `;` comments (via CSimpleIniA)
+- **Format Versioning:** `formatVersion: 1` written to all exported files
+  - Import defaults to version 1 for legacy files without the field
+  - Unknown versions trigger warning but attempt parsing (graceful fallback)
+  - Enables future format migrations without breaking old files
 - **Time Offset:** Applied to all imported point times (for timeline concatenation)
-- **Conversion Factor:** Translation uses 1.0 (no conversion), Rotation uses deg/rad conversion
-- **Playback Mode:** Read from General section, applied via `state->timeline.SetPlaybackMode()` (syncs both tracks)
-- **Version Check:** Warns if file version ≠ plugin version (non-blocking)
+- **Angle Conversion (useDegrees Flag):**
+  - **New files (Export):** Always write `formatVersion: 1`, `useDegrees: true` with angles in degrees (conversion factor = 180/π ≈ 57.2958)
+  - **Import:** Read `useDegrees` flag from YAML
+    * `useDegrees: true` → Apply π/180 (≈ 0.0174533) to convert degrees to radians
+    * `useDegrees: false` or missing → Use 1.0 (no conversion, assume radians)
+  - **Translation:** No conversion (world units, no conversion factor parameter)
+  - **Backwards Compatibility:** Old files without `useDegrees` flag default to radians (no conversion)
+- **Reference Resolution:** EditorID lookup first (requires po3's Tweaks), FormID fallback
+- **File Extension:** `.yaml` or `.yml` recommended for clarity
 
 ---
 
@@ -1477,6 +1625,12 @@ if (state->isPlaybackRunning) {
 
 ### **6.1 Import/Export Implementation (CameraPath.cpp)**
 
+**Hardcoded Defaults:**
+- Import functions use hardcoded defaults: `InterpolationMode::kCubicHermite`, `easeIn = false`, `easeOut = false`
+- Points can override these individually in YAML (point-level values take precedence)
+- No separate "defaults" section in YAML files (removed for simplicity - redundant with hardcoded values)
+- Export optimization: Points only write non-default values to minimize file size
+
 **Reference Resolution Strategy:**
 1. **EditorID First** (load-order independent)
    - `RE::TESForm::LookupByEditorID<RE::TESObjectREFR>(editorID)`
@@ -1568,6 +1722,36 @@ T GetValueFromINI(vm, stackId, "key:section", filePath, defaultValue)
 ---
 
 ### **6.4 Helper Functions (FCFW_Utils)**
+
+**YAML Enum Conversion Helpers:**
+```cpp
+// String to Enum converters (with validation)
+PointType StringToPointType(const std::string& str)
+  // "world" -> kWorld, "reference" -> kReference, "camera" -> kCamera
+  // Unknown values log warning and default to kWorld
+
+InterpolationMode StringToInterpolationMode(const std::string& str)
+  // "none" -> kNone, "linear" -> kLinear, "cubicHermite"/"cubic" -> kCubicHermite
+  // Unknown values log warning and default to kCubicHermite
+
+PlaybackMode StringToPlaybackMode(const std::string& str)
+  // "end" -> kEnd, "loop" -> kLoop, "wait" -> kWait
+  // Unknown values log warning and default to kEnd
+
+// Enum to String converters (for export)
+std::string PointTypeToString(PointType type)
+  // Switch statement with default fallback to "world"
+
+std::string InterpolationModeToString(InterpolationMode mode)
+  // Switch statement with default fallback to "cubicHermite"
+
+std::string PlaybackModeToString(PlaybackMode mode)
+  // Switch statement with default fallback to "end"
+```
+**Usage:** Used by `CameraPath.cpp` and `TimelineManager.cpp` for YAML import/export
+- Import reads string values and converts to enums
+- Export writes enums as human-readable strings
+- All conversions include validation with warning logs for unknown values
 
 **Cubic Hermite Interpolation:**
 ```cpp

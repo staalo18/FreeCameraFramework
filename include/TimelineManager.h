@@ -8,28 +8,29 @@
 namespace FCFW {
     // Per-timeline state container
     struct TimelineState {
-        size_t m_id;                           // Unique timeline identifier
-        Timeline m_timeline;                   // Paired translation + rotation tracks
-        
-        // Recording state (per-timeline)
-        bool m_isRecording{ false };           // Currently capturing camera
-        float m_currentRecordingTime{ 0.0f };
-        float m_lastRecordedPointTime{ 0.0f };
-        
-        // Playback state (per-timeline)
-        bool m_isPlaybackRunning{ false };     // Active playback
-        float m_playbackSpeed{ 1.0f };
-        bool m_globalEaseIn{ false };
-        bool m_globalEaseOut{ false };
-        float m_playbackDuration{ 0.0f };
-        bool m_showMenusDuringPlayback{ false };
-        bool m_allowUserRotation{ false };     // Allow user to control rotation during playback
-        bool m_isCompletedAndWaiting{ false }; // Track if kTimelinePlaybackCompleted event was dispatched (for kWait mode)
-        RE::BSTPoint2<float> m_rotationOffset{ 0.0f, 0.0f }; // Per-timeline rotation offset from user input
-        
-        // Owner tracking
-        SKSE::PluginHandle m_ownerHandle;      // Plugin that registered this timeline
+        // ===== IDENTITY & OWNERSHIP (immutable after creation) =====
+        size_t m_id;                           // Timeline unique identifier
+        SKSE::PluginHandle m_ownerHandle;      // Plugin that owns this timeline
         std::string m_ownerName;               // Plugin name (for logging)
+        
+        // ===== TIMELINE DATA & STATIC CONFIGURATION (persisted in YAML) =====
+        Timeline m_timeline;                   // Paired translation + rotation tracks
+        bool m_globalEaseIn{ false };          // Apply easing to timeline start (user preference)
+        bool m_globalEaseOut{ false };         // Apply easing to timeline end (user preference)
+        bool m_showMenusDuringPlayback{ false }; // UI visibility during playback (user preference)
+        bool m_allowUserRotation{ false };     // Allow user camera control during playback (user preference)
+        
+        // ===== RECORDING STATE (runtime, reset on StopRecording) =====
+        bool m_isRecording{ false };           // Currently capturing camera
+        float m_currentRecordingTime{ 0.0f };  // Elapsed time during recording
+        float m_lastRecordedPointTime{ 0.0f }; // Last sample timestamp
+        
+        // ===== PLAYBACK STATE (runtime, reset on StopPlayback) =====
+        bool m_isPlaybackRunning{ false };     // Active playback
+        float m_playbackSpeed{ 1.0f };         // Computed time multiplier (runtime only, NOT persisted)
+        float m_playbackDuration{ 0.0f };      // Computed total duration (runtime only, NOT persisted)
+        bool m_isCompletedAndWaiting{ false }; // kWait mode completion flag (runtime only)
+        RE::BSTPoint2<float> m_rotationOffset{ 0.0f, 0.0f }; // Accumulated user rotation (runtime only)
     };
 
     class TimelineManager {
@@ -115,11 +116,8 @@ namespace FCFW {
             
             // Playback
             bool m_isShowingMenus = true;         // Whether menus were showing before playback started
-            bool m_showMenusDuringPlayback = false; // Whether to show menus during playback
             bool m_userTurning = false;           // Whether user is manually controlling camera during playback
-            RE::NiPoint2 m_lastFreeRotation;           // camera free rotation before playback started (third-person only)
-            
-            // Papyrus event registration
+            RE::NiPoint2 m_lastFreeRotation;           // camera free rotation before playback started (third-person only)            // Papyrus event registration
             std::vector<RE::TESForm*> m_eventReceivers;  // Forms registered for timeline events
     }; // class TimelineManager
 } // namespace FCFW

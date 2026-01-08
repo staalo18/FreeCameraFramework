@@ -2,6 +2,65 @@
 #include "Offsets.h"
 
 namespace FCFW {
+    // ===== YAML Enum Conversion Helpers =====
+    
+    // Convert string to PointType enum
+    PointType StringToPointType(const std::string& str) {
+        if (str == "world") return PointType::kWorld;
+        if (str == "reference") return PointType::kReference;
+        if (str == "camera") return PointType::kCamera;
+        log::warn("Unknown PointType '{}', defaulting to 'world'", str);
+        return PointType::kWorld;
+    }
+    
+    // Convert PointType enum to string
+    std::string PointTypeToString(PointType type) {
+        switch (type) {
+            case PointType::kWorld: return "world";
+            case PointType::kReference: return "reference";
+            case PointType::kCamera: return "camera";
+            default: return "world";
+        }
+    }
+    
+    // Convert string to InterpolationMode enum
+    InterpolationMode StringToInterpolationMode(const std::string& str) {
+        if (str == "none") return InterpolationMode::kNone;
+        if (str == "linear") return InterpolationMode::kLinear;
+        if (str == "cubicHermite" || str == "cubic") return InterpolationMode::kCubicHermite;
+        log::warn("Unknown InterpolationMode '{}', defaulting to 'cubicHermite'", str);
+        return InterpolationMode::kCubicHermite;
+    }
+    
+    // Convert InterpolationMode enum to string
+    std::string InterpolationModeToString(InterpolationMode mode) {
+        switch (mode) {
+            case InterpolationMode::kNone: return "none";
+            case InterpolationMode::kLinear: return "linear";
+            case InterpolationMode::kCubicHermite: return "cubicHermite";
+            default: return "cubicHermite";
+        }
+    }
+    
+    // Convert string to PlaybackMode enum
+    PlaybackMode StringToPlaybackMode(const std::string& str) {
+        if (str == "end") return PlaybackMode::kEnd;
+        if (str == "loop") return PlaybackMode::kLoop;
+        if (str == "wait") return PlaybackMode::kWait;
+        log::warn("Unknown PlaybackMode '{}', defaulting to 'end'", str);
+        return PlaybackMode::kEnd;
+    }
+    
+    // Convert PlaybackMode enum to string
+    std::string PlaybackModeToString(PlaybackMode mode) {
+        switch (mode) {
+            case PlaybackMode::kEnd: return "end";
+            case PlaybackMode::kLoop: return "loop";
+            case PlaybackMode::kWait: return "wait";
+            default: return "end";
+        }
+    }
+
     SKSE::PluginHandle ModNameToHandle(const char* a_modName) {
         if (!a_modName || strlen(a_modName) == 0) {
             log::error("{}: Invalid mod name (null or empty)", __FUNCTION__);

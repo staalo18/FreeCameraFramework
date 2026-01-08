@@ -135,19 +135,20 @@ namespace FCFW
 		return m_rotationTrack.GetPointAtCamera(a_time, a_easeIn, a_easeOut);
 	}
 
-	bool Timeline::AddTranslationPathFromFile(std::ifstream& a_file, float a_timeOffset, float a_conversionFactor)
+	// YAML import/export wrappers
+	bool Timeline::AddTranslationPathFromFile(const std::string& a_filePath, float a_timeOffset)
 	{
-		return m_translationTrack.AddPathFromFile(a_file, a_timeOffset, a_conversionFactor);
+		return m_translationTrack.AddPathFromFile(a_filePath, a_timeOffset);
 	}
 
-	bool Timeline::AddRotationPathFromFile(std::ifstream& a_file, float a_timeOffset, float a_conversionFactor)
+	bool Timeline::AddRotationPathFromFile(const std::string& a_filePath, float a_timeOffset, float a_conversionFactor)
 	{
-		return m_rotationTrack.AddPathFromFile(a_file, a_timeOffset, a_conversionFactor);
+		return m_rotationTrack.AddPathFromFile(a_filePath, a_timeOffset, a_conversionFactor);
 	}
 
-	bool Timeline::ExportTranslationPath(std::ofstream& a_file, float a_conversionFactor) const
+	bool Timeline::ExportTranslationPath(std::ofstream& a_file) const
 	{
-		return m_translationTrack.ExportPath(a_file, a_conversionFactor);
+		return m_translationTrack.ExportPath(a_file);
 	}
 
 	bool Timeline::ExportRotationPath(std::ofstream& a_file, float a_conversionFactor) const

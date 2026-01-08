@@ -43,7 +43,8 @@ namespace FCFW
 
 		TransitionPoint GetPointAtCamera(float a_time, bool a_easeIn, bool a_easeOut) const;
 		const TransitionPoint& GetPoint(size_t a_index) const;
-		bool AddPathFromFile(std::ifstream& a_file, float a_timeOffset = 0.0f, float a_conversionFactor = 1.0f);
+		
+		bool AddPathFromFile(const std::string& a_filePath, float a_timeOffset = 0.0f, float a_conversionFactor = 1.0f);
 		bool ExportPath(std::ofstream& a_file, float a_conversionFactor = 1.0f) const;
 
 	private:
@@ -395,9 +396,9 @@ log::info("{}: Setting playbackMode: {}", __FUNCTION__, static_cast<int>(a_mode)
 	}
 
 	template <typename PathType>
-	bool TimelineTrack<PathType>::AddPathFromFile(std::ifstream& a_file, float a_timeOffset, float a_conversionFactor)
+	bool TimelineTrack<PathType>::AddPathFromFile(const std::string& a_filePath, float a_timeOffset, float a_conversionFactor)
 	{
-		return m_path.AddPathFromFile(a_file, a_timeOffset, a_conversionFactor);
+		return m_path.AddPathFromFile(a_filePath, a_timeOffset, a_conversionFactor);
 	}
 
 	template <typename PathType>

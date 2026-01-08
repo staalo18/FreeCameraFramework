@@ -1,5 +1,6 @@
 #pragma once
 
+#include "CameraTypes.h"
 
 namespace FCFW {
     constexpr float EPSILON_COMPARISON = 0.0001f;
@@ -19,5 +20,15 @@ namespace FCFW {
      RE::NiPointer<RE::NiAVObject> GetTargetPoint(RE::Actor* a_actor);
 
     SKSE::PluginHandle ModNameToHandle(const char* a_modName);
+
+    // ===== YAML Enum Conversion Helpers =====
+    std::string PointTypeToString(PointType type);
+    PointType StringToPointType(const std::string& str);
+    
+    std::string InterpolationModeToString(InterpolationMode mode);
+    InterpolationMode StringToInterpolationMode(const std::string& str);
+    
+    std::string PlaybackModeToString(PlaybackMode mode);
+    PlaybackMode StringToPlaybackMode(const std::string& str);
 } // namespace FCFW
 
