@@ -57,7 +57,7 @@ namespace FCFW {
             bool RemoveTranslationPoint(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, size_t a_index);
             bool RemoveRotationPoint(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, size_t a_index);
 
-            bool ClearTimeline(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, bool a_notifyUser = true);
+            bool ClearTimeline(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID);
             
             int GetTranslationPointCount(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID) const;
             int GetRotationPointCount(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID) const;
@@ -76,7 +76,7 @@ namespace FCFW {
             void SetUserTurning(bool a_turning);
             bool AllowUserRotation(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, bool a_allow);
             bool IsUserRotationAllowed(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID) const;
-            bool SetPlaybackMode(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, int a_playbackMode);
+            bool SetPlaybackMode(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, int a_playbackMode, float a_loopTimeOffset = 0.0f);
             
             // Overloads for internal use (no ownership validation - for hooks)
             bool IsPlaybackRunning(size_t a_timelineID) const;

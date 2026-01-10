@@ -70,8 +70,8 @@ bool Messaging::FCFWInterface::RemoveRotationPoint(SKSE::PluginHandle a_pluginHa
 	return FCFW::TimelineManager::GetSingleton().RemoveRotationPoint(a_pluginHandle, a_timelineID, a_index);
 }
 
-bool Messaging::FCFWInterface::ClearTimeline(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, bool a_notifyUser) const noexcept {
-	return FCFW::TimelineManager::GetSingleton().ClearTimeline(a_pluginHandle, a_timelineID, a_notifyUser);
+bool Messaging::FCFWInterface::ClearTimeline(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID) const noexcept {
+	return FCFW::TimelineManager::GetSingleton().ClearTimeline(a_pluginHandle, a_timelineID);
 }
 
 int Messaging::FCFWInterface::GetTranslationPointCount(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID) const noexcept {
@@ -131,14 +131,12 @@ void Messaging::FCFWInterface::AllowUserRotation(SKSE::PluginHandle a_pluginHand
 }
 
 bool Messaging::FCFWInterface::IsUserRotationAllowed(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID) const noexcept {
-    return FCFW::TimelineManager::GetSingleton().IsUserRotationAllowed(a_pluginHandle, a_timelineID);
+	return FCFW::TimelineManager::GetSingleton().IsUserRotationAllowed(a_pluginHandle, a_timelineID);
 }
 
-bool Messaging::FCFWInterface::SetPlaybackMode(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, int a_playbackMode) const noexcept {
-    return FCFW::TimelineManager::GetSingleton().SetPlaybackMode(a_pluginHandle, a_timelineID, a_playbackMode);
-}
-
-bool Messaging::FCFWInterface::AddTimelineFromFile(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, const char* a_filePath, float a_timeOffset) const noexcept {
+bool Messaging::FCFWInterface::SetPlaybackMode(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, int a_playbackMode, float a_loopTimeOffset) const noexcept {
+	return FCFW::TimelineManager::GetSingleton().SetPlaybackMode(a_pluginHandle, a_timelineID, a_playbackMode, a_loopTimeOffset);
+}bool Messaging::FCFWInterface::AddTimelineFromFile(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, const char* a_filePath, float a_timeOffset) const noexcept {
     return FCFW::TimelineManager::GetSingleton().AddTimelineFromFile(a_pluginHandle, a_timelineID, a_filePath, a_timeOffset);
 }
 

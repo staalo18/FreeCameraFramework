@@ -78,7 +78,6 @@ namespace FCFW {
             if (file && file->fileName && std::string(file->fileName) == a_modName) {
                 // Use compile index as plugin handle (unique per mod in load order)
                 auto handle = static_cast<SKSE::PluginHandle>(file->compileIndex);
-                log::info("{}: Mod '{}' found with index {}", __FUNCTION__, a_modName, handle);
                 return handle;
             }
         }

@@ -14,15 +14,15 @@ namespace FCFW_API {
 	enum class FCFWMessage : uint32_t {
 		// Dispatched when timeline playback starts
 		// Data: FCFWTimelineEventData*
-		kTimelinePlaybackStarted = 0,
+		kPlaybackStart = 0,
 		
 		// Dispatched when timeline playback stops (manual stop or kEnd mode completion)
 		// Data: FCFWTimelineEventData*
-		kTimelinePlaybackStopped = 1,
+		kPlaybackStop = 1,
 		
 		// Dispatched when timeline reaches end in kWait mode (stays at final position)
 		// Data: FCFWTimelineEventData*
-		kTimelinePlaybackCompleted = 2
+		kPlaybackWait = 2
 	};
 
 	// Event data structure for timeline events
@@ -197,13 +197,12 @@ namespace FCFW_API {
 		virtual bool StopRecording(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID) const noexcept = 0;
 
 		/// <summary>
-		/// Clear the entire timeline. Prints a notification if a_notifyUser is true.
+		/// Clear the entire timeline.
 		/// </summary>
 		/// <param name="a_pluginHandle">Plugin handle of the calling plugin (use SKSE::GetPluginHandle())</param>
 		/// <param name="a_timelineID">Timeline ID to clear</param>
-		/// <param name="a_notifyUser">Whether to show a notification to the user (default: true)</param>
 		/// <returns>true if cleared successfully, false on failure</returns>
-		virtual bool ClearTimeline(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, bool a_notifyUser = true) const noexcept = 0;
+		virtual bool ClearTimeline(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID) const noexcept = 0;
 
         /// <summary>
         /// Get the number of translation points in the timeline.
@@ -341,13 +340,14 @@ namespace FCFW_API {
 		[[nodiscard]] virtual bool IsUserRotationAllowed(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID) const noexcept = 0;
 
 		/// <summary>
-		/// Set the playback mode for a timeline.
+		/// Set the playback mode and loop time offset for a timeline.
 		/// </summary>
 		/// <param name="a_pluginHandle">Plugin handle for ownership validation</param>
 		/// <param name="a_timelineID">Timeline ID to configure</param>
 		/// <param name="a_playbackMode">Playback mode: 0=kEnd (stop at end), 1=kLoop (wrap to beginning), 2=kWait (stay at final point until StopPlayback is called)</param>
+		/// <param name="a_loopTimeOffset">Time offset in seconds when looping back (only used in kLoop mode, default: 0.0)</param>
 		/// <returns>True if successfully set, false on failure</returns>
-		[[nodiscard]] virtual bool SetPlaybackMode(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, int a_playbackMode) const noexcept = 0;
+		[[nodiscard]] virtual bool SetPlaybackMode(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, int a_playbackMode, float a_loopTimeOffset = 0.0f) const noexcept = 0;
 
 		/// <summary>
 		/// Adds camera timeline imported from a_filePath at time a_timeOffset to the specified timeline.

@@ -43,7 +43,7 @@ namespace FCFW {
         
         int AddTranslationPointAtCamera(RE::StaticFunctionTag*, RE::BSFixedString a_modName, int a_timelineID, float a_time, bool a_easeIn, bool a_easeOut, int a_interpolationMode) {
             if (a_modName.empty() || a_timelineID <= 0) {
-                return false;
+                return -1;
             }
 
             SKSE::PluginHandle handle = FCFW::ModNameToHandle(a_modName.c_str());
@@ -57,7 +57,7 @@ namespace FCFW {
 
         int AddTranslationPoint(RE::StaticFunctionTag*, RE::BSFixedString a_modName, int a_timelineID, float a_time, float a_posX, float a_posY, float a_posZ, bool a_easeIn, bool a_easeOut, int a_interpolationMode) {
             if (a_modName.empty() || a_timelineID <= 0) {
-                return false;
+                return -1;
             }
 
             SKSE::PluginHandle handle = FCFW::ModNameToHandle(a_modName.c_str());
@@ -72,7 +72,8 @@ namespace FCFW {
 
         int AddTranslationPointAtRef(RE::StaticFunctionTag*, RE::BSFixedString a_modName, int a_timelineID, float a_time, RE::TESObjectREFR* a_reference, float a_offsetX, float a_offsetY, float a_offsetZ, bool a_isOffsetRelative, bool a_easeIn, bool a_easeOut, int a_interpolationMode) {
             if (a_modName.empty() || a_timelineID <= 0) {
-                return false;
+log::error("{}: Invalid mod name '{}' or timeline ID {}", __FUNCTION__, a_modName.c_str(), a_timelineID);
+                return -1;
             }
 
             SKSE::PluginHandle handle = FCFW::ModNameToHandle(a_modName.c_str());
@@ -87,7 +88,7 @@ namespace FCFW {
 
         int AddRotationPointAtCamera(RE::StaticFunctionTag*, RE::BSFixedString a_modName, int a_timelineID, float a_time, bool a_easeIn, bool a_easeOut, int a_interpolationMode) {
             if (a_modName.empty() || a_timelineID <= 0) {
-                return false;
+                return -1;
             }
 
             SKSE::PluginHandle handle = FCFW::ModNameToHandle(a_modName.c_str());
@@ -96,12 +97,12 @@ namespace FCFW {
                 return -1;
             }
 
-            return FCFW::TimelineManager::GetSingleton().AddRotationPointAtCamera(static_cast<size_t>(a_timelineID), handle, a_time, a_easeIn, a_easeOut, ToInterpolationMode(a_interpolationMode));
+            return FCFW::TimelineManager::GetSingleton().AddRotationPointAtCamera(handle, static_cast<size_t>(a_timelineID), a_time, a_easeIn, a_easeOut, ToInterpolationMode(a_interpolationMode));
         }
 
         int AddRotationPoint(RE::StaticFunctionTag*, RE::BSFixedString a_modName, int a_timelineID, float a_time, float a_pitch, float a_yaw, bool a_easeIn, bool a_easeOut, int a_interpolationMode) {
             if (a_modName.empty() || a_timelineID <= 0) {
-                return false;
+                return -1;
             }
 
             SKSE::PluginHandle handle = FCFW::ModNameToHandle(a_modName.c_str());
@@ -116,7 +117,7 @@ namespace FCFW {
 
         int AddRotationPointAtRef(RE::StaticFunctionTag*, RE::BSFixedString a_modName, int a_timelineID, float a_time, RE::TESObjectREFR* a_reference, float a_offsetPitch, float a_offsetYaw, bool a_isOffsetRelative, bool a_easeIn, bool a_easeOut, int a_interpolationMode) {
             if (a_modName.empty() || a_timelineID <= 0) {
-                return false;
+                return -1;
             }
 
             SKSE::PluginHandle handle = FCFW::ModNameToHandle(a_modName.c_str());
@@ -185,7 +186,7 @@ namespace FCFW {
             return FCFW::TimelineManager::GetSingleton().RemoveRotationPoint(handle, static_cast<size_t>(a_timelineID), static_cast<size_t>(a_index));
         }
 
-        bool ClearTimeline(RE::StaticFunctionTag*, RE::BSFixedString a_modName, int a_timelineID, bool a_notifyUser) {
+        bool ClearTimeline(RE::StaticFunctionTag*, RE::BSFixedString a_modName, int a_timelineID) {
             if (a_modName.empty() || a_timelineID <= 0) {
                 return false;
             }
@@ -196,7 +197,7 @@ namespace FCFW {
                 return false;
             }
 
-            return FCFW::TimelineManager::GetSingleton().ClearTimeline(handle, static_cast<size_t>(a_timelineID), a_notifyUser);
+            return FCFW::TimelineManager::GetSingleton().ClearTimeline(handle, static_cast<size_t>(a_timelineID));
         }
 
         int GetTranslationPointCount(RE::StaticFunctionTag*, RE::BSFixedString a_modName, int a_timelineID) {
@@ -446,7 +447,7 @@ namespace FCFW {
             return FCFW::TimelineManager::GetSingleton().IsUserRotationAllowed(handle, static_cast<size_t>(a_timelineID));
         }
 
-        bool SetPlaybackMode(RE::StaticFunctionTag*, RE::BSFixedString a_modName, std::int32_t a_timelineID, std::int32_t a_playbackMode) {
+        bool SetPlaybackMode(RE::StaticFunctionTag*, RE::BSFixedString a_modName, std::int32_t a_timelineID, std::int32_t a_playbackMode, float a_loopTimeOffset) {
             if (a_modName.empty() || a_timelineID <= 0) {
                 return false;
             }
@@ -457,7 +458,7 @@ namespace FCFW {
                 return false;
             }
 
-            return FCFW::TimelineManager::GetSingleton().SetPlaybackMode(handle, static_cast<size_t>(a_timelineID), a_playbackMode);
+            return FCFW::TimelineManager::GetSingleton().SetPlaybackMode(handle, static_cast<size_t>(a_timelineID), a_playbackMode, a_loopTimeOffset);
         }
 
         bool AddTimelineFromFile(RE::StaticFunctionTag*, RE::BSFixedString a_modName, std::int32_t a_timelineID, RE::BSFixedString a_filePath, float a_timeOffset) {
@@ -486,6 +487,32 @@ namespace FCFW {
             }            
 
             return FCFW::TimelineManager::GetSingleton().ExportTimeline(handle, static_cast<size_t>(a_timelineID), a_filePath.c_str());
+        }
+        
+        // Camera utility functions
+        float GetCameraPosX(RE::StaticFunctionTag*) {
+            RE::NiPoint3 pos = _ts_SKSEFunctions::GetCameraPos();
+            return pos.x;
+        }
+        
+        float GetCameraPosY(RE::StaticFunctionTag*) {
+            RE::NiPoint3 pos = _ts_SKSEFunctions::GetCameraPos();
+            return pos.y;
+        }
+        
+        float GetCameraPosZ(RE::StaticFunctionTag*) {
+            RE::NiPoint3 pos = _ts_SKSEFunctions::GetCameraPos();
+            return pos.z;
+        }
+        
+        float GetCameraPitch(RE::StaticFunctionTag*) {
+            RE::NiPoint3 rot = _ts_SKSEFunctions::GetCameraRotation();
+            return rot.x;  // Pitch
+        }
+        
+        float GetCameraYaw(RE::StaticFunctionTag*) {
+            RE::NiPoint3 rot = _ts_SKSEFunctions::GetCameraRotation();
+            return rot.z;  // Yaw
         }
         
         void RegisterForTimelineEvents(RE::StaticFunctionTag*, RE::TESForm* a_form) {
@@ -544,6 +571,14 @@ namespace FCFW {
             a_vm->RegisterFunction("FCFW_ExportTimeline", "FCFW_SKSEFunctions", ExportTimeline);
             a_vm->RegisterFunction("FCFW_RegisterForTimelineEvents", "FCFW_SKSEFunctions", RegisterForTimelineEvents);
             a_vm->RegisterFunction("FCFW_UnregisterForTimelineEvents", "FCFW_SKSEFunctions", UnregisterForTimelineEvents);
+            
+            // Camera utility functions
+            a_vm->RegisterFunction("FCFW_GetCameraPosX", "FCFW_SKSEFunctions", GetCameraPosX);
+            a_vm->RegisterFunction("FCFW_GetCameraPosY", "FCFW_SKSEFunctions", GetCameraPosY);
+            a_vm->RegisterFunction("FCFW_GetCameraPosZ", "FCFW_SKSEFunctions", GetCameraPosZ);
+            a_vm->RegisterFunction("FCFW_GetCameraPitch", "FCFW_SKSEFunctions", GetCameraPitch);
+            a_vm->RegisterFunction("FCFW_GetCameraYaw", "FCFW_SKSEFunctions", GetCameraYaw);
+            
             return true;
         }
     } // namespace Interface

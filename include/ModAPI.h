@@ -33,7 +33,7 @@ namespace Messaging
 		virtual bool StartRecording(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID) const noexcept override;
 		virtual bool StopRecording(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID) const noexcept override;
 		virtual bool RemoveRotationPoint(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, size_t a_index) const noexcept override;
-		virtual bool ClearTimeline(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, bool a_notifyUser = true) const noexcept override;
+		virtual bool ClearTimeline(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID) const noexcept override;
 		virtual int GetTranslationPointCount(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID) const noexcept override;
 		virtual int GetRotationPointCount(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID) const noexcept override;
 		virtual RE::NiPoint3 GetTranslationPoint(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, size_t a_index) const noexcept override;
@@ -49,7 +49,7 @@ namespace Messaging
 		virtual size_t GetActiveTimelineID() const noexcept override;
 		virtual void AllowUserRotation(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, bool a_allow) const noexcept override;
 		virtual bool IsUserRotationAllowed(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID) const noexcept override;
-		virtual bool SetPlaybackMode(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, int a_playbackMode) const noexcept override;
+		virtual bool SetPlaybackMode(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, int a_playbackMode, float a_loopTimeOffset = 0.0f) const noexcept override;
 		virtual bool AddTimelineFromFile(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, const char* a_filePath, float a_timeOffset = 0.0f) const noexcept override;
 		virtual bool ExportTimeline(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, const char* a_filePath) const noexcept override;
 

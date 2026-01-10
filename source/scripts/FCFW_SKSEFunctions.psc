@@ -126,9 +126,8 @@ bool Function FCFW_RemoveRotationPoint(string modName, int timelineID, int index
 ; Clear the entire camera timeline
 ; modName: name of your mod's ESP/ESL file
 ; timelineID: timeline ID to clear
-; notifyUser: whether to show a notification to the user
 ; Returns: true if cleared, false on failure
-bool Function FCFW_ClearTimeline(string modName, int timelineID, bool notifyUser = true) global native
+bool Function FCFW_ClearTimeline(string modName, int timelineID) global native
 
 ; Get the number of translation points in the timeline
 ; modName: name of your mod's ESP/ESL file (e.g., "MyMod.esp")
@@ -251,7 +250,8 @@ int Function FCFW_GetActiveTimelineID() global native
 ; modName: name of your mod's ESP/ESL file (e.g., "MyMod.esp")
 ; timelineID: timeline ID to configure
 ; allow: true to allow user rotation, false to disable
-Function FCFW_AllowUserRotation(string modName, int timelineID, bool allow) global native
+; Returns: true on success, false on failure
+bool Function FCFW_AllowUserRotation(string modName, int timelineID, bool allow) global native
 
 ; Check if user rotation is currently allowed for a specific timeline
 ; modName: name of your mod's ESP/ESL file (e.g., "MyMod.esp")
@@ -259,13 +259,14 @@ Function FCFW_AllowUserRotation(string modName, int timelineID, bool allow) glob
 ; Returns: true if user can control rotation, false otherwise
 bool Function FCFW_IsUserRotationAllowed(string modName, int timelineID) global native
 
-; Set the playback mode for a timeline
+; Set the playback mode and loop time offset for a timeline
 ; This determines what happens when the timeline reaches its end
 ; modName: name of your mod's ESP/ESL file (e.g., "MyMod.esp")
 ; timelineID: timeline ID to configure
-; playbackMode: 0=kEnd (stop at end), 1=kLoop (wrap to beginning), 2=kWait (stay at final position until StopPlayback is called)
+; playbackMode: 0=end (stop at end), 1=loop (wrap to beginning), 2=wait (stay at final position until StopPlayback is called)
+; loopTimeOffset: Time offset in seconds when looping back (only used in loop mode, default: 0.0)
 ; Returns: true if successfully set, false on failure
-bool Function FCFW_SetPlaybackMode(string modName, int timelineID, int playbackMode) global native
+bool Function FCFW_SetPlaybackMode(string modName, int timelineID, int playbackMode, float loopTimeOffset = 0.0) global native
 
 ; Adds camera timeline imported from filePath at timeOffset to the specified timeline.
 ; modName: Name of your mod (case-sensitive, as defined in SKSE plugin)
@@ -284,14 +285,36 @@ bool Function FCFW_ExportTimeline(string modName, int timelineID, string filePat
 
 ; ===== Event Registration =====
 
-; Register a form (Quest, ReferenceAlias, etc.) to receive timeline playback events
+; Register a form (Quest etc.) to receive timeline playback events
 ; The form's script must define these event handlers:
-;   Event OnTimelinePlaybackStarted(int timelineID)
-;   Event OnTimelinePlaybackStopped(int timelineID)
-;   Event OnTimelinePlaybackCompleted(int timelineID)  ; For kWait mode: timeline reached end and is waiting
+;   Event OnPlaybackStart(int timelineID)
+;   Event OnPlaybackStop(int timelineID)
+;   Event OnPlaybackWait(int timelineID)  ; For wait mode: timeline reached end and is waiting
 ; form: The form/alias to register (typically 'self' from a script)
 Function FCFW_RegisterForTimelineEvents(Form form) global native
 
 ; Unregister a form from receiving timeline playback events
 ; form: The form/alias to unregister
 Function FCFW_UnregisterForTimelineEvents(Form form) global native
+
+; ===== Camera Utility Functions =====
+
+; Get current camera X position (world coordinates)
+; Returns: X coordinate of current camera position
+float Function FCFW_GetCameraPosX() global native
+
+; Get current camera Y position (world coordinates)
+; Returns: Y coordinate of current camera position
+float Function FCFW_GetCameraPosY() global native
+
+; Get current camera Z position (world coordinates)
+; Returns: Z coordinate of current camera position
+float Function FCFW_GetCameraPosZ() global native
+
+; Get current camera pitch (rotation around X axis)
+; Returns: Pitch in radians
+float Function FCFW_GetCameraPitch() global native
+
+; Get current camera yaw (rotation around Z axis)
+; Returns: Yaw in radians
+float Function FCFW_GetCameraYaw() global native

@@ -147,7 +147,6 @@ log::info("{}: Sent Papyrus event '{}' for timeline {} to {} receivers", __FUNCT
         RotationPoint rotationPoint(transRotation, PointType::kWorld, RE::BSTPoint2<float>({cameraRot.x, cameraRot.z}));
         state->m_timeline.AddRotationPoint(rotationPoint);
         
-        RE::DebugNotification("Starting camera path recording...");
         log::info("{}: Started recording on timeline {}", __FUNCTION__, a_timelineID);
         return true;
     }
@@ -196,7 +195,6 @@ log::info("{}: Sent Papyrus event '{}' for timeline {} to {} receivers", __FUNCT
         m_activeTimelineID = 0;
         state->m_isRecording = false;
         
-        RE::DebugNotification("Camera path recording stopped.");
         log::info("{}: Stopped recording on timeline {}", __FUNCTION__, a_timelineID);
         return true;
     }
@@ -439,8 +437,8 @@ log::info("{}: Sent Papyrus event '{}' for timeline {} to {} receivers", __FUNCT
             float playbackTime = a_state->m_timeline.GetPlaybackTime();
             float timelineDuration = a_state->m_timeline.GetDuration();
             if ((playbackTime >= timelineDuration) && !a_state->m_isCompletedAndWaiting) {
-                DispatchTimelineEvent(static_cast<uint32_t>(FCFW_API::FCFWMessage::kTimelinePlaybackCompleted), a_state->m_id);
-                DispatchTimelineEventPapyrus("OnTimelinePlaybackCompleted", a_state->m_id);
+                DispatchTimelineEvent(static_cast<uint32_t>(FCFW_API::FCFWMessage::kPlaybackWait), a_state->m_id);
+                DispatchTimelineEventPapyrus("OnPlaybackWait", a_state->m_id);
                 a_state->m_isCompletedAndWaiting = true;
             }
             // Keep playback running - user must manually call StopPlayback
@@ -451,7 +449,7 @@ log::info("{}: Sent Papyrus event '{}' for timeline {} to {} receivers", __FUNCT
         }
     }
 
-    bool TimelineManager::ClearTimeline(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, bool a_notifyUser) {
+    bool TimelineManager::ClearTimeline(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID) {
         std::lock_guard<std::recursive_mutex> lock(m_timelineMutex);
         
         TimelineState* state = GetTimeline(a_timelineID, a_pluginHandle);
@@ -461,10 +459,6 @@ log::info("{}: Sent Papyrus event '{}' for timeline {} to {} receivers", __FUNCT
         
         if (state->m_isRecording) {
             return false;
-        }
-        
-        if (a_notifyUser) {
-            RE::DebugNotification("Clearing camera path...");
         }
         
         if (state->m_isPlaybackRunning) {
@@ -587,8 +581,8 @@ log::info("{}: Sent Papyrus event '{}' for timeline {} to {} receivers", __FUNCT
         log::info("{}: Started playback on timeline {}", __FUNCTION__, a_timelineID);
         
         // Dispatch playback started event
-        DispatchTimelineEvent(static_cast<uint32_t>(FCFW_API::FCFWMessage::kTimelinePlaybackStarted), a_timelineID);
-        DispatchTimelineEventPapyrus("OnTimelinePlaybackStarted", a_timelineID);
+        DispatchTimelineEvent(static_cast<uint32_t>(FCFW_API::FCFWMessage::kPlaybackStart), a_timelineID);
+        DispatchTimelineEventPapyrus("OnPlaybackStart", a_timelineID);
         
         return true;
     }
@@ -637,12 +631,7 @@ log::info("{}: Sent Papyrus event '{}' for timeline {} to {} receivers", __FUNCT
         
         auto* playerCamera = RE::PlayerCamera::GetSingleton();
         if (playerCamera && playerCamera->IsInFreeCameraMode()) {
-            if (playerCamera->IsInFreeCameraMode()) {
-                playerCamera->ToggleFreeCameraMode(false);
-            } else {
-                log::warn("{}: Not in free camera mode", __FUNCTION__);
-            }
-
+            playerCamera->ToggleFreeCameraMode(false);
             
             auto* ui = RE::UI::GetSingleton();
             if (ui) {
@@ -668,8 +657,8 @@ log::info("{}: Sent Papyrus event '{}' for timeline {} to {} receivers", __FUNCT
         log::info("{}: Stopped playback on timeline {}", __FUNCTION__, a_timelineID);
         
         // Dispatch playback stopped event
-        DispatchTimelineEvent(static_cast<uint32_t>(FCFW_API::FCFWMessage::kTimelinePlaybackStopped), a_timelineID);
-        DispatchTimelineEventPapyrus("OnTimelinePlaybackStopped", a_timelineID);
+        DispatchTimelineEvent(static_cast<uint32_t>(FCFW_API::FCFWMessage::kPlaybackStop), a_timelineID);
+        DispatchTimelineEventPapyrus("OnPlaybackStop", a_timelineID);
         
         return true;
     }
@@ -736,8 +725,8 @@ log::info("{}: Sent Papyrus event '{}' for timeline {} to {} receivers", __FUNCT
         m_activeTimelineID = 0;  // Temporarily clear to allow new timeline activation
         
         // Dispatch stop event for source timeline
-        DispatchTimelineEvent(static_cast<uint32_t>(FCFW_API::FCFWMessage::kTimelinePlaybackStopped), a_fromTimelineID);
-        DispatchTimelineEventPapyrus("OnTimelinePlaybackStopped", a_fromTimelineID);
+        DispatchTimelineEvent(static_cast<uint32_t>(FCFW_API::FCFWMessage::kPlaybackStop), a_fromTimelineID);
+        DispatchTimelineEventPapyrus("OnPlaybackStop", a_fromTimelineID);
         
         // Initialize target timeline (StartPlayback will call UpdateCameraPoints internally)
         toState->m_timeline.ResetPlayback();
@@ -764,8 +753,8 @@ log::info("{}: Sent Papyrus event '{}' for timeline {} to {} receivers", __FUNCT
         toState->m_isCompletedAndWaiting = false;
         
         // Dispatch start event for target timeline
-        DispatchTimelineEvent(static_cast<uint32_t>(FCFW_API::FCFWMessage::kTimelinePlaybackStarted), a_toTimelineID);
-        DispatchTimelineEventPapyrus("OnTimelinePlaybackStarted", a_toTimelineID);
+        DispatchTimelineEvent(static_cast<uint32_t>(FCFW_API::FCFWMessage::kPlaybackStart), a_toTimelineID);
+        DispatchTimelineEventPapyrus("OnPlaybackStart", a_toTimelineID);
         
         log::info("{}: Successfully switched to timeline {}", __FUNCTION__, a_toTimelineID);
         return true;
@@ -897,7 +886,7 @@ log::info("{}: Sent Papyrus event '{}' for timeline {} to {} receivers", __FUNCT
         return state->m_allowUserRotation;
     }
 
-    bool TimelineManager::SetPlaybackMode(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, int a_playbackMode) {
+    bool TimelineManager::SetPlaybackMode(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, int a_playbackMode, float a_loopTimeOffset) {
         std::lock_guard<std::recursive_mutex> lock(m_timelineMutex);
         
         TimelineState* state = GetTimeline(a_timelineID, a_pluginHandle);
@@ -912,6 +901,7 @@ log::info("{}: Sent Papyrus event '{}' for timeline {} to {} receivers", __FUNCT
         
         PlaybackMode mode = static_cast<PlaybackMode>(a_playbackMode);
         state->m_timeline.SetPlaybackMode(mode);
+        state->m_timeline.SetLoopTimeOffset(a_loopTimeOffset);
         
         return true;
     }
@@ -1051,7 +1041,6 @@ state->m_timeline.GetRotationPointCount(), a_timelineID, a_filePath);
     }
 
     size_t TimelineManager::RegisterTimeline(SKSE::PluginHandle a_pluginHandle) {
-        log::info("{}: ENTER - Plugin handle {}", __FUNCTION__, a_pluginHandle);
         
         std::lock_guard<std::recursive_mutex> lock(m_timelineMutex);
         
