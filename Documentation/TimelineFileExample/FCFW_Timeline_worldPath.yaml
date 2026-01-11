@@ -1,0 +1,86 @@
+# FreeCameraFramework Timeline (YAML format)
+formatVersion: 1
+
+playbackMode: wait
+loopTimeOffset: 0.0
+globalEaseIn: false
+globalEaseOut: false
+showMenusDuringPlayback: false
+allowUserRotation: true
+useDegrees: true
+
+translationPoints:
+  - time: 0
+    type: world
+    position: [5103.1, -15151.4, -5098.13]
+    interpolationMode: cubicHermite
+  - time: 1
+    type: world
+    position: [5104.75, -15171.3, -5098.24]
+    interpolationMode: cubicHermite
+  - time: 2
+    type: world
+    position: [5060.46, -16146.7, -4988.79]
+    interpolationMode: cubicHermite
+  - time: 3
+    type: world
+    position: [4440.37, -16498.3, -4865.96]
+    interpolationMode: cubicHermite
+  - time: 4
+    type: world
+    position: [3876.84, -16041.7, -4908.09]
+    interpolationMode: cubicHermite
+  - time: 5
+    type: world
+    position: [4250.91, -15494.1, -5078.12]
+    interpolationMode: cubicHermite
+  - time: 6
+    type: world
+    position: [5021.69, -15739.6, -5127.54]
+    interpolationMode: cubicHermite
+  - time: 7
+    type: world
+    position: [5604.94, -16201.2, -4872.48]
+    interpolationMode: cubicHermite
+  - time: 8
+    type: world
+    position: [5730.04, -17060.6, -4662.35]
+    interpolationMode: cubicHermite
+
+rotationPoints:
+  - time: 0
+    type: world
+    rotation: [0.00615747, 3.06069]
+    interpolationMode: cubicHermite
+  - time: 1
+    type: world
+    rotation: [0.00553213, 3.05937]
+    interpolationMode: cubicHermite
+  - time: 2
+    type: world
+    rotation: [6.06268, 3.68628]
+    interpolationMode: cubicHermite
+  - time: 3
+    type: world
+    rotation: [6.19836, 4.80869]
+    interpolationMode: cubicHermite
+  - time: 4
+    type: world
+    rotation: [0.246377, 6.02453]
+    interpolationMode: cubicHermite
+  - time: 5
+    type: world
+    rotation: [0.160888, 1.41267]
+    interpolationMode: cubicHermite
+  - time: 6
+    type: world
+    rotation: [6.16173, 2.08814]
+    interpolationMode: cubicHermite
+  - time: 7
+    type: world
+    rotation: [5.88728, 2.52834]
+    interpolationMode: cubicHermite
+  - time: 8
+    type: world
+    rotation: [6.19881, 3.61824]
+    interpolationMode: cubicHermite

@@ -313,7 +313,8 @@ log::info("{}: Setting playbackMode: {}", __FUNCTION__, static_cast<int>(a_mode)
 			currentPoint.m_transition.m_easeIn,
 			currentPoint.m_transition.m_easeOut);
 
-		TransitionPoint result = prevPoint + (currentPoint - prevPoint) * t;
+		// Use the LinearInterpolate method which handles angular wrapping for rotation
+		TransitionPoint result = prevPoint.LinearInterpolate(prevPoint, currentPoint, t);
 		return result.GetPoint();
 	}
 

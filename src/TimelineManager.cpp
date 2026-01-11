@@ -98,7 +98,7 @@ log::info("{}: Sent Papyrus event '{}' for timeline {} to {} receivers", __FUNCT
         RecordTimeline(activeState);
     }
 
-    bool TimelineManager::StartRecording(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID) {
+    bool TimelineManager::StartRecording(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, float a_recordingInterval, bool a_append, float a_timeOffset) {
         std::lock_guard<std::recursive_mutex> lock(m_timelineMutex);
         
         // Check if any timeline is already active
@@ -123,31 +123,57 @@ log::info("{}: Sent Papyrus event '{}' for timeline {} to {} receivers", __FUNCT
             return false;
         }
 
-        // Enter free camera mode
+        // Validate and set recording interval
+        if (a_recordingInterval < 0.0f) {
+            log::warn("{}: Negative recording interval ({}) provided, treating as 0.0 (every frame)", __FUNCTION__, a_recordingInterval);
+            state->m_recordingInterval = 0.0f;
+        } else if (a_recordingInterval == 0.0f) {
+            state->m_recordingInterval = 0.0f;
+        } else {
+            state->m_recordingInterval = a_recordingInterval;
+        }
+
         playerCamera->ToggleFreeCameraMode(false);
+
+        // Calculate start time and easing based on append mode
+        float startTime = 0.0f;
+        bool useEaseIn = true;
+        
+        if (a_append) {
+            // Get the latest point time from either track
+            float timelineDuration = state->m_timeline.GetDuration();
+            
+            if (timelineDuration > 0.0f) {
+                // Timeline has existing points - append after them
+                startTime = timelineDuration + a_timeOffset;
+                useEaseIn = false;  // Not the first point
+            } else {
+                // Timeline is empty - use timeOffset as absolute start time
+                startTime = a_timeOffset;
+                useEaseIn = false;  // No easing when starting at non-zero time
+            }
+        } else {
+            state->m_timeline.ClearPoints();
+        }
 
         // Set as active timeline
         m_activeTimelineID = a_timelineID;
         state->m_isRecording = true;
-        state->m_currentRecordingTime = 0.0f;
-        state->m_lastRecordedPointTime = -m_recordingInterval;  // Ensure first point is captured immediately
-        
-        // Clear existing points
-        state->m_timeline.ClearPoints();
-        
+        state->m_currentRecordingTime = startTime;
+        state->m_lastRecordedPointTime = startTime - state->m_recordingInterval;  // Ensure first point is captured immediately
+
         // Add initial point
         RE::NiPoint3 cameraPos = _ts_SKSEFunctions::GetCameraPos();
         RE::NiPoint3 cameraRot = _ts_SKSEFunctions::GetCameraRotation();
         
-        Transition transTranslation(0.0f, InterpolationMode::kCubicHermite, true, false);
+        Transition transTranslation(startTime, InterpolationMode::kCubicHermite, useEaseIn, false);
         TranslationPoint translationPoint(transTranslation, PointType::kWorld, cameraPos);
         state->m_timeline.AddTranslationPoint(translationPoint);
         
-        Transition transRotation(0.0f, InterpolationMode::kCubicHermite, true, false);
+        Transition transRotation(startTime, InterpolationMode::kCubicHermite, useEaseIn, false);
         RotationPoint rotationPoint(transRotation, PointType::kWorld, RE::BSTPoint2<float>({cameraRot.x, cameraRot.z}));
         state->m_timeline.AddRotationPoint(rotationPoint);
         
-        log::info("{}: Started recording on timeline {}", __FUNCTION__, a_timelineID);
         return true;
     }
 
@@ -1014,7 +1040,7 @@ state->m_timeline.GetRotationPointCount() - rotationPointCount, a_filePath, a_ti
 		file << "# FreeCameraFramework Timeline (YAML format)\n";
 		file << "formatVersion: 1\n\n";
 		
-    	file << "playbackMode: " << PlaybackModeToString(state->m_timeline.GetPlaybackMode()) << "  # end, loop, or wait\n";
+    	file << "playbackMode: " << PlaybackModeToString(state->m_timeline.GetPlaybackMode()) << "\n";
     	file << "loopTimeOffset: " << state->m_timeline.GetLoopTimeOffset() << "\n";
     	file << "globalEaseIn: " << (state->m_globalEaseIn ? "true" : "false") << "\n";
     	file << "globalEaseOut: " << (state->m_globalEaseOut ? "true" : "false") << "\n";
@@ -1040,8 +1066,7 @@ state->m_timeline.GetRotationPointCount(), a_timelineID, a_filePath);
         return true;
     }
 
-    size_t TimelineManager::RegisterTimeline(SKSE::PluginHandle a_pluginHandle) {
-        
+    size_t TimelineManager::RegisterTimeline(SKSE::PluginHandle a_pluginHandle) {        
         std::lock_guard<std::recursive_mutex> lock(m_timelineMutex);
         
         size_t newID = m_nextTimelineID.fetch_add(1);
@@ -1162,7 +1187,8 @@ state->m_timeline.GetRotationPointCount(), a_timelineID, a_filePath);
         
         a_state->m_currentRecordingTime += _ts_SKSEFunctions::GetRealTimeDeltaTime();
         
-        if (a_state->m_currentRecordingTime - a_state->m_lastRecordedPointTime >= m_recordingInterval) {
+        if (a_state->m_recordingInterval == 0.0f || 
+            (a_state->m_currentRecordingTime - a_state->m_lastRecordedPointTime >= a_state->m_recordingInterval)) {
             // Capture camera position/rotation as kWorld points
             RE::NiPoint3 cameraPos = _ts_SKSEFunctions::GetCameraPos();
             RE::NiPoint3 cameraRot = _ts_SKSEFunctions::GetCameraRotation();

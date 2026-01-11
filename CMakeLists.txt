@@ -4,7 +4,7 @@ cmake_minimum_required(VERSION 3.21)
 
 # Set your project name. This will be the name of your SKSE .dll file.
 set(NAME "FreeCameraFramework" CACHE STRING "")
-set(VERSION 0.0.1 CACHE STRING "")
+set(VERSION 0.9.0 CACHE STRING "")
 
 project(
 	${NAME}
@@ -52,6 +52,15 @@ endif()
 
 add_subdirectory("$ENV{CommonLibSSEPath_NG}" CommonLibSSE EXCLUDE_FROM_ALL)
 
+# --- ClibUtils: Use local path from environment variable ---
+set(CLIBUTILS_PATH $ENV{CLibUtilsPath})
+
+if(NOT CLIBUTILS_PATH)
+    message(FATAL_ERROR "CLibUtilsPath environment variable is not set!")
+endif()
+
+add_subdirectory("$ENV{CLibUtilsPath}" ClibUtils EXCLUDE_FROM_ALL)
+
 # Add your SKSE plugin target
 add_library(${PROJECT_NAME} SHARED ${SOURCES})
 target_compile_features(${PROJECT_NAME} PRIVATE cxx_std_23) # <--- use C++23 standard
@@ -64,6 +73,9 @@ target_link_libraries(${PROJECT_NAME} PRIVATE spdlog::spdlog)
 
 # Link to CommonLibSSE (adjust the library name if needed)
 target_link_libraries(${PROJECT_NAME} PRIVATE CommonLibSSE::CommonLibSSE)
+
+# Link to CLibUtil (header-only interface library)
+target_link_libraries(${PROJECT_NAME} PRIVATE CLibUtil::CLibUtil)
 
 # Link yaml-cpp for YAML timeline format
 find_package(yaml-cpp CONFIG REQUIRED)
@@ -119,6 +131,51 @@ if(DEFINED OUTPUT_FOLDER)
         POST_BUILD
         COMMAND "${CMAKE_COMMAND}" -E make_directory "${SOURCE_SCRIPTS_FOLDER}"
         COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${CMAKE_CURRENT_SOURCE_DIR}/source/scripts/FCFW_SKSEFunctions.psc" "${SOURCE_SCRIPTS_FOLDER}/FCFW_SKSEFunctions.psc"
+        VERBATIM
+    )
+
+    # Copy Documentation folder and all its contents
+    set(DOCUMENTATION_FOLDER "${OUTPUT_FOLDER}/Documentation")
+    message(STATUS "Documentation output folder: ${DOCUMENTATION_FOLDER}")
+
+    add_custom_command(
+        TARGET "${PROJECT_NAME}"
+        POST_BUILD
+        COMMAND "${CMAKE_COMMAND}" -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}/Documentation" "${DOCUMENTATION_FOLDER}"
+        VERBATIM
+    )
+
+    # Copy FCFW_PAPYRUS_REFERENCE.md to Documentation folder
+    add_custom_command(
+        TARGET "${PROJECT_NAME}"
+        POST_BUILD
+        COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${CMAKE_CURRENT_SOURCE_DIR}/Documentation/FCFW_PAPYRUS_REFERENCE.md" "${DOCUMENTATION_FOLDER}/FCFW_PAPYRUS_REFERENCE.md"
+        VERBATIM
+    )
+
+    # Copy example scripts directly to Documentation output folder (not to project dir)
+    add_custom_command(
+        TARGET "${PROJECT_NAME}"
+        POST_BUILD
+        COMMAND "${CMAKE_COMMAND}" -E make_directory "${DOCUMENTATION_FOLDER}/PapyrusExample/Scripts"
+        COMMAND "${CMAKE_COMMAND}" -E make_directory "${DOCUMENTATION_FOLDER}/PapyrusExample/Source/Scripts"
+        COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${CMAKE_CURRENT_SOURCE_DIR}/scripts/FCFW_EXAMPLE_QUESTSCRIPT.pex" "${DOCUMENTATION_FOLDER}/PapyrusExample/Scripts/FCFW_EXAMPLE_QUESTSCRIPT.pex"
+        COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${CMAKE_CURRENT_SOURCE_DIR}/source/scripts/FCFW_EXAMPLE_QUESTSCRIPT.psc" "${DOCUMENTATION_FOLDER}/PapyrusExample/Source/Scripts/FCFW_EXAMPLE_QUESTSCRIPT.psc"
+        VERBATIM
+    )
+
+    # Copy PapyrusExample to separate example mod folder
+    set(EXAMPLE_MOD_FOLDER "C:/Users/tom/AppData/Local/ModOrganizer/MO_SkyrimSE/mods/_DEV_FCFW_EXAMPLE")
+    message(STATUS "Example mod output folder: ${EXAMPLE_MOD_FOLDER}")
+
+    add_custom_command(
+        TARGET "${PROJECT_NAME}"
+        POST_BUILD
+        COMMAND "${CMAKE_COMMAND}" -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}/Documentation/PapyrusExample" "${EXAMPLE_MOD_FOLDER}"
+        COMMAND "${CMAKE_COMMAND}" -E make_directory "${EXAMPLE_MOD_FOLDER}/Scripts"
+        COMMAND "${CMAKE_COMMAND}" -E make_directory "${EXAMPLE_MOD_FOLDER}/Source/Scripts"
+        COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${CMAKE_CURRENT_SOURCE_DIR}/scripts/FCFW_EXAMPLE_QUESTSCRIPT.pex" "${EXAMPLE_MOD_FOLDER}/Scripts/FCFW_EXAMPLE_QUESTSCRIPT.pex"
+        COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${CMAKE_CURRENT_SOURCE_DIR}/source/scripts/FCFW_EXAMPLE_QUESTSCRIPT.psc" "${EXAMPLE_MOD_FOLDER}/Source/Scripts/FCFW_EXAMPLE_QUESTSCRIPT.psc"
         VERBATIM
     )
 endif()

@@ -140,10 +140,10 @@ Apply to RE::FreeCameraState (position/rotation)
 **Testing Entry Points:**
 1. Launch Skyrim AE with SKSE
 2. Open console: `tfc` (enable free camera)
-3. From Papyrus: Call `FCFW_RegisterTimeline("YourMod.esp")` to get a timeline ID
-4. Call `FCFW_StartRecording("YourMod.esp", timelineID)` to begin recording
-5. Move camera, then call `FCFW_StopRecording("YourMod.esp", timelineID)` to stop
-6. Exit free camera (`tfc`), then call `FCFW_StartPlayback("YourMod.esp", timelineID, ...)` to play timeline
+3. From Papyrus: Call `RegisterTimeline("YourMod.esp")` to get a timeline ID
+4. Call `StartRecording("YourMod.esp", timelineID)` to begin recording
+5. Move camera, then call `StopRecording("YourMod.esp", timelineID)` to stop
+6. Exit free camera (`tfc`), then call `StartPlayback("YourMod.esp", timelineID, ...)` to play timeline
 7. Check logs: `Documents/My Games/Skyrim Special Edition/SKSE/FreeCameraFramework.log`
 
 **Common Pitfalls & Debugging:**
@@ -248,71 +248,71 @@ RequestPluginAPI(InterfaceVersion) [Mod API entry]
 **Multi-Timeline Management:**
 | Papyrus Function | Return | Parameters | Notes |
 |-----------------|--------|------------|-------|
-| `FCFW_RegisterTimeline` | int | modName | Returns new timeline ID for your mod |
-| `FCFW_UnregisterTimeline` | bool | modName, timelineID | Remove timeline (requires ownership) |
+| `RegisterTimeline` | int | modName | Returns new timeline ID for your mod |
+| `UnregisterTimeline` | bool | modName, timelineID | Remove timeline (requires ownership) |
 
 **Event Callback Registration:**
 | Papyrus Function | Return | Parameters | Notes |
 |-----------------|--------|------------|-------|
-| `FCFW_RegisterForTimelineEvents` | void | form | Register a form to receive playback events |
-| `FCFW_UnregisterForTimelineEvents` | void | form | Unregister a form from receiving events |
+| `RegisterForTimelineEvents` | void | form | Register a form to receive playback events |
+| `UnregisterForTimelineEvents` | void | form | Unregister a form from receiving events |
 
 **Camera Utility Functions:**
 | Papyrus Function | Return | Parameters | Notes |
 |-----------------|--------|------------|-------|
-| `FCFW_GetCameraPosX` | float | - | Get current camera X position (world coordinates) |
-| `FCFW_GetCameraPosY` | float | - | Get current camera Y position (world coordinates) |
-| `FCFW_GetCameraPosZ` | float | - | Get current camera Z position (world coordinates) |
-| `FCFW_GetCameraPitch` | float | - | Get current camera pitch in radians |
-| `FCFW_GetCameraYaw` | float | - | Get current camera yaw in radians |
+| `GetCameraPosX` | float | - | Get current camera X position (world coordinates) |
+| `GetCameraPosY` | float | - | Get current camera Y position (world coordinates) |
+| `GetCameraPosZ` | float | - | Get current camera Z position (world coordinates) |
+| `GetCameraPitch` | float | - | Get current camera pitch in radians |
+| `GetCameraYaw` | float | - | Get current camera yaw in radians |
 
 **Timeline Building Functions:**
 | Papyrus Function | Return | Parameters | Notes |
 |-----------------|--------|------------|-------|
-| `FCFW_AddTranslationPointAtCamera` | int | **modName, timelineID**, time, easeIn, easeOut, interpolationMode | Captures camera position |
-| `FCFW_AddTranslationPoint` | int | **modName, timelineID**, time, posX, posY, posZ, easeIn, easeOut, interpolationMode | Absolute world position (Papyrus accepts individual coordinates) |
-| `FCFW_AddTranslationPointAtRef` | int | **modName, timelineID**, time, ref, offsetX/Y/Z, isOffsetRelative, easeIn, easeOut, interpolationMode | Ref-based position |
-| `FCFW_AddRotationPointAtCamera` | int | **modName, timelineID**, time, easeIn, easeOut, interpolationMode | Captures camera rotation |
-| `FCFW_AddRotationPoint` | int | **modName, timelineID**, time, pitch, yaw, easeIn, easeOut, interpolationMode | Absolute world rotation (Papyrus accepts individual pitch/yaw) |
-| `FCFW_AddRotationPointAtRef` | int | **modName, timelineID**, time, ref, offsetPitch/Yaw, isOffsetRelative, easeIn, easeOut, interpolationMode | Ref-based rotation |
-| `FCFW_RemoveTranslationPoint` | bool | **modName, timelineID**, index | Remove by index (requires ownership) |
-| `FCFW_RemoveRotationPoint` | bool | **modName, timelineID**, index | Remove by index (requires ownership) |
-| `FCFW_ClearTimeline` | bool | **modName, timelineID** | Clear all points (requires ownership) |
-| `FCFW_GetTranslationPointCount` | int | **modName, timelineID** | Query point count (-1 if timeline not found) |
-| `FCFW_GetRotationPointCount` | int | **modName, timelineID** | Query point count (-1 if timeline not found) |
-| `FCFW_GetTranslationPointX` | float | **modName, timelineID**, index | Get X coordinate of translation point. Returns 0.0 on error. |
-| `FCFW_GetTranslationPointY` | float | **modName, timelineID**, index | Get Y coordinate of translation point. Returns 0.0 on error. |
-| `FCFW_GetTranslationPointZ` | float | **modName, timelineID**, index | Get Z coordinate of translation point. Returns 0.0 on error. |
-| `FCFW_GetRotationPointPitch` | float | **modName, timelineID**, index | Get pitch (radians) of rotation point. Returns 0.0 on error. |
-| `FCFW_GetRotationPointYaw` | float | **modName, timelineID**, index | Get yaw (radians) of rotation point. Returns 0.0 on error. |
+| `AddTranslationPointAtCamera` | int | **modName, timelineID**, time, easeIn, easeOut, interpolationMode | Captures camera position |
+| `AddTranslationPoint` | int | **modName, timelineID**, time, posX, posY, posZ, easeIn, easeOut, interpolationMode | Absolute world position (Papyrus accepts individual coordinates) |
+| `AddTranslationPointAtRef` | int | **modName, timelineID**, time, ref, offsetX/Y/Z, isOffsetRelative, easeIn, easeOut, interpolationMode | Ref-based position |
+| `AddRotationPointAtCamera` | int | **modName, timelineID**, time, easeIn, easeOut, interpolationMode | Captures camera rotation |
+| `AddRotationPoint` | int | **modName, timelineID**, time, pitch, yaw, easeIn, easeOut, interpolationMode | Absolute world rotation (Papyrus accepts individual pitch/yaw) |
+| `AddRotationPointAtRef` | int | **modName, timelineID**, time, ref, offsetPitch/Yaw, isOffsetRelative, easeIn, easeOut, interpolationMode | Ref-based rotation |
+| `RemoveTranslationPoint` | bool | **modName, timelineID**, index | Remove by index (requires ownership) |
+| `RemoveRotationPoint` | bool | **modName, timelineID**, index | Remove by index (requires ownership) |
+| `ClearTimeline` | bool | **modName, timelineID** | Clear all points (requires ownership) |
+| `GetTranslationPointCount` | int | **modName, timelineID** | Query point count (-1 if timeline not found) |
+| `GetRotationPointCount` | int | **modName, timelineID** | Query point count (-1 if timeline not found) |
+| `GetTranslationPointX` | float | **modName, timelineID**, index | Get X coordinate of translation point. Returns 0.0 on error. |
+| `GetTranslationPointY` | float | **modName, timelineID**, index | Get Y coordinate of translation point. Returns 0.0 on error. |
+| `GetTranslationPointZ` | float | **modName, timelineID**, index | Get Z coordinate of translation point. Returns 0.0 on error. |
+| `GetRotationPointPitch` | float | **modName, timelineID**, index | Get pitch (radians) of rotation point. Returns 0.0 on error. |
+| `GetRotationPointYaw` | float | **modName, timelineID**, index | Get yaw (radians) of rotation point. Returns 0.0 on error. |
 
 **Recording Functions:**
 | Papyrus Function | Return | Parameters | Notes |
 |-----------------|--------|------------|-------|
-| `FCFW_StartRecording` | bool | **modName, timelineID** | Begin capturing (requires ownership) |
-| `FCFW_StopRecording` | bool | **modName, timelineID** | Stop capturing (requires ownership) |
+| `StartRecording` | bool | **modName, timelineID**, recordingInterval, append, timeOffset | Begin capturing. recordingInterval=1.0 (default): 1 point/sec. 0.0: every frame. append=false (default): clears timeline. append=true: continues after existing points with timeOffset gap (requires ownership) |
+| `StopRecording` | bool | **modName, timelineID** | Stop capturing (requires ownership) |
 
 **Playback Functions:**
 | Papyrus Function | Return | Parameters | Notes |
 |-----------------|--------|------------|-------|
-| `FCFW_StartPlayback` | bool | **modName, timelineID**, speed, globalEaseIn, globalEaseOut, useDuration, duration | Begin timeline playback (validates ownership) |
-| `FCFW_StopPlayback` | bool | **modName, timelineID** | Stop playback (validates ownership) |
-| `FCFW_SwitchPlayback` | bool | **modName, fromTimelineID, toTimelineID** | Glitch-free timeline switch (validates ownership of both source and target timelines) |
-| `FCFW_PausePlayback` | bool | **modName, timelineID** | Pause playback (validates ownership) |
-| `FCFW_ResumePlayback` | bool | **modName, timelineID** | Resume from pause (validates ownership) |
-| `FCFW_IsPlaybackPaused` | bool | **modName, timelineID** | Query pause state (validates ownership) |
-| `FCFW_IsPlaybackRunning` | bool | **modName, timelineID** | Query playback state (validates ownership) |
-| `FCFW_IsRecording` | bool | **modName, timelineID** | Query recording state (validates ownership) |
-| `FCFW_GetActiveTimelineID` | int | - | Get ID of currently active timeline (0 if none) |
-| `FCFW_AllowUserRotation` | void | **modName, timelineID**, allow | Enable/disable user camera control (validates ownership) |
-| `FCFW_IsUserRotationAllowed` | bool | **modName, timelineID** | Query user rotation state (validates ownership) |
-| `FCFW_SetPlaybackMode` | bool | **modName, timelineID**, playbackMode, loopTimeOffset | Set playback mode (0=kEnd, 1=kLoop, 2=kWait) and loop time offset - requires ownership |
+| `StartPlayback` | bool | **modName, timelineID**, speed, globalEaseIn, globalEaseOut, useDuration, duration | Begin timeline playback (validates ownership) |
+| `StopPlayback` | bool | **modName, timelineID** | Stop playback (validates ownership) |
+| `SwitchPlayback` | bool | **modName, fromTimelineID, toTimelineID** | Glitch-free timeline switch (validates ownership of both source and target timelines) |
+| `PausePlayback` | bool | **modName, timelineID** | Pause playback (validates ownership) |
+| `ResumePlayback` | bool | **modName, timelineID** | Resume from pause (validates ownership) |
+| `IsPlaybackPaused` | bool | **modName, timelineID** | Query pause state (validates ownership) |
+| `IsPlaybackRunning` | bool | **modName, timelineID** | Query playback state (validates ownership) |
+| `IsRecording` | bool | **modName, timelineID** | Query recording state (validates ownership) |
+| `GetActiveTimelineID` | int | - | Get ID of currently active timeline (0 if none) |
+| `AllowUserRotation` | void | **modName, timelineID**, allow | Enable/disable user camera control (validates ownership) |
+| `IsUserRotationAllowed` | bool | **modName, timelineID** | Query user rotation state (validates ownership) |
+| `SetPlaybackMode` | bool | **modName, timelineID**, playbackMode, loopTimeOffset | Set playback mode (0=kEnd, 1=kLoop, 2=kWait) and loop time offset - requires ownership |
 
 **Import/Export Functions:**
 | Papyrus Function | Return | Parameters | Notes |
 |-----------------|--------|------------|-------|
-| `FCFW_AddTimelineFromFile` | bool | **modName, timelineID**, filePath, timeOffset | Import YAML file (requires ownership) |
-| `FCFW_ExportTimeline` | bool | **modName, timelineID**, filePath | Export to YAML file (validates ownership) |
+| `AddTimelineFromFile` | bool | **modName, timelineID**, filePath, timeOffset | Import YAML file (requires ownership) |
+| `ExportTimeline` | bool | **modName, timelineID**, filePath | Export to YAML file (validates ownership) |
 
 **Parameter Notes:**
 - **modName**: Your mod's ESP/ESL filename (e.g., `"MyMod.esp"`), case-sensitive. Required for ALL timeline operations to validate that the calling plugin has access to the specified timeline.
@@ -344,27 +344,27 @@ Scriptname MyQuest extends Quest
 
 Event OnInit()
     ; Register THIS quest (which extends Form) to receive events
-    FCFW_SKSEFunctions.FCFW_RegisterForTimelineEvents(self as Form)
+    FCFW_SKSEFunctions.RegisterForTimelineEvents(self as Form)
 EndEvent
 
 Function SetupTimeline()
     ; First, register a new timeline to get its ID
-    int timelineID = FCFW_SKSEFunctions.FCFW_RegisterTimeline("MyMod.esp")
+    int timelineID = FCFW_SKSEFunctions.RegisterTimeline("MyMod.esp")
     
     ; Add some points...
-    FCFW_SKSEFunctions.FCFW_AddTranslationPoint("MyMod.esp", timelineID, 0.0, 100.0, 200.0, 300.0, false, false, 2)
-    FCFW_SKSEFunctions.FCFW_AddTranslationPoint("MyMod.esp", timelineID, 5.0, 400.0, 500.0, 600.0, false, false, 2)
+    FCFW_SKSEFunctions.AddTranslationPoint("MyMod.esp", timelineID, 0.0, 100.0, 200.0, 300.0, false, false, 2)
+    FCFW_SKSEFunctions.AddTranslationPoint("MyMod.esp", timelineID, 5.0, 400.0, 500.0, 600.0, false, false, 2)
     
     ; Set playback mode to kWait (2) - timeline will stay at final position
-    FCFW_SKSEFunctions.FCFW_SetPlaybackMode("MyMod.esp", timelineID, 2)
+    FCFW_SKSEFunctions.SetPlaybackMode("MyMod.esp", timelineID, 2)
     
     ; Start playback
-    FCFW_SKSEFunctions.FCFW_StartPlayback("MyMod.esp", timelineID, 1.0, false, false, false, 0.0)
+    FCFW_SKSEFunctions.StartPlayback("MyMod.esp", timelineID, 1.0, false, false, false, 0.0)
 EndFunction
 
 Function Cleanup()
     ; When done with timeline, unregister it to free resources
-    FCFW_SKSEFunctions.FCFW_UnregisterTimeline("MyMod.esp", timelineID)
+    FCFW_SKSEFunctions.UnregisterTimeline("MyMod.esp", timelineID)
 EndFunction
 
 Event OnPlaybackStart(int timelineID)
@@ -377,7 +377,7 @@ EndEvent
 
 Event OnPlaybackWait(int timelineID)
     Debug.Notification("Timeline " + timelineID + " completed (kWait mode)")
-    ; Timeline is now waiting at final position - call FCFW_StopPlayback when ready
+    ; Timeline is now waiting at final position - call StopPlayback when ready
 EndEvent
 ```
 
@@ -619,9 +619,6 @@ std::atomic<size_t> m_nextTimelineID{ 1 };              // Auto-incrementing ID 
 size_t m_activeTimelineID{ 0 };                         // Currently active timeline (0 = none)
 mutable std::recursive_mutex m_timelineMutex;           // Thread-safe access (recursive for reentrant safety)
 
-// Recording (shared across all timelines)
-float m_recordingInterval{ 1.0f };                      // Sample rate (1 point per second)
-
 // Playback (global state shared across all timelines)
 bool m_isShowingMenus{ true };                          // Pre-playback UI state (captured before starting playback)
 bool m_userTurning{ false };                            // User camera control flag
@@ -650,6 +647,7 @@ struct TimelineState {
     bool m_isRecording{ false };           // Currently capturing camera
     float m_currentRecordingTime{ 0.0f };  // Elapsed time during recording
     float m_lastRecordedPointTime{ 0.0f }; // Last sample timestamp
+    float m_recordingInterval{ 1.0f };     // Sample interval for this recording session (0.0 = every frame)
     
     // ===== PLAYBACK STATE (runtime, reset on StopPlayback) =====
     bool m_isPlaybackRunning{ false };     // Active playback
@@ -730,18 +728,33 @@ void TimelineManager::Update() {
 
 #### **Recording Lifecycle:**
 ```
-StartRecording(timelineID, pluginHandle)
+StartRecording(timelineID, pluginHandle, recordingInterval=1.0, append=false, timeOffset=0.0)
 ├─> Validate ownership: GetTimeline(timelineID, pluginHandle)
 ├─> Validate: Free camera mode, not already recording/playing (exclusive check)
-├─> ClearTimeline(timelineID, pluginHandle, notify=false)
-├─> Capture initial point (easeIn=true)
+├─> Set recording interval:
+│   ├─> IF recordingInterval < 0: log warning, set state->m_recordingInterval = 0.0
+│   ├─> ELSE IF recordingInterval == 0.0: set state->m_recordingInterval = 0.0 (every frame)
+│   └─> ELSE: set state->m_recordingInterval = recordingInterval
+├─> IF append=false:
+│   ├─> ClearTimeline(timelineID, pluginHandle, notify=false)
+│   ├─> startTime = 0.0
+│   └─> useEaseIn = true
+├─> ELSE IF append=true:
+│   ├─> Get timeline duration: max(translation, rotation track durations)
+│   ├─> IF duration > 0:
+│   │   ├─> startTime = duration + timeOffset
+│   │   └─> useEaseIn = false (not first point)
+│   └─> ELSE (timeline is empty):
+│       ├─> startTime = timeOffset
+│       └─> useEaseIn = false (non-zero start)
+├─> Capture initial point at startTime (easeIn=useEaseIn)
 ├─> Set state->isRecording = true
 └─> Set m_activeTimelineID = timelineID
 
 RecordTimeline(TimelineState* state) [called every frame]
 ├─> Check: state->isRecording (early exit if false)
 ├─> Update state->currentRecordingTime += deltaTime
-├─> If (time - lastSample >= m_recordingInterval):
+├─> If (state->recordingInterval == 0.0 OR time - lastSample >= state->recordingInterval):
 │   ├─> GetCameraPos/Rotation (from _ts_SKSEFunctions)
 │   ├─> AddTranslationPoint(timelineID, pluginHandle, kWorld, pos)
 │   ├─> AddRotationPoint(timelineID, pluginHandle, kWorld, rotation)
@@ -763,7 +776,10 @@ StopRecording(timelineID, pluginHandle)
 
 **Key Characteristics:**
 - **PointType:** Always creates `kWorld` points (static coordinates)
-- **Sampling:** Fixed 1-second intervals (`m_recordingInterval`, shared across all timelines)
+- **Sampling:** Session-specific interval (default 1.0 second, configurable per recording session)
+  - `recordingInterval > 0.0`: Fixed time intervals (e.g., 1.0 = 1 point per second)
+  - `recordingInterval = 0.0`: Captures every frame (frame-rate dependent, potentially hundreds/thousands of points per second)
+  - `recordingInterval < 0.0`: Treated as 0.0 with warning logged
 - **Interpolation:** All recorded points use `kCubicHermite` mode
 - **Position:** `_ts_SKSEFunctions::GetCameraPos()` returns current camera world position
 - **Rotation:** `_ts_SKSEFunctions::GetCameraRotation()` returns pitch (x) and yaw (z)
@@ -771,8 +787,8 @@ StopRecording(timelineID, pluginHandle)
 
 **Camera Utility Functions:**
 The following Papyrus API functions provide convenient access to current camera state:
-- `FCFW_GetCameraPosX/Y/Z()` - Returns individual X/Y/Z components of camera world position
-- `FCFW_GetCameraPitch/Yaw()` - Returns individual pitch/yaw components in radians
+- `GetCameraPosX/Y/Z()` - Returns individual X/Y/Z components of camera world position
+- `GetCameraPitch/Yaw()` - Returns individual pitch/yaw components in radians
 - These are simple wrappers around `_ts_SKSEFunctions::GetCameraPos()` and `GetCameraRotation()`
 - Useful for: dynamic timeline generation, debugging, conditional logic based on camera state
 - No parameters required, no ownership validation (reads global camera state)
@@ -1300,13 +1316,13 @@ FreeCameraFramework uses YAML for timeline import/export, providing human-readab
 formatVersion: 1
 
 # Metadata section
-playbackMode: end  # end, loop, or wait
+playbackMode: end
 loopTimeOffset: 0.0
 globalEaseIn: false
 globalEaseOut: false
 showMenusDuringPlayback: false
 allowUserRotation: true
-useDegrees: true  # Rotation angles in degrees (false=radians)
+useDegrees: true
 
 # Translation points
 translationPoints:
@@ -1578,8 +1594,8 @@ void UnregisterForTimelineEvents(RE::StaticFunctionTag*, RE::TESForm* a_form) {
 }
 
 // Registration in RegisterPapyrusFunctions():
-a_vm->RegisterFunction("FCFW_RegisterForTimelineEvents", "FCFW_SKSEFunctions", RegisterForTimelineEvents);
-a_vm->RegisterFunction("FCFW_UnregisterForTimelineEvents", "FCFW_SKSEFunctions", UnregisterForTimelineEvents);
+a_vm->RegisterFunction("RegisterForTimelineEvents", "FCFW_SKSEFunctions", RegisterForTimelineEvents);
+a_vm->RegisterFunction("UnregisterForTimelineEvents", "FCFW_SKSEFunctions", UnregisterForTimelineEvents);
 ```
 
 **Papyrus Consumer Pattern (FCFW_SKSEFunctions.psc):**
@@ -1587,7 +1603,7 @@ a_vm->RegisterFunction("FCFW_UnregisterForTimelineEvents", "FCFW_SKSEFunctions",
 Scriptname MyQuest extends Quest
 
 Event OnInit()
-    FCFW_SKSEFunctions.FCFW_RegisterForTimelineEvents(self)
+    FCFW_SKSEFunctions.RegisterForTimelineEvents(self)
 EndEvent
 
 Event OnPlaybackStart(int timelineID)

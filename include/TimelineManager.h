@@ -24,6 +24,7 @@ namespace FCFW {
         bool m_isRecording{ false };           // Currently capturing camera
         float m_currentRecordingTime{ 0.0f };  // Elapsed time during recording
         float m_lastRecordedPointTime{ 0.0f }; // Last sample timestamp
+        float m_recordingInterval{ 1.0f };     // Sample interval for this recording session (0.0 = every frame)
         
         // ===== PLAYBACK STATE (runtime, reset on StopPlayback) =====
         bool m_isPlaybackRunning{ false };     // Active playback
@@ -44,7 +45,7 @@ namespace FCFW {
 
             void Update();
 
-            bool StartRecording(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID);
+            bool StartRecording(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, float a_recordingInterval = 1.0f, bool a_append = false, float a_timeOffset = 0.0f);
             bool StopRecording(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID);
 
             int AddTranslationPointAtCamera(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, float a_time, bool a_easeIn, bool a_easeOut, InterpolationMode a_interpolationMode);
@@ -110,10 +111,7 @@ namespace FCFW {
             mutable std::recursive_mutex m_timelineMutex;  // Protect map operations (recursive for reentrant safety)
             std::atomic<size_t> m_nextTimelineID{ 1 };     // ID generator
             size_t m_activeTimelineID{ 0 };            // Which timeline is active (0 = none)
-            
-            // Recording (shared across all timelines)
-            float m_recordingInterval = 1.0f;         // Sample rate (1 point per second)
-            
+                        
             // Playback
             bool m_isShowingMenus = true;         // Whether menus were showing before playback started
             bool m_userTurning = false;           // Whether user is manually controlling camera during playback

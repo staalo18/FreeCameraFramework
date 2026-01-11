@@ -1,0 +1,77 @@
+# FreeCameraFramework Timeline (YAML format)
+formatVersion: 1
+
+playbackMode: loop
+loopTimeOffset: 1.0
+globalEaseIn: false
+globalEaseOut: false
+showMenusDuringPlayback: false
+allowUserRotation: true
+useDegrees: true
+
+translationPoints:
+  - time: 0
+    type: reference
+    offset: [0, 1000, 200]
+    reference:
+      plugin: Skyrim.esm
+      formID: 0xD8C56
+    interpolationMode: cubicHermite
+  - time: 1
+    type: reference
+    offset: [707.1, 707.1, 200]
+    reference:
+      plugin: Skyrim.esm
+      formID: 0xD8C56
+    interpolationMode: cubicHermite
+  - time: 2
+    type: reference
+    offset: [1000, 0, 200]
+    reference:
+      plugin: Skyrim.esm
+      formID: 0xD8C56
+    interpolationMode: cubicHermite
+  - time: 3
+    type: reference
+    offset: [707.1, -707.1, 200]
+    reference:
+      plugin: Skyrim.esm
+      formID: 0xD8C56
+    interpolationMode: cubicHermite
+  - time: 4
+    type: reference
+    offset: [0, -1000, 200]
+    reference:
+      plugin: Skyrim.esm
+      formID: 0xD8C56
+    interpolationMode: cubicHermite
+  - time: 5
+    type: reference
+    offset: [-707.1, -707.1, 200]
+    reference:
+      plugin: Skyrim.esm
+      formID: 0xD8C56
+    interpolationMode: cubicHermite
+  - time: 6
+    type: reference
+    offset: [-1000, 0, 200]
+    reference:
+      plugin: Skyrim.esm
+      formID: 0xD8C56
+    interpolationMode: cubicHermite
+  - time: 7
+    type: reference
+    offset: [-707.1, 707.1, 200]
+    reference:
+      plugin: Skyrim.esm
+      formID: 0xD8C56
+    interpolationMode: cubicHermite
+
+rotationPoints:
+  - time: 0
+    type: reference
+    offset: [0, 0]
+    reference:
+      plugin: Skyrim.esm
+      formID: 0xD8C56
+    interpolationMode: linear

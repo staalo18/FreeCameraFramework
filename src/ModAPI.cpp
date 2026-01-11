@@ -54,8 +54,8 @@ int Messaging::FCFWInterface::AddRotationPointAtCamera(SKSE::PluginHandle a_plug
     return FCFW::TimelineManager::GetSingleton().AddRotationPointAtCamera(a_pluginHandle, a_timelineID, a_time, a_easeIn, a_easeOut, FCFW::ToInterpolationMode(a_interpolationMode));
 }
 
-bool Messaging::FCFWInterface::StartRecording(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID) const noexcept {
-    return FCFW::TimelineManager::GetSingleton().StartRecording(a_pluginHandle, a_timelineID);
+bool Messaging::FCFWInterface::StartRecording(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, float a_recordingInterval, bool a_append, float a_timeOffset) const noexcept {
+    return FCFW::TimelineManager::GetSingleton().StartRecording(a_pluginHandle, a_timelineID, a_recordingInterval, a_append, a_timeOffset);
 }
 
 bool Messaging::FCFWInterface::StopRecording(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID) const noexcept {

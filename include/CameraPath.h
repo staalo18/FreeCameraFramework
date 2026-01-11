@@ -81,8 +81,22 @@ namespace FCFW {
                    std::abs(pos.z - otherPos.z) < EPSILON_COMPARISON;
         }
        
+        TranslationPoint LinearInterpolate(const TranslationPoint& p1, const TranslationPoint& p2, float t) const {
+            TranslationPoint result;
+            result.m_transition = m_transition;
+            
+            auto pt1 = p1.GetPoint();
+            auto pt2 = p2.GetPoint();
+            
+            result.m_point.x = pt1.x + t * (pt2.x - pt1.x);
+            result.m_point.y = pt1.y + t * (pt2.y - pt1.y);
+            result.m_point.z = pt1.z + t * (pt2.z - pt1.z);
+            
+            return result;
+        }
+        
         TranslationPoint CubicHermite(const TranslationPoint& p0, const TranslationPoint& p1,
-                                   const TranslationPoint& p2, const TranslationPoint& p3, float t) {
+                                   const TranslationPoint& p2, const TranslationPoint& p3, float t) const {
             TranslationPoint result;
             result.m_transition = m_transition;
 
@@ -244,8 +258,26 @@ namespace FCFW {
                    std::abs(rot.y - otherRot.y) < EPSILON_COMPARISON;
         }
 
+        RotationPoint LinearInterpolate(const RotationPoint& p1, const RotationPoint& p2, float t) const {
+            RotationPoint result;
+            result.m_transition = m_transition;
+            
+            auto pt1 = p1.GetPoint();
+            auto pt2 = p2.GetPoint();
+            
+            // Calculate angular deltas with wrapping
+            float pitchDelta = _ts_SKSEFunctions::NormalRelativeAngle(pt2.x - pt1.x);
+            float yawDelta = _ts_SKSEFunctions::NormalRelativeAngle(pt2.y - pt1.y);
+            
+            // Interpolate and normalize result
+            result.m_point.x = _ts_SKSEFunctions::NormalRelativeAngle(pt1.x + t * pitchDelta);
+            result.m_point.y = _ts_SKSEFunctions::NormalRelativeAngle(pt1.y + t * yawDelta);
+            
+            return result;
+        }
+        
         RotationPoint CubicHermite(const RotationPoint& p0, const RotationPoint& p1,
-                                   const RotationPoint& p2, const RotationPoint& p3, float t) {
+                                   const RotationPoint& p2, const RotationPoint& p3, float t) const {
             RotationPoint result;
             result.m_transition = m_transition;
 

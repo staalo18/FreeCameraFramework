@@ -87,6 +87,8 @@ namespace FCFW_API {
 		/// <param name="a_easeOut">Apply ease-out at the end of interpolation (default: false)</param>
 		/// <param name="a_interpolationMode">Interpolation mode: 0=None, 1=Linear, 2=CubicHermite (default)</param>
 		/// <returns>Index of the added point, or -1 on failure</returns>
+		/// <remarks>NOTE: Both easeIn and easeOut control the INCOMING segment (previous→current point), not the outgoing segment.
+		/// For smooth transition through a point, set easeOut=false for the current point AND easeIn=false for the next point.</remarks>
 		[[nodiscard]] virtual int AddTranslationPoint(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, float a_time, const RE::NiPoint3& a_position, bool a_easeIn = false, bool a_easeOut = false, int a_interpolationMode = 2) const noexcept = 0;
 
 		/// <summary>
@@ -104,6 +106,8 @@ namespace FCFW_API {
 		/// <param name="a_easeOut">Apply ease-out at the end of interpolation (default: false)</param>
 		/// <param name="a_interpolationMode">Interpolation mode: 0=None, 1=Linear, 2=CubicHermite (default)</param>
 		/// <returns>Index of the added point, or -1 on failure</returns>
+		/// <remarks>NOTE: Both easeIn and easeOut control the INCOMING segment (previous→current point), not the outgoing segment.
+		/// For smooth transition through a point, set easeOut=false for the current point AND easeIn=false for the next point.</remarks>
 		[[nodiscard]] virtual int AddTranslationPointAtRef(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, float a_time, RE::TESObjectREFR* a_reference, const RE::NiPoint3& a_offset = RE::NiPoint3(), bool a_isOffsetRelative = false, bool a_easeIn = false, bool a_easeOut = false, int a_interpolationMode = 2) const noexcept = 0;
 
 		/// <summary>
@@ -117,6 +121,8 @@ namespace FCFW_API {
 		/// <param name="a_easeOut">Apply ease-out at the end of interpolation (default: false)</param>
 		/// <param name="a_interpolationMode">Interpolation mode: 0=None, 1=Linear, 2=CubicHermite (default)</param>
 		/// <returns> Index of the added point, or -1 on failure</returns>
+		/// <remarks>NOTE: Both easeIn and easeOut control the INCOMING segment (previous→current point), not the outgoing segment.
+		/// For smooth transition through a point, set easeOut=false for the current point AND easeIn=false for the next point.</remarks>
 		[[nodiscard]] virtual int AddTranslationPointAtCamera(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, float a_time, bool a_easeIn = false, bool a_easeOut = false, int a_interpolationMode = 2) const noexcept = 0;
 
         /// <summary>
@@ -130,6 +136,8 @@ namespace FCFW_API {
         /// <param name="a_easeOut">Apply ease-out at the end of interpolation (default: false)</param>
         /// <param name="a_interpolationMode">Interpolation mode: 0=None, 1=Linear, 2=CubicHermite (default)</param>
         /// <returns>Index of the added point, or -1 on failure</returns>
+        /// <remarks>NOTE: Both easeIn and easeOut control the INCOMING segment (previous→current point), not the outgoing segment.
+        /// For smooth transition through a point, set easeOut=false for the current point AND easeIn=false for the next point.</remarks>
         [[nodiscard]] virtual int AddRotationPoint(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, float a_time, const RE::BSTPoint2<float>& a_rotation, bool a_easeIn = false, bool a_easeOut = false, int a_interpolationMode = 2) const noexcept = 0;
 		
 		/// <summary>
@@ -147,6 +155,8 @@ namespace FCFW_API {
 		/// <param name="a_easeOut">Ease out at the end of interpolation (default: false)</param>
 		/// <param name="a_interpolationMode">0=None, 1=Linear, 2=CubicHermite (default)</param>
 		/// <returns> Index of the added point on success, -1 on failure</returns>
+		/// <remarks>NOTE: Both easeIn and easeOut control the INCOMING segment (previous→current point), not the outgoing segment.
+		/// For smooth transition through a point, set easeOut=false for the current point AND easeIn=false for the next point.</remarks>
 		[[nodiscard]] virtual int AddRotationPointAtRef(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, float a_time, RE::TESObjectREFR* a_reference, const RE::BSTPoint2<float>& a_offset = RE::BSTPoint2<float>(), bool a_isOffsetRelative = false, bool a_easeIn = false, bool a_easeOut = false, int a_interpolationMode = 2) const noexcept = 0;        /// <summary>
 
 		/// Add a rotation point that captures camera rotation at the start of playback.
@@ -159,6 +169,8 @@ namespace FCFW_API {
         /// <param name="a_easeOut">Apply ease-out at the end of interpolation (default: false)</param>
         /// <param name="a_interpolationMode">Interpolation mode: 0=None, 1=Linear, 2=CubicHermite (default)</param>
 		/// <returns>Index of the added point, or -1 on failure</returns>
+		/// <remarks>NOTE: Both easeIn and easeOut control the INCOMING segment (previous→current point), not the outgoing segment.
+		/// For smooth transition through a point, set easeOut=false for the current point AND easeIn=false for the next point.</remarks>
 		[[nodiscard]] virtual int AddRotationPointAtCamera(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, float a_time, bool a_easeIn = false, bool a_easeOut = false, int a_interpolationMode = 2) const noexcept = 0;
 
 		/// <summary>
@@ -177,15 +189,22 @@ namespace FCFW_API {
 		/// <param name="a_timelineID">Timeline ID to remove the point from</param>
 		/// <param name="a_index">Index of the point to remove</param>
 		/// <returns>true if the point was removed, false on failure</returns>
-		virtual bool RemoveRotationPoint(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, size_t a_index) const noexcept = 0;
+		[[nodiscard]] virtual bool RemoveRotationPoint(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, size_t a_index) const noexcept = 0;
 
         /// <summary>
         /// Start recording camera movement to a timeline.
         /// </summary>
         /// <param name="a_pluginHandle">Plugin handle of the calling plugin (use SKSE::GetPluginHandle())</param>
         /// <param name="a_timelineID">Timeline ID to record to</param>
+        /// <param name="a_recordingInterval">Time between samples in seconds. 0.0 = capture every frame (default: 1.0)</param>
+        /// <param name="a_append">If true, append to existing timeline; if false, clear timeline first (default: false)</param>
+        /// <param name="a_timeOffset">Time offset in seconds added after the last existing point when appending (default: 0.0)</param>
         /// <returns>True on success, false on failure</returns>
-        virtual bool StartRecording(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID) const noexcept = 0;
+        /// <remarks>When a_recordingInterval = 0.0 or negative: captures every frame (frame-rate dependent).
+        /// When a_append=true: First recorded point placed at (lastPointTime + a_timeOffset). Uses easeIn=false.
+        /// If timeline is empty when appending, starts at a_timeOffset with easeIn=false.
+        /// When a_append=false: Clears timeline and starts at time 0.0 with easeIn=true.</remarks>
+        [[nodiscard]] virtual bool StartRecording(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, float a_recordingInterval = 1.0f, bool a_append = false, float a_timeOffset = 0.0f) const noexcept = 0;
 
 		/// <summary>
 		/// Stop recording camera movements on a timeline.
@@ -194,7 +213,7 @@ namespace FCFW_API {
 		/// <param name="a_pluginHandle">Plugin handle of the calling plugin (use SKSE::GetPluginHandle())</param>
 		/// <param name="a_timelineID">Timeline ID to stop recording on</param>
 		/// <returns>true on success, false on failure</returns>
-		virtual bool StopRecording(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID) const noexcept = 0;
+		[[nodiscard]] virtual bool StopRecording(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID) const noexcept = 0;
 
 		/// <summary>
 		/// Clear the entire timeline.
@@ -202,7 +221,7 @@ namespace FCFW_API {
 		/// <param name="a_pluginHandle">Plugin handle of the calling plugin (use SKSE::GetPluginHandle())</param>
 		/// <param name="a_timelineID">Timeline ID to clear</param>
 		/// <returns>true if cleared successfully, false on failure</returns>
-		virtual bool ClearTimeline(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID) const noexcept = 0;
+		[[nodiscard]] virtual bool ClearTimeline(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID) const noexcept = 0;
 
         /// <summary>
         /// Get the number of translation points in the timeline.

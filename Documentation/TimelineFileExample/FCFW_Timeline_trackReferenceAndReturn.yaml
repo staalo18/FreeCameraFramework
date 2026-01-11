@@ -1,0 +1,106 @@
+# FreeCameraFramework Timeline (YAML format)
+formatVersion: 1
+
+playbackMode: end
+loopTimeOffset: 0
+globalEaseIn: false
+globalEaseOut: false
+showMenusDuringPlayback: false
+allowUserRotation: false
+useDegrees: true
+
+translationPoints:
+  - time: 0
+    type: camera
+    offset: [0, 0, 0]
+    interpolationMode: cubicHermite
+    easeIn: true
+    easeOut: true
+  - time: 2
+    type: reference
+    offset: [1.53857422, 21.5302734, 124.128418]
+    reference:
+      plugin: Skyrim.esm
+      formID: 0xD8C58
+    isOffsetRelative: true
+    interpolationMode: cubicHermite
+    easeIn: true
+    easeOut: true
+  - time: 8
+    type: reference
+    offset: [1.53857422, 21.5302734, 124.128418]
+    reference:
+      plugin: Skyrim.esm
+      formID: 0xD8C58
+    isOffsetRelative: true
+    interpolationMode: cubicHermite
+    easeIn: true
+    easeOut: true
+  - time: 10
+    type: camera
+    offset: [0, 0, 0]
+    interpolationMode: cubicHermite
+    easeIn: true
+    easeOut: true
+rotationPoints:
+  - time: 0
+    type: camera
+    offset: [0, 0]
+    interpolationMode: cubicHermite
+    easeIn: true
+    easeOut: true
+  - time: 0.5
+    type: reference
+    offset: [0, 0]
+    reference:
+      plugin: Skyrim.esm
+      formID: 0xD8C58
+    isOffsetRelative: false
+    interpolationMode: cubicHermite
+    easeIn: true
+    easeOut: true
+  - time: 1.5
+    type: reference
+    offset: [0, 0]
+    reference:
+      plugin: Skyrim.esm
+      formID: 0xD8C58
+    isOffsetRelative: false
+    interpolationMode: cubicHermite
+    easeIn: true
+    easeOut: true
+  - time: 2
+    type: reference
+    offset: [0, 0]
+    reference:
+      plugin: Skyrim.esm
+      formID: 0xD8C58
+    isOffsetRelative: true
+    interpolationMode: cubicHermite
+    easeIn: true
+    easeOut: true
+  - time: 8
+    type: reference
+    offset: [0, 0]
+    reference:
+      plugin: Skyrim.esm
+      formID: 0xD8C58
+    isOffsetRelative: true
+    interpolationMode: cubicHermite
+    easeIn: true
+    easeOut: true
+  - time: 9
+    type: reference
+    offset: [0, 0]
+    reference:
+      formID: 0x14
+    isOffsetRelative: false
+    interpolationMode: cubicHermite
+    easeIn: true
+    easeOut: true
+  - time: 10
+    type: camera
+    offset: [0, 0]
+    interpolationMode: cubicHermite
+    easeIn: true
+    easeOut: true

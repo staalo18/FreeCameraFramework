@@ -130,7 +130,7 @@ log::error("{}: Invalid mod name '{}' or timeline ID {}", __FUNCTION__, a_modNam
             return FCFW::TimelineManager::GetSingleton().AddRotationPointAtRef(handle, static_cast<size_t>(a_timelineID), a_time, a_reference, offset, a_isOffsetRelative, a_easeIn, a_easeOut, ToInterpolationMode(a_interpolationMode));
         }
 
-        bool StartRecording(RE::StaticFunctionTag*, RE::BSFixedString a_modName, int a_timelineID) {
+        bool StartRecording(RE::StaticFunctionTag*, RE::BSFixedString a_modName, int a_timelineID, float a_recordingInterval, bool a_append, float a_timeOffset) {
             if (a_modName.empty() || a_timelineID <= 0) {
                 return false;
             }
@@ -141,7 +141,7 @@ log::error("{}: Invalid mod name '{}' or timeline ID {}", __FUNCTION__, a_modNam
                 return false;
             }
 
-            return FCFW::TimelineManager::GetSingleton().StartRecording(handle, static_cast<size_t>(a_timelineID));
+            return FCFW::TimelineManager::GetSingleton().StartRecording(handle, static_cast<size_t>(a_timelineID), a_recordingInterval, a_append, a_timeOffset);
         }
 
         bool StopRecording(RE::StaticFunctionTag*, RE::BSFixedString a_modName, int a_timelineID) {
@@ -534,50 +534,50 @@ log::error("{}: Invalid mod name '{}' or timeline ID {}", __FUNCTION__, a_modNam
         }
 
         bool FCFWFunctions(RE::BSScript::Internal::VirtualMachine * a_vm){
-            a_vm->RegisterFunction("FCFW_GetPluginVersion", "FCFW_SKSEFunctions", GetFCFWPluginVersion);
-            a_vm->RegisterFunction("FCFW_RegisterTimeline", "FCFW_SKSEFunctions", RegisterTimeline);
-            a_vm->RegisterFunction("FCFW_UnregisterTimeline", "FCFW_SKSEFunctions", UnregisterTimeline);
-            a_vm->RegisterFunction("FCFW_AddTranslationPointAtCamera", "FCFW_SKSEFunctions", AddTranslationPointAtCamera);
-            a_vm->RegisterFunction("FCFW_AddTranslationPoint", "FCFW_SKSEFunctions", AddTranslationPoint);
-            a_vm->RegisterFunction("FCFW_AddTranslationPointAtRef", "FCFW_SKSEFunctions", AddTranslationPointAtRef);
-            a_vm->RegisterFunction("FCFW_AddRotationPointAtCamera", "FCFW_SKSEFunctions", AddRotationPointAtCamera);
-            a_vm->RegisterFunction("FCFW_AddRotationPoint", "FCFW_SKSEFunctions", AddRotationPoint);
-            a_vm->RegisterFunction("FCFW_AddRotationPointAtRef", "FCFW_SKSEFunctions", AddRotationPointAtRef);
-            a_vm->RegisterFunction("FCFW_StartRecording", "FCFW_SKSEFunctions", StartRecording);
-            a_vm->RegisterFunction("FCFW_StopRecording", "FCFW_SKSEFunctions", StopRecording);
-            a_vm->RegisterFunction("FCFW_RemoveTranslationPoint", "FCFW_SKSEFunctions", RemoveTranslationPoint);
-            a_vm->RegisterFunction("FCFW_RemoveRotationPoint", "FCFW_SKSEFunctions", RemoveRotationPoint);
-            a_vm->RegisterFunction("FCFW_ClearTimeline", "FCFW_SKSEFunctions", ClearTimeline);
-            a_vm->RegisterFunction("FCFW_GetTranslationPointCount", "FCFW_SKSEFunctions", GetTranslationPointCount);
-            a_vm->RegisterFunction("FCFW_GetRotationPointCount", "FCFW_SKSEFunctions", GetRotationPointCount);
-            a_vm->RegisterFunction("FCFW_GetTranslationPointX", "FCFW_SKSEFunctions", GetTranslationPointX);
-            a_vm->RegisterFunction("FCFW_GetTranslationPointY", "FCFW_SKSEFunctions", GetTranslationPointY);
-            a_vm->RegisterFunction("FCFW_GetTranslationPointZ", "FCFW_SKSEFunctions", GetTranslationPointZ);
-            a_vm->RegisterFunction("FCFW_GetRotationPointPitch", "FCFW_SKSEFunctions", GetRotationPointPitch);
-            a_vm->RegisterFunction("FCFW_GetRotationPointYaw", "FCFW_SKSEFunctions", GetRotationPointYaw);
-            a_vm->RegisterFunction("FCFW_StartPlayback", "FCFW_SKSEFunctions", StartPlayback);
-            a_vm->RegisterFunction("FCFW_StopPlayback", "FCFW_SKSEFunctions", StopPlayback);
-            a_vm->RegisterFunction("FCFW_SwitchPlayback", "FCFW_SKSEFunctions", SwitchPlayback);
-            a_vm->RegisterFunction("FCFW_PausePlayback", "FCFW_SKSEFunctions", PausePlayback);
-            a_vm->RegisterFunction("FCFW_ResumePlayback", "FCFW_SKSEFunctions", ResumePlayback);
-            a_vm->RegisterFunction("FCFW_IsPlaybackPaused", "FCFW_SKSEFunctions", IsPlaybackPaused);
-            a_vm->RegisterFunction("FCFW_IsPlaybackRunning", "FCFW_SKSEFunctions", IsPlaybackRunning);
-            a_vm->RegisterFunction("FCFW_IsRecording", "FCFW_SKSEFunctions", IsRecording);
-            a_vm->RegisterFunction("FCFW_GetActiveTimelineID", "FCFW_SKSEFunctions", GetActiveTimelineID);
-            a_vm->RegisterFunction("FCFW_AllowUserRotation", "FCFW_SKSEFunctions", AllowUserRotation);
-            a_vm->RegisterFunction("FCFW_IsUserRotationAllowed", "FCFW_SKSEFunctions", IsUserRotationAllowed);
-            a_vm->RegisterFunction("FCFW_SetPlaybackMode", "FCFW_SKSEFunctions", SetPlaybackMode);
-            a_vm->RegisterFunction("FCFW_AddTimelineFromFile", "FCFW_SKSEFunctions", AddTimelineFromFile);
-            a_vm->RegisterFunction("FCFW_ExportTimeline", "FCFW_SKSEFunctions", ExportTimeline);
-            a_vm->RegisterFunction("FCFW_RegisterForTimelineEvents", "FCFW_SKSEFunctions", RegisterForTimelineEvents);
-            a_vm->RegisterFunction("FCFW_UnregisterForTimelineEvents", "FCFW_SKSEFunctions", UnregisterForTimelineEvents);
+            a_vm->RegisterFunction("GetPluginVersion", "FCFW_SKSEFunctions", GetFCFWPluginVersion);
+            a_vm->RegisterFunction("RegisterTimeline", "FCFW_SKSEFunctions", RegisterTimeline);
+            a_vm->RegisterFunction("UnregisterTimeline", "FCFW_SKSEFunctions", UnregisterTimeline);
+            a_vm->RegisterFunction("AddTranslationPointAtCamera", "FCFW_SKSEFunctions", AddTranslationPointAtCamera);
+            a_vm->RegisterFunction("AddTranslationPoint", "FCFW_SKSEFunctions", AddTranslationPoint);
+            a_vm->RegisterFunction("AddTranslationPointAtRef", "FCFW_SKSEFunctions", AddTranslationPointAtRef);
+            a_vm->RegisterFunction("AddRotationPointAtCamera", "FCFW_SKSEFunctions", AddRotationPointAtCamera);
+            a_vm->RegisterFunction("AddRotationPoint", "FCFW_SKSEFunctions", AddRotationPoint);
+            a_vm->RegisterFunction("AddRotationPointAtRef", "FCFW_SKSEFunctions", AddRotationPointAtRef);
+            a_vm->RegisterFunction("StartRecording", "FCFW_SKSEFunctions", StartRecording);
+            a_vm->RegisterFunction("StopRecording", "FCFW_SKSEFunctions", StopRecording);
+            a_vm->RegisterFunction("RemoveTranslationPoint", "FCFW_SKSEFunctions", RemoveTranslationPoint);
+            a_vm->RegisterFunction("RemoveRotationPoint", "FCFW_SKSEFunctions", RemoveRotationPoint);
+            a_vm->RegisterFunction("ClearTimeline", "FCFW_SKSEFunctions", ClearTimeline);
+            a_vm->RegisterFunction("GetTranslationPointCount", "FCFW_SKSEFunctions", GetTranslationPointCount);
+            a_vm->RegisterFunction("GetRotationPointCount", "FCFW_SKSEFunctions", GetRotationPointCount);
+            a_vm->RegisterFunction("GetTranslationPointX", "FCFW_SKSEFunctions", GetTranslationPointX);
+            a_vm->RegisterFunction("GetTranslationPointY", "FCFW_SKSEFunctions", GetTranslationPointY);
+            a_vm->RegisterFunction("GetTranslationPointZ", "FCFW_SKSEFunctions", GetTranslationPointZ);
+            a_vm->RegisterFunction("GetRotationPointPitch", "FCFW_SKSEFunctions", GetRotationPointPitch);
+            a_vm->RegisterFunction("GetRotationPointYaw", "FCFW_SKSEFunctions", GetRotationPointYaw);
+            a_vm->RegisterFunction("StartPlayback", "FCFW_SKSEFunctions", StartPlayback);
+            a_vm->RegisterFunction("StopPlayback", "FCFW_SKSEFunctions", StopPlayback);
+            a_vm->RegisterFunction("SwitchPlayback", "FCFW_SKSEFunctions", SwitchPlayback);
+            a_vm->RegisterFunction("PausePlayback", "FCFW_SKSEFunctions", PausePlayback);
+            a_vm->RegisterFunction("ResumePlayback", "FCFW_SKSEFunctions", ResumePlayback);
+            a_vm->RegisterFunction("IsPlaybackPaused", "FCFW_SKSEFunctions", IsPlaybackPaused);
+            a_vm->RegisterFunction("IsPlaybackRunning", "FCFW_SKSEFunctions", IsPlaybackRunning);
+            a_vm->RegisterFunction("IsRecording", "FCFW_SKSEFunctions", IsRecording);
+            a_vm->RegisterFunction("GetActiveTimelineID", "FCFW_SKSEFunctions", GetActiveTimelineID);
+            a_vm->RegisterFunction("AllowUserRotation", "FCFW_SKSEFunctions", AllowUserRotation);
+            a_vm->RegisterFunction("IsUserRotationAllowed", "FCFW_SKSEFunctions", IsUserRotationAllowed);
+            a_vm->RegisterFunction("SetPlaybackMode", "FCFW_SKSEFunctions", SetPlaybackMode);
+            a_vm->RegisterFunction("AddTimelineFromFile", "FCFW_SKSEFunctions", AddTimelineFromFile);
+            a_vm->RegisterFunction("ExportTimeline", "FCFW_SKSEFunctions", ExportTimeline);
+            a_vm->RegisterFunction("RegisterForTimelineEvents", "FCFW_SKSEFunctions", RegisterForTimelineEvents);
+            a_vm->RegisterFunction("UnregisterForTimelineEvents", "FCFW_SKSEFunctions", UnregisterForTimelineEvents);
             
             // Camera utility functions
-            a_vm->RegisterFunction("FCFW_GetCameraPosX", "FCFW_SKSEFunctions", GetCameraPosX);
-            a_vm->RegisterFunction("FCFW_GetCameraPosY", "FCFW_SKSEFunctions", GetCameraPosY);
-            a_vm->RegisterFunction("FCFW_GetCameraPosZ", "FCFW_SKSEFunctions", GetCameraPosZ);
-            a_vm->RegisterFunction("FCFW_GetCameraPitch", "FCFW_SKSEFunctions", GetCameraPitch);
-            a_vm->RegisterFunction("FCFW_GetCameraYaw", "FCFW_SKSEFunctions", GetCameraYaw);
+            a_vm->RegisterFunction("GetCameraPosX", "FCFW_SKSEFunctions", GetCameraPosX);
+            a_vm->RegisterFunction("GetCameraPosY", "FCFW_SKSEFunctions", GetCameraPosY);
+            a_vm->RegisterFunction("GetCameraPosZ", "FCFW_SKSEFunctions", GetCameraPosZ);
+            a_vm->RegisterFunction("GetCameraPitch", "FCFW_SKSEFunctions", GetCameraPitch);
+            a_vm->RegisterFunction("GetCameraYaw", "FCFW_SKSEFunctions", GetCameraYaw);
             
             return true;
         }

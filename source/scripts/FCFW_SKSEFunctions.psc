@@ -3,7 +3,7 @@ Scriptname FCFW_SKSEFunctions
 ; Get plugin version
 ; Encoded as: major * 10000 + minor * 100 + patch
 ; Example: version 1.2.3 returns 10203
-int Function FCFW_GetPluginVersion() global native
+int Function GetPluginVersion() global native
 
 ; ===== Timeline Management =====
 
@@ -14,14 +14,14 @@ int Function FCFW_GetPluginVersion() global native
 ; when you no longer need the timeline at all (e.g., plugin shutdown).
 ; modName: name of your mod's ESP/ESL file (e.g., "MyMod.esp")
 ; Returns: new timeline ID (>0) on success, or -1 on failure
-int Function FCFW_RegisterTimeline(string modName) global native
+int Function RegisterTimeline(string modName) global native
 
 ; Unregister a timeline and free its resources
 ; This will stop any active playback/recording on the timeline before removing it
 ; modName: name of your mod's ESP/ESL file (e.g., "MyMod.esp")
 ; timelineID: timeline ID to unregister
 ; Returns: true if successfully unregistered, false on failure
-bool Function FCFW_UnregisterTimeline(string modName, int timelineID) global native
+bool Function UnregisterTimeline(string modName, int timelineID) global native
 
 ; ===== Timeline Building =====
 
@@ -34,7 +34,9 @@ bool Function FCFW_UnregisterTimeline(string modName, int timelineID) global nat
 ; easeOut: ease out at the end of interpolation
 ; interpolationMode: 0=None, 1=Linear, 2=CubicHermite (default)
 ; Returns: index of the added point, or -1 on failure
-int Function FCFW_AddTranslationPoint(string modName, int timelineID, float time, float posX, float posY, float posZ, bool easeIn = false, bool easeOut = false, int interpolationMode = 2) global native
+; NOTE: Both easeIn and easeOut control the INCOMING segment (previous->current point), not the outgoing segment.
+; For smooth transition through a point, set easeOut=false for the current point AND easeIn=false for the next point.
+int Function AddTranslationPoint(string modName, int timelineID, float time, float posX, float posY, float posZ, bool easeIn = false, bool easeOut = false, int interpolationMode = 2) global native
 
 ; Add a translation point relative to a reference object
 ; modName: name of your mod's ESP/ESL file (e.g., "MyMod.esp")
@@ -47,7 +49,9 @@ int Function FCFW_AddTranslationPoint(string modName, int timelineID, float time
 ; easeOut: ease out at the end of interpolation
 ; interpolationMode: 0=None, 1=Linear, 2=CubicHermite (default)
 ; Returns: index of the added point, or -1 on failure
-int Function FCFW_AddTranslationPointAtRef(string modName, int timelineID, float time, ObjectReference reference, float offsetX, float offsetY, float offsetZ, bool isOffsetRelative = false, bool easeIn = false, bool easeOut = false, int interpolationMode = 2) global native
+; NOTE: Both easeIn and easeOut control the INCOMING segment (previous->current point), not the outgoing segment.
+; For smooth transition through a point, set easeOut=false for the current point AND easeIn=false for the next point.
+int Function AddTranslationPointAtRef(string modName, int timelineID, float time, ObjectReference reference, float offsetX, float offsetY, float offsetZ, bool isOffsetRelative = false, bool easeIn = false, bool easeOut = false, int interpolationMode = 2) global native
 
 ; Add a translation point that captures camera position at the start of playback
 ; This point can be used to start playback smoothly from the last camera position, and return to it later.
@@ -59,7 +63,7 @@ int Function FCFW_AddTranslationPointAtRef(string modName, int timelineID, float
 ; easeOut: ease out at the end of interpolation
 ; interpolationMode: 0=None, 1=Linear, 2=CubicHermite (default)
 ; Returns: index of the added point, or -1 on failure
-int Function FCFW_AddTranslationPointAtCamera(string modName, int timelineID, float time, bool easeIn = false, bool easeOut = false, int interpolationMode = 2) global native
+int Function AddTranslationPointAtCamera(string modName, int timelineID, float time, bool easeIn = false, bool easeOut = false, int interpolationMode = 2) global native
 
 ; Add a rotation point with specified pitch and yaw
 ; modName: name of your mod's ESP/ESL file (e.g., "MyMod.esp")
@@ -71,7 +75,9 @@ int Function FCFW_AddTranslationPointAtCamera(string modName, int timelineID, fl
 ; easeOut: ease out at the end of interpolation
 ; interpolationMode: 0=None, 1=Linear, 2=CubicHermite (default)
 ; Returns: index of the added point, or -1 on failure
-int Function FCFW_AddRotationPoint(string modName, int timelineID, float time, float pitch, float yaw, bool easeIn = false, bool easeOut = false, int interpolationMode = 2) global native
+; NOTE: Both easeIn and easeOut control the INCOMING segment (previous->current point), not the outgoing segment.
+; For smooth transition through a point, set easeOut=false for the current point AND easeIn=false for the next point.
+int Function AddRotationPoint(string modName, int timelineID, float time, float pitch, float yaw, bool easeIn = false, bool easeOut = false, int interpolationMode = 2) global native
 
 ; Add a rotation point that sets the rotation relative to camera-to-reference direction, or alternatively the ref's heading
 ; time: time in seconds when this point occurs
@@ -84,7 +90,9 @@ int Function FCFW_AddRotationPoint(string modName, int timelineID, float time, f
 ; easeOut: ease out at the end of interpolation
 ; interpolationMode: 0=None, 1=Linear, 2=CubicHermite (default)
 ; Returns: index of the added point on success, -1 on failure
-int Function FCFW_AddRotationPointAtRef(string modName, int timelineID, float time, ObjectReference reference, float offsetPitch, float offsetYaw, bool isOffsetRelative = false, bool easeIn = false, bool easeOut = false, int interpolationMode = 2) global native
+; NOTE: Both easeIn and easeOut control the INCOMING segment (previous->current point), not the outgoing segment.
+; For smooth transition through a point, set easeOut=false for the current point AND easeIn=false for the next point.
+int Function AddRotationPointAtRef(string modName, int timelineID, float time, ObjectReference reference, float offsetPitch, float offsetYaw, bool isOffsetRelative = false, bool easeIn = false, bool easeOut = false, int interpolationMode = 2) global native
 
 ; Add a rotation point that captures camera rotation at the start of playback
 ; This point can be used to start playback smoothly from the last camera rotation, and return to it later.
@@ -95,86 +103,95 @@ int Function FCFW_AddRotationPointAtRef(string modName, int timelineID, float ti
 ; easeOut: ease out at the end of interpolation
 ; interpolationMode: 0=None, 1=Linear, 2=CubicHermite (default)
 ; Returns: index of the added point, or -1 on failure
-int Function FCFW_AddRotationPointAtCamera(string modName, int timelineID, float time, bool easeIn = false, bool easeOut = false, int interpolationMode = 2) global native
+; NOTE: Both easeIn and easeOut control the INCOMING segment (previous->current point), not the outgoing segment.
+; For smooth transition through a point, set easeOut=false for the current point AND easeIn=false for the next point.
+int Function AddRotationPointAtCamera(string modName, int timelineID, float time, bool easeIn = false, bool easeOut = false, int interpolationMode = 2) global native
 
 ; Start recording camera movements to the timeline
 ; modName: name of your mod's ESP/ESL file (e.g., "MyMod.esp")
 ; timelineID: timeline ID to record to
+; recordingInterval: time between samples in seconds. 0.0 = capture every frame (default: 1.0)
+; append: if true, append to existing timeline; if false, clear timeline first (default: false)
+; timeOffset: time offset in seconds added after the last existing point when appending (default: 0.0)
 ; Returns: true on success, false on failure
-bool Function FCFW_StartRecording(string modName, int timelineID) global native
+; When interval = 0.0 or negative: captures every frame (frame-rate dependent).
+; When append=true: First recorded point placed at (lastPointTime + timeOffset). Uses easeIn=false.
+; If timeline is empty when appending, starts at timeOffset with easeIn=false.
+; When append=false: Clears timeline and starts at time 0.0 with easeIn=true.
+bool Function StartRecording(string modName, int timelineID, float recordingInterval = 1.0, bool append = false, float timeOffset = 0.0) global native
 
 ; Stop recording camera movements on a timeline
 ; modName: name of your mod's ESP/ESL file (e.g., "MyMod.esp")
 ; timelineID: timeline ID to stop recording on
 ; Returns: true on success, false on failure
-bool Function FCFW_StopRecording(string modName, int timelineID) global native
+bool Function StopRecording(string modName, int timelineID) global native
 
 ; Remove a translation point from the timeline
 ; modName: name of your mod's ESP/ESL file
 ; timelineID: timeline ID to remove the point from
 ; index: index of the point to remove
 ; Returns: true if removed, false on failure
-bool Function FCFW_RemoveTranslationPoint(string modName, int timelineID, int index) global native
+bool Function RemoveTranslationPoint(string modName, int timelineID, int index) global native
 
 ; Remove a rotation point from the timeline
 ; modName: name of your mod's ESP/ESL file
 ; timelineID: timeline ID to remove the point from
 ; index: index of the point to remove
 ; Returns: true if removed, false on failure
-bool Function FCFW_RemoveRotationPoint(string modName, int timelineID, int index) global native
+bool Function RemoveRotationPoint(string modName, int timelineID, int index) global native
 
 ; Clear the entire camera timeline
 ; modName: name of your mod's ESP/ESL file
 ; timelineID: timeline ID to clear
 ; Returns: true if cleared, false on failure
-bool Function FCFW_ClearTimeline(string modName, int timelineID) global native
+bool Function ClearTimeline(string modName, int timelineID) global native
 
 ; Get the number of translation points in the timeline
 ; modName: name of your mod's ESP/ESL file (e.g., "MyMod.esp")
 ; timelineID: timeline ID to query
 ; Returns: number of translation points, or -1 if timeline not found
-int Function FCFW_GetTranslationPointCount(string modName, int timelineID) global native
+int Function GetTranslationPointCount(string modName, int timelineID) global native
 
 ; Get the number of rotation points in the timeline
 ; modName: name of your mod's ESP/ESL file (e.g., "MyMod.esp")
 ; timelineID: timeline ID to query
 ; Returns: number of rotation points, or -1 if timeline not found
-int Function FCFW_GetRotationPointCount(string modName, int timelineID) global native
+int Function GetRotationPointCount(string modName, int timelineID) global native
 
 ; Get the X coordinate of a translation point by index
 ; modName: name of your mod's ESP/ESL file (e.g., "MyMod.esp")
 ; timelineID: timeline ID to query
 ; index: 0-based index of the point
 ; Returns: X coordinate, or 0.0 if timeline not found or index out of range
-float Function FCFW_GetTranslationPointX(string modName, int timelineID, int index) global native
+float Function GetTranslationPointX(string modName, int timelineID, int index) global native
 
 ; Get the Y coordinate of a translation point by index
 ; modName: name of your mod's ESP/ESL file (e.g., "MyMod.esp")
 ; timelineID: timeline ID to query
 ; index: 0-based index of the point
 ; Returns: Y coordinate, or 0.0 if timeline not found or index out of range
-float Function FCFW_GetTranslationPointY(string modName, int timelineID, int index) global native
+float Function GetTranslationPointY(string modName, int timelineID, int index) global native
 
 ; Get the Z coordinate of a translation point by index
 ; modName: name of your mod's ESP/ESL file (e.g., "MyMod.esp")
 ; timelineID: timeline ID to query
 ; index: 0-based index of the point
 ; Returns: Z coordinate, or 0.0 if timeline not found or index out of range
-float Function FCFW_GetTranslationPointZ(string modName, int timelineID, int index) global native
+float Function GetTranslationPointZ(string modName, int timelineID, int index) global native
 
 ; Get the pitch (in radians) of a rotation point by index
 ; modName: name of your mod's ESP/ESL file (e.g., "MyMod.esp")
 ; timelineID: timeline ID to query
 ; index: 0-based index of the point
 ; Returns: pitch in radians, or 0.0 if timeline not found or index out of range
-float Function FCFW_GetRotationPointPitch(string modName, int timelineID, int index) global native
+float Function GetRotationPointPitch(string modName, int timelineID, int index) global native
 
 ; Get the yaw (in radians) of a rotation point by index
 ; modName: name of your mod's ESP/ESL file (e.g., "MyMod.esp")
 ; timelineID: timeline ID to query
 ; index: 0-based index of the point
 ; Returns: yaw in radians, or 0.0 if timeline not found or index out of range
-float Function FCFW_GetRotationPointYaw(string modName, int timelineID, int index) global native
+float Function GetRotationPointYaw(string modName, int timelineID, int index) global native
 
 ; Start playback with advanced options
 ; speed: playback speed multiplier (only used if useDuration=false)
@@ -193,57 +210,57 @@ float Function FCFW_GetRotationPointYaw(string modName, int timelineID, int inde
 ;              if false (default), plays timeline with speed as speed multiplier
 ; duration: total duration in seconds for entire timeline, only used if useDuration=true (default: 0.0)
 ; Returns: true on success, false on failure
-bool Function FCFW_StartPlayback(string modName, int timelineID, float speed = 1.0, bool globalEaseIn = false, bool globalEaseOut = false, bool useDuration = false, float duration = 0.0) global native
+bool Function StartPlayback(string modName, int timelineID, float speed = 1.0, bool globalEaseIn = false, bool globalEaseOut = false, bool useDuration = false, float duration = 0.0) global native
 
 ; Stop playback of the camera timeline
 ; Stop playback of a camera path timeline
 ; modName: name of your mod's ESP/ESL file (e.g., "MyMod.esp")
 ; timelineID: timeline ID to stop
 ; Returns: true on success, false on failure
-bool Function FCFW_StopPlayback(string modName, int timelineID) global native
+bool Function StopPlayback(string modName, int timelineID) global native
 
 ; Switch playback from one timeline to another without exiting free camera mode
 ; modName: name of your mod's ESP/ESL file (e.g., "MyMod.esp")
 ; fromTimelineID: source timeline ID (0 = any owned timeline currently playing)
 ; toTimelineID: target timeline ID to switch to
 ; Returns: true on successful switch, false on failure
-bool Function FCFW_SwitchPlayback(string modName, int fromTimelineID, int toTimelineID) global native
+bool Function SwitchPlayback(string modName, int fromTimelineID, int toTimelineID) global native
 
 ; Pause the camera timeline playback
 ; Pause playback of a camera path timeline
 ; modName: name of your mod's ESP/ESL file (e.g., "MyMod.esp")
 ; timelineID: timeline ID to pause
 ; Returns: true on success, false on failure
-bool Function FCFW_PausePlayback(string modName, int timelineID) global native
+bool Function PausePlayback(string modName, int timelineID) global native
 
 ; Resume the camera timeline playback
 ; Resume playback of a camera path timeline
 ; modName: name of your mod's ESP/ESL file (e.g., "MyMod.esp")
 ; timelineID: timeline ID to resume
 ; Returns: true on success, false on failure
-bool Function FCFW_ResumePlayback(string modName, int timelineID) global native
+bool Function ResumePlayback(string modName, int timelineID) global native
 
 ; Check if a timeline is currently playing back
 ; modName: name of your mod's ESP/ESL file (e.g., "MyMod.esp")
 ; timelineID: timeline ID to check
 ; Returns: true if playing, false otherwise
-bool Function FCFW_IsPlaybackRunning(string modName, int timelineID) global native
+bool Function IsPlaybackRunning(string modName, int timelineID) global native
 
 ; Check if a timeline is currently recording
 ; modName: name of your mod's ESP/ESL file (e.g., "MyMod.esp")
 ; timelineID: timeline ID to check
 ; Returns: true if recording, false otherwise
-bool Function FCFW_IsRecording(string modName, int timelineID) global native
+bool Function IsRecording(string modName, int timelineID) global native
 
 ; Check if timeline playback is currently paused
 ; modName: name of your mod's ESP/ESL file (e.g., "MyMod.esp")
 ; timelineID: timeline ID to check
 ; Returns: true if paused, false otherwise
-bool Function FCFW_IsPlaybackPaused(string modName, int timelineID) global native
+bool Function IsPlaybackPaused(string modName, int timelineID) global native
 
 ; Get the ID of the currently active timeline (recording or playing)
 ; Returns: timeline ID if active (>0), or 0 if no timeline is active
-int Function FCFW_GetActiveTimelineID() global native
+int Function GetActiveTimelineID() global native
 
 ; Enable or disable user rotation control during playback for a specific timeline
 ; This setting is stored per-timeline and applied when that timeline is playing
@@ -251,13 +268,13 @@ int Function FCFW_GetActiveTimelineID() global native
 ; timelineID: timeline ID to configure
 ; allow: true to allow user rotation, false to disable
 ; Returns: true on success, false on failure
-bool Function FCFW_AllowUserRotation(string modName, int timelineID, bool allow) global native
+bool Function AllowUserRotation(string modName, int timelineID, bool allow) global native
 
 ; Check if user rotation is currently allowed for a specific timeline
 ; modName: name of your mod's ESP/ESL file (e.g., "MyMod.esp")
 ; timelineID: timeline ID to check
 ; Returns: true if user can control rotation, false otherwise
-bool Function FCFW_IsUserRotationAllowed(string modName, int timelineID) global native
+bool Function IsUserRotationAllowed(string modName, int timelineID) global native
 
 ; Set the playback mode and loop time offset for a timeline
 ; This determines what happens when the timeline reaches its end
@@ -266,7 +283,7 @@ bool Function FCFW_IsUserRotationAllowed(string modName, int timelineID) global 
 ; playbackMode: 0=end (stop at end), 1=loop (wrap to beginning), 2=wait (stay at final position until StopPlayback is called)
 ; loopTimeOffset: Time offset in seconds when looping back (only used in loop mode, default: 0.0)
 ; Returns: true if successfully set, false on failure
-bool Function FCFW_SetPlaybackMode(string modName, int timelineID, int playbackMode, float loopTimeOffset = 0.0) global native
+bool Function SetPlaybackMode(string modName, int timelineID, int playbackMode, float loopTimeOffset = 0.0) global native
 
 ; Adds camera timeline imported from filePath at timeOffset to the specified timeline.
 ; modName: Name of your mod (case-sensitive, as defined in SKSE plugin)
@@ -274,14 +291,14 @@ bool Function FCFW_SetPlaybackMode(string modName, int timelineID, int playbackM
 ; filePath: Relative path from Data folder (e.g., "SKSE/Plugins/MyTimeline.dat")
 ; timeOffset: Time offset to add to all imported point times (default 0.0)
 ; Returns: true if successful, false otherwise
-bool Function FCFW_AddTimelineFromFile(string modName, int timelineID, string filePath, float timeOffset = 0.0) global native
+bool Function AddTimelineFromFile(string modName, int timelineID, string filePath, float timeOffset = 0.0) global native
 
 ; Export the specified timeline to a file
 ; modName: Name of your mod (case-sensitive, as defined in SKSE plugin)
 ; timelineID: ID of the timeline to export
 ; filePath: Relative path from Data folder (e.g., "SKSE/Plugins/MyTimeline.dat")
 ; Returns: true if successful, false otherwise
-bool Function FCFW_ExportTimeline(string modName, int timelineID, string filePath) global native
+bool Function ExportTimeline(string modName, int timelineID, string filePath) global native
 
 ; ===== Event Registration =====
 
@@ -291,30 +308,30 @@ bool Function FCFW_ExportTimeline(string modName, int timelineID, string filePat
 ;   Event OnPlaybackStop(int timelineID)
 ;   Event OnPlaybackWait(int timelineID)  ; For wait mode: timeline reached end and is waiting
 ; form: The form/alias to register (typically 'self' from a script)
-Function FCFW_RegisterForTimelineEvents(Form form) global native
+Function RegisterForTimelineEvents(Form form) global native
 
 ; Unregister a form from receiving timeline playback events
 ; form: The form/alias to unregister
-Function FCFW_UnregisterForTimelineEvents(Form form) global native
+Function UnregisterForTimelineEvents(Form form) global native
 
 ; ===== Camera Utility Functions =====
 
 ; Get current camera X position (world coordinates)
 ; Returns: X coordinate of current camera position
-float Function FCFW_GetCameraPosX() global native
+float Function GetCameraPosX() global native
 
 ; Get current camera Y position (world coordinates)
 ; Returns: Y coordinate of current camera position
-float Function FCFW_GetCameraPosY() global native
+float Function GetCameraPosY() global native
 
 ; Get current camera Z position (world coordinates)
 ; Returns: Z coordinate of current camera position
-float Function FCFW_GetCameraPosZ() global native
+float Function GetCameraPosZ() global native
 
 ; Get current camera pitch (rotation around X axis)
 ; Returns: Pitch in radians
-float Function FCFW_GetCameraPitch() global native
+float Function GetCameraPitch() global native
 
 ; Get current camera yaw (rotation around Z axis)
 ; Returns: Yaw in radians
-float Function FCFW_GetCameraYaw() global native
+float Function GetCameraYaw() global native

@@ -1,6 +1,7 @@
 #include "CameraPath.h"
 #include "FCFW_Utils.h"
 #include <yaml-cpp/yaml.h>
+#include "CLIBUtil/EditorID.hpp"
 
 
 namespace FCFW {
@@ -228,8 +229,8 @@ namespace FCFW {
                 if (point.m_pointType == FCFW::PointType::kReference && point.m_reference) {
                     out << YAML::Key << "reference" << YAML::Value << YAML::BeginMap;
                     
-                    const char* editorID = point.m_reference->GetFormEditorID();
-                    if (editorID && editorID[0] != '\0') {
+                    std::string editorID = clib_util::editorID::get_editorID(point.m_reference);
+                    if (editorID.c_str() && editorID.c_str()[0] != '\0') {
                         out << YAML::Key << "editorID" << YAML::Value << editorID;
                     } else {
                         log::warn("{}: Reference 0x{:X} has no EditorID - timeline may not be portable across load orders", 
