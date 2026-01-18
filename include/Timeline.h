@@ -50,11 +50,6 @@ namespace FCFW
 		RE::BSTPoint2<float> GetRotationPoint(size_t a_index) const;
 
 	private:
-		TranslationTrack& GetTranslationTrack() { return m_translationTrack; }
-		RotationTrack& GetRotationTrack() { return m_rotationTrack; }
-		const TranslationTrack& GetTranslationTrack() const { return m_translationTrack; }
-		const RotationTrack& GetRotationTrack() const { return m_rotationTrack; }
-
 		TranslationTrack m_translationTrack;  // Position keyframes
 		RotationTrack m_rotationTrack;        // Rotation keyframes
 };}  // namespace FCFW

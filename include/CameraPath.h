@@ -29,7 +29,7 @@ namespace FCFW {
         }
 
         RE::NiPoint3 GetPoint() const {
-            if (m_pointType == PointType::kReference && m_reference) {
+            if (m_pointType == PointType::kReference && m_reference && m_reference->Is3DLoaded()) {
                 RE::NiPoint3 offset = m_offset;
                 
                 // If offset is relative to reference heading, rotate it
@@ -68,9 +68,11 @@ namespace FCFW {
                     offset = rotatedOffset;
                 }
                 
-                return m_reference->GetPosition() + offset;
+                // Cache last valid position in m_point for fallback if reference becomes invalid
+                m_point = m_reference->GetPosition() + offset;
+                return m_point;
             }
-            return m_point;
+            return m_point;  // Return cached position if reference is null/invalid
         }
        
         bool IsNearlyEqual(const TranslationPoint& other) const {
@@ -154,7 +156,7 @@ namespace FCFW {
         }
 
         RE::BSTPoint2<float> GetPoint() const {
-            if (m_pointType == PointType::kReference && m_reference) {
+            if (m_pointType == PointType::kReference && m_reference && m_reference->Is3DLoaded()) {
                 if (m_isOffsetRelative) { // If offset is relative to reference heading, use reference's facing direction
                     float pitch = 0.0f;
                     float yaw = 0.0f;
@@ -166,10 +168,11 @@ namespace FCFW {
                         yaw = m_reference->GetAngleZ();
                     }
                     
-                    // Apply offset to reference's base orientation
-                    return RE::BSTPoint2<float>{
+                    // Apply offset to reference's base orientation and cache
+                    m_point = RE::BSTPoint2<float>{
                         _ts_SKSEFunctions::NormalRelativeAngle(pitch + m_offset.x),
                         _ts_SKSEFunctions::NormalRelativeAngle(yaw + m_offset.y)};
+                    return m_point;
                 } else { // camera looks at reference with offset
                     RE::NiPoint3 refPos = m_reference->GetPosition();                
                     RE::NiPoint3 cameraPos = _ts_SKSEFunctions::GetCameraPos();
@@ -190,9 +193,10 @@ namespace FCFW {
                                         
                     // If offsets are zero (or very small), just use base direction
                     if (std::abs(m_offset.x) <EPSILON_COMPARISON && std::abs(m_offset.y) < EPSILON_COMPARISON) {
-                        return RE::BSTPoint2<float>{
+                        m_point = RE::BSTPoint2<float>{
                             _ts_SKSEFunctions::NormalRelativeAngle(basePitch),
                             _ts_SKSEFunctions::NormalRelativeAngle(baseYaw)};
+                        return m_point;
                     }
                     
                     // Now apply the offsets to this base direction
@@ -239,16 +243,17 @@ namespace FCFW {
                     worldDir.y = localDir.x * right.y + localDir.y * forward.y + localDir.z * up.y;
                     worldDir.z = localDir.x * right.z + localDir.y * forward.z + localDir.z * up.z;
                     
-                    // Convert world direction back to pitch/yaw angles
+                    // Convert world direction back to pitch/yaw angles and cache
                     float worldPitch = -std::asin(worldDir.z);
                     float worldYaw = std::atan2(worldDir.x, worldDir.y);
                     
-                    return RE::BSTPoint2<float>{
+                    m_point = RE::BSTPoint2<float>{
                         _ts_SKSEFunctions::NormalRelativeAngle(worldPitch),
                         _ts_SKSEFunctions::NormalRelativeAngle(worldYaw)};
+                    return m_point;
                 }
             }
-            return m_point;
+            return m_point;  // Return cached rotation if reference is null/invalid
         }
        
         bool IsNearlyEqual(const RotationPoint& other) const {

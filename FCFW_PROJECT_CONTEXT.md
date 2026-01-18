@@ -68,7 +68,7 @@ FCFW follows a **singleton manager pattern** with **multi-timeline storage** and
 - **Paired Tracks**: `Timeline` class coordinates independent `TimelineTrack<TranslationPath>` and `TimelineTrack<RotationPath>`
 - **Three-Tier Encapsulation**: 
   - `Timeline` hides `TimelineTrack` implementation from `TimelineManager`
-  - `TimelineTrack` hides `Path` implementation via wrapper methods (GetPath() private)
+  - `TimelineTrack` hides `Path` implementation via wrapper methods
   - `Path` fully encapsulated - only accessible through `TimelineTrack` wrappers
 - **Template Specialization**: `TimelineTrack<T>` provides type-safe interpolation for position and rotation data
 - **Track Independence**: Translation and rotation tracks can have different point counts and keyframe times
@@ -104,7 +104,7 @@ GetTimeline(timelineID, pluginHandle) → TimelineState*
   ↓
 TimelineState->m_timeline.AddTranslationPoint() / AddRotationPoint()
   ↓
-TimelineTrack<PathType>::AddPoint() (internal: stores in m_path via private GetPath())
+TimelineTrack<PathType>::AddPoint() (internal: stores in m_path directly)
   ↓
 MainUpdateHook (every frame)
   ↓
@@ -121,7 +121,7 @@ Apply to RE::FreeCameraState (position/rotation)
 
 **Encapsulation Boundaries:**
 - **TimelineManager** → sees only Timeline public API
-- **Timeline** → sees TimelineTrack public API (GetPath() hidden)
+- **Timeline** → sees TimelineTrack public API
 - **TimelineTrack** → directly accesses m_path member (Path fully encapsulated)
 
 **Common Tasks:**
@@ -195,7 +195,8 @@ Update Loop (Hooks.cpp):
 - **PlaybackMode:** `kEnd` (stop), `kLoop` (wrap with offset), `kWait` (stay at final position)
 
 ### **Critical Patterns:**
-- **Timeline Registration:** Call `RegisterTimeline(pluginHandle)` to get unique timeline ID (required first step)
+- **Plugin Registration (Required):** Call `RegisterPlugin(pluginHandle)` in OnInit/OnPlayerLoadGame to register plugin and cleanup orphaned timelines
+- **Timeline Registration:** Call `RegisterTimeline(pluginHandle)` to get unique timeline ID (requires RegisterPlugin first)
 - **Ownership Validation:** `GetTimeline(timelineID, pluginHandle)` validates before all operations
 - **Exclusive Active Timeline:** Only ONE timeline can record/play at a time (m_activeTimelineID)
 - **Point Construction:** Always pass `Transition` object (not raw time)
@@ -223,13 +224,8 @@ Update Loop (Hooks.cpp):
 ```
 SKSEPlugin_Load()
 ├─> _ts_SKSEFunctions::InitializeLogging() [log level from INI]
-├─> Register SKSE message listener → MessageHandler()
 ├─> Register Papyrus functions → FCFW::Interface::FCFWFunctions()
 └─> Install Hooks → Hooks::Install()
-
-MessageHandler() [SKSE lifecycle events]
-├─> kDataLoaded/kPostLoad/kPostPostLoad: APIs::RequestAPIs()
-└─> kPostLoadGame/kNewGame: APIs::RequestAPIs()
 
 RequestPluginAPI(InterfaceVersion) [Mod API entry]
 └─> Returns FCFWInterface singleton for V1
@@ -245,10 +241,11 @@ RequestPluginAPI(InterfaceVersion) [Mod API entry]
 ### **2.2 Papyrus API (`plugin.cpp` - FCFW::Interface namespace)**
 **Registration:** All functions bound to `FCFW_SKSEFunctions` Papyrus script
 
-**Multi-Timeline Management:**
+**Plugin & Timeline Management:**
 | Papyrus Function | Return | Parameters | Notes |
 |-----------------|--------|------------|-------|
-| `RegisterTimeline` | int | modName | Returns new timeline ID for your mod |
+| `RegisterPlugin` | bool | modName | **Required first step** - Register plugin and cleanup orphaned timelines |
+| `RegisterTimeline` | int | modName | Returns new timeline ID (requires RegisterPlugin first) |
 | `UnregisterTimeline` | bool | modName, timelineID | Remove timeline (requires ownership) |
 
 **Event Callback Registration:**
@@ -342,29 +339,42 @@ Registered forms receive these event callbacks:
 ```papyrus
 Scriptname MyQuest extends Quest
 
+string ModName = "MyMod.esp"
+int timelineID = -1
+
 Event OnInit()
     ; Register THIS quest (which extends Form) to receive events
     FCFW_SKSEFunctions.RegisterForTimelineEvents(self as Form)
+    InitializeTimelines()
 EndEvent
 
-Function SetupTimeline()
-    ; First, register a new timeline to get its ID
-    int timelineID = FCFW_SKSEFunctions.RegisterTimeline("MyMod.esp")
+Event OnPlayerLoadGame()
+    InitializeTimelines()
+EndEvent
+
+Function InitializeTimelines()
+    ; First, register plugin (cleans up orphaned timelines from previous sessions)
+    FCFW_SKSEFunctions.RegisterPlugin(ModName)
     
+    ; Now register a new timeline to get its ID
+    timelineID = FCFW_SKSEFunctions.RegisterTimeline(ModName)
+EndFunction
+
+Function SetupTimeline()
     ; Add some points...
-    FCFW_SKSEFunctions.AddTranslationPoint("MyMod.esp", timelineID, 0.0, 100.0, 200.0, 300.0, false, false, 2)
-    FCFW_SKSEFunctions.AddTranslationPoint("MyMod.esp", timelineID, 5.0, 400.0, 500.0, 600.0, false, false, 2)
+    FCFW_SKSEFunctions.AddTranslationPoint(ModName, timelineID, 0.0, 100.0, 200.0, 300.0, false, false, 2)
+    FCFW_SKSEFunctions.AddTranslationPoint(ModName, timelineID, 5.0, 400.0, 500.0, 600.0, false, false, 2)
     
     ; Set playback mode to kWait (2) - timeline will stay at final position
-    FCFW_SKSEFunctions.SetPlaybackMode("MyMod.esp", timelineID, 2)
+    FCFW_SKSEFunctions.SetPlaybackMode(ModName, timelineID, 2)
     
     ; Start playback
-    FCFW_SKSEFunctions.StartPlayback("MyMod.esp", timelineID, 1.0, false, false, false, 0.0)
+    FCFW_SKSEFunctions.StartPlayback(ModName, timelineID, 1.0, false, false, false, 0.0)
 EndFunction
 
 Function Cleanup()
     ; When done with timeline, unregister it to free resources
-    FCFW_SKSEFunctions.UnregisterTimeline("MyMod.esp", timelineID)
+    FCFW_SKSEFunctions.UnregisterTimeline(ModName, timelineID)
 EndFunction
 
 Event OnPlaybackStart(int timelineID)
@@ -435,8 +445,9 @@ SKSE::GetMessagingInterface()->RegisterListener(MessageHandler);
 **Interface: `IVFCFW1`** (pure virtual, defined in `FCFW_API.h`)
 - **Thread Safety:** `GetFCFWThreadId()` returns TID for thread validation
 - **Version Check:** `GetFCFWPluginVersion()` returns encoded version
-- **Timeline Management:**
-  - `RegisterTimeline(pluginHandle)` - Returns new timeline ID (size_t, >0) for your plugin
+- **Plugin & Timeline Management:**
+  - `RegisterPlugin(pluginHandle)` - **Required first step** - Register plugin and cleanup orphaned timelines
+  - `RegisterTimeline(pluginHandle)` - Returns new timeline ID (size_t, >0) for your plugin (requires RegisterPlugin first)
   - `UnregisterTimeline(timelineID, pluginHandle)` - Frees timeline resources (stops active operations first)
 - **Multi-Timeline API:** All functions require `size_t timelineID` and `SKSE::PluginHandle` parameters
   - External plugins pass their own plugin handle (via `SKSE::GetPluginHandle()` in their code)
@@ -461,6 +472,10 @@ auto api = reinterpret_cast<FCFW_API::IVFCFW1*>(
     FCFW_API::RequestPluginAPI(FCFW_API::InterfaceVersion::V1)
 );
 
+// First, register plugin (cleans up orphaned timelines from previous sessions)
+api->RegisterPlugin(SKSE::GetPluginHandle());
+
+// Now register a timeline
 size_t timelineID = api->RegisterTimeline(SKSE::GetPluginHandle());
 
 // Add translation points using RE::NiPoint3
@@ -613,6 +628,9 @@ enum class PlaybackMode : int {
 
 **Member Variables:**
 ```cpp
+// Plugin Registry (for lifecycle management)
+std::unordered_set<SKSE::PluginHandle> m_registeredPlugins;  // Track registered plugins
+
 // Multi-Timeline Storage (Phase 4 Complete)
 std::unordered_map<size_t, TimelineState> m_timelines;  // Timeline ID → state
 std::atomic<size_t> m_nextTimelineID{ 1 };              // Auto-incrementing ID generator
@@ -669,6 +687,12 @@ struct TimelineState {
 - **Before Phase 4:** Single `Timeline m_timeline`, all state in TimelineManager
 - **After Phase 4 (✅ Complete - January 2, 2026):** Map of `TimelineState` objects, each containing timeline + per-timeline state
 - **Old Code Removed:** All single-timeline functions and obsolete member variables cleaned up
+- **Plugin Registration (✅ Complete - January 18, 2026):** Required initialization step for all plugins
+  - `RegisterPlugin(pluginHandle)` must be called before `RegisterTimeline()` (typically in OnInit/OnPlayerLoadGame)
+  - First call: Registers plugin in `m_registeredPlugins` set
+  - Subsequent calls: Automatically cleans up orphaned timelines from previous sessions
+  - Solves timeline accumulation problem when loading savegames (Papyrus properties reset but FCFW state persists)
+  - `RegisterTimeline()` validates plugin registration before creating new timelines
 - **Ownership:** Every timeline has `ownerPluginHandle`, validated on all operations
 - **Active Timeline:** Only ONE timeline can be recording/playing at a time (enforced by `m_activeTimelineID`)
 - **Helper Pattern:** All public API functions call `GetTimeline(timelineID, pluginHandle)` to validate ownership + existence before operations
@@ -681,7 +705,7 @@ struct TimelineState {
   - SKSE Messaging: Broadcasts to all C++ plugins via `SKSE::GetMessagingInterface()->Dispatch()`
   - Papyrus Events: Queues events to registered forms via `SKSE::GetTaskInterface()->AddTask()`
 - **Global vs Per-Timeline State:**
-  - **Global (shared):** `m_recordingInterval`, `m_isShowingMenus`, `m_userTurning`, `m_lastFreeRotation`, `m_eventReceivers`
+  - **Global (shared):** `m_registeredPlugins`, `m_recordingInterval`, `m_isShowingMenus`, `m_userTurning`, `m_lastFreeRotation`, `m_eventReceivers`
   - **Per-Timeline (in TimelineState):**
     - **Static config (persisted):** `m_globalEaseIn`, `m_globalEaseOut`, `m_showMenusDuringPlayback`, `m_allowUserRotation`
     - **Runtime only (NOT persisted):** `m_isRecording`, `m_currentRecordingTime`, `m_lastRecordedPointTime`, `m_isPlaybackRunning`, `m_playbackSpeed`, `m_playbackDuration`, `m_isCompletedAndWaiting`, `m_rotationOffset`
@@ -1029,15 +1053,6 @@ RE::NiPoint3 GetTranslationPoint(size_t a_index) const;        // Get world posi
 RE::BSTPoint2<float> GetRotationPoint(size_t a_index) const;   // Get rotation (pitch, yaw in radians)
 ```
 
-**Private Track Access:**
-```cpp
-// These are now private - only accessible within Timeline.cpp implementations
-TranslationTrack& GetTranslationTrack();
-RotationTrack& GetRotationTrack();
-const TranslationTrack& GetTranslationTrack() const;
-const RotationTrack& GetRotationTrack() const;
-```
-
 **Architectural Benefits:**
 1. **Complete Encapsulation:** TimelineManager has no direct access to TimelineTrack internals
 2. **Unified Interface:** All operations go through Timeline public API
@@ -1078,7 +1093,7 @@ PathType::ValueType        // RE::NiPoint3 or RE::BSTPoint2<float>
 
 **Encapsulation Architecture:**
 
-TimelineTrack now provides complete path encapsulation through wrapper methods. The `GetPath()` accessor is private (internal use only).
+TimelineTrack provides complete path encapsulation through wrapper methods. All path access is done directly via the `m_path` member variable.
 
 **Public Path Operations (wrapper methods):**
 ```cpp
@@ -1089,12 +1104,6 @@ const TransitionPoint& GetPoint(size_t a_index) const;                          
 // File I/O
 bool AddPathFromFile(std::ifstream& a_file, float a_timeOffset, float a_conversionFactor);  // Delegate to m_path
 bool ExportPath(std::ofstream& a_file, float a_conversionFactor) const;                    // Delegate to m_path
-```
-
-**Private Path Access (internal only):**
-```cpp
-PathType& GetPath() { return m_path; }              // For internal modifications
-const PathType& GetPath() const { return m_path; }  // For internal const access
 ```
 
 **Three-Tier Encapsulation:**

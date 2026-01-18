@@ -48,9 +48,6 @@ namespace FCFW
 		bool ExportPath(std::ofstream& a_file, float a_conversionFactor = 1.0f) const;
 
 	private:
-		PathType& GetPath() { return m_path; }
-		const PathType& GetPath() const { return m_path; }
-
 		typename PathType::ValueType GetInterpolatedPoint(size_t a_index, float a_progress) const;
 		typename PathType::ValueType GetPointLinear(size_t a_index, float a_progress) const;
 		typename PathType::ValueType GetPointCubicHermite(size_t a_index, float a_progress) const;

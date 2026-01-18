@@ -20,6 +20,7 @@ namespace FCFW {
      RE::NiPointer<RE::NiAVObject> GetTargetPoint(RE::Actor* a_actor);
 
     SKSE::PluginHandle ModNameToHandle(const char* a_modName);
+    bool IsPluginHandleValid(SKSE::PluginHandle a_handle);
 
     // ===== YAML Enum Conversion Helpers =====
     std::string PointTypeToString(PointType type);

@@ -72,7 +72,6 @@ int togglePlayback2_Key = 3 ; "2"
 int toggleRecording_Key = 4 ; "3"
 int exportTimeline_Key = 5 ; "4"
 int importTimeline_Key = 6 ; "5"
-bool keyRegistered = false 
 
 ; timeline configuration
 float CircleRadius = 1000.0 ; radius of orbit around marker
@@ -91,70 +90,37 @@ int currentTimelineID = -1
 
 
 Event OnInit()
-    if(!keyRegistered)
-        RegisterForKey(togglePlayback1_Key)
-        RegisterForKey(togglePlayback2_Key)
-        RegisterForKey(toggleRecording_Key)
-        RegisterForKey(exportTimeline_Key)
-        RegisterForKey(importTimeline_Key)
-        keyRegistered = true
-    endif
-
-    IntializeTimelines()
+    Initalize()
 EndEvent
 
 
-Event OnPlayerLoadGame()
-    if(!keyRegistered)
-        RegisterForKey(togglePlayback1_Key)
-        RegisterForKey(togglePlayback2_Key)
-        RegisterForKey(toggleRecording_Key)
-        RegisterForKey(exportTimeline_Key)
-        RegisterForKey(importTimeline_Key)
-        keyRegistered = true
-    endif
-    
+Function Initalize()
+    InitializeKeys()
     IntializeTimelines()
-EndEvent
+EndFunction
+
+
+Function InitializeKeys()
+    RegisterForKey(togglePlayback1_Key)
+    RegisterForKey(togglePlayback2_Key)
+    RegisterForKey(toggleRecording_Key)
+    RegisterForKey(exportTimeline_Key)
+    RegisterForKey(importTimeline_Key)
+endFunction
 
 
 Function IntializeTimelines()
-    ; Register timelines with FCFW
-    if timeline1ID > 0
-        FCFW_SKSEFunctions.ClearTimeline(ModName, timeline1ID)
-    else
-        timeline1ID = RegisterTimeline()
-    endif
-
-    if timeline2ID > 0
-        FCFW_SKSEFunctions.ClearTimeline(ModName, timeline2ID)
-    else
-        timeline2ID = RegisterTimeline()
-    endif
-
-    if timeline3ID > 0
-        FCFW_SKSEFunctions.ClearTimeline(ModName, timeline3ID)
-    else
-        timeline3ID = RegisterTimeline()
-    endif
-
-    if timeline4ID > 0
-        FCFW_SKSEFunctions.ClearTimeline(ModName, timeline4ID)
-    else
-        timeline4ID = RegisterTimeline()
-    endif
-
-    if timeline5ID > 0
-        FCFW_SKSEFunctions.ClearTimeline(ModName, timeline5ID)
-    else
-        timeline5ID = RegisterTimeline()
-    endif
+    FCFW_SKSEFunctions.RegisterPlugin(ModName)
+    timeline1ID = RegisterTimeline()
+    timeline2ID = RegisterTimeline()
+    timeline3ID = RegisterTimeline()
+    timeline4ID = RegisterTimeline()
+    timeline5ID = RegisterTimeline()
 
     FCFW_SKSEFunctions.RegisterForTimelineEvents(self as Form)
 
     BuildTimeline2() 
     ; The other timelines will be built dynamically on playback start, or will be recorded by the user
-
 EndFunction
 
 

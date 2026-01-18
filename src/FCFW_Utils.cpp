@@ -87,6 +87,26 @@ namespace FCFW {
         return 0;
     }
 
+    bool IsPluginHandleValid(SKSE::PluginHandle a_handle) {
+        if (a_handle == 0) {
+            return false;
+        }
+        
+        auto* dataHandler = RE::TESDataHandler::GetSingleton();
+        if (!dataHandler) {
+            return false;
+        }
+        
+        // Check if any loaded file has matching compile index
+        for (const auto& file : dataHandler->files) {
+            if (file && file->compileIndex == a_handle) {
+                return true;
+            }
+        }
+        
+        return false;
+    }
+
     void ComputeHermiteBasis(float t, float& h00, float& h10, float& h01, float& h11) {
         float t2 = t * t;
         float t3 = t2 * t;

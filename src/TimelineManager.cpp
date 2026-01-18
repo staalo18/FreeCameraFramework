@@ -1066,11 +1066,77 @@ state->m_timeline.GetRotationPointCount(), a_timelineID, a_filePath);
         return true;
     }
 
+    bool TimelineManager::RegisterPlugin(SKSE::PluginHandle a_pluginHandle) {
+        std::lock_guard<std::recursive_mutex> lock(m_timelineMutex);
+        
+        // Check if plugin was already registered
+        if (m_registeredPlugins.contains(a_pluginHandle)) {
+            log::info("{}: Plugin {} re-registering, cleaning up orphaned timelines", __FUNCTION__, a_pluginHandle);
+            CleanupPluginTimelines(a_pluginHandle);
+        }
+
+        m_registeredPlugins.insert(a_pluginHandle);
+        return true;
+    }
+
+    void TimelineManager::CleanupPluginTimelines(SKSE::PluginHandle a_pluginHandle) {
+        std::vector<size_t> timelinesToRemove;
+        
+        // Collect timeline IDs to remove
+        for (const auto& [timelineID, state] : m_timelines) {
+            if (state.m_ownerHandle == a_pluginHandle) {
+                timelinesToRemove.push_back(timelineID);
+            }
+        }
+        
+        // Remove timelines
+        for (size_t timelineID : timelinesToRemove) {
+            auto it = m_timelines.find(timelineID);
+            if (it != m_timelines.end()) {
+                TimelineState& state = it->second;
+                
+                // Stop any active operations
+                if (state.m_isPlaybackRunning) {
+                    log::info("{}: Stopping playback for orphaned timeline {} before cleanup", __FUNCTION__, timelineID);
+                    if (m_activeTimelineID == timelineID) {
+                        // Exit free camera and restore UI state
+                        auto* playerCamera = RE::PlayerCamera::GetSingleton();
+                        if (playerCamera && playerCamera->currentState && playerCamera->currentState->id == RE::CameraState::kFree) {
+                            playerCamera->ToggleFreeCameraMode(false);
+                            
+                            auto* ui = RE::UI::GetSingleton();
+                            if (ui && !state.m_showMenusDuringPlayback) {
+                                ui->ShowMenus(m_isShowingMenus);  // Use global member
+                            }
+                        }
+                        m_activeTimelineID = 0;
+                    }
+                    state.m_isPlaybackRunning = false;
+                }
+                
+                if (state.m_isRecording) {
+                    log::info("{}: Stopping recording for orphaned timeline {} before cleanup", __FUNCTION__, timelineID);
+                    if (m_activeTimelineID == timelineID) {
+                        m_activeTimelineID = 0;
+                    }
+                    state.m_isRecording = false;
+                }
+                
+                m_timelines.erase(it);
+            }
+        }
+    }
+
     size_t TimelineManager::RegisterTimeline(SKSE::PluginHandle a_pluginHandle) {        
         std::lock_guard<std::recursive_mutex> lock(m_timelineMutex);
         
+        // Require plugin registration first
+        if (!m_registeredPlugins.contains(a_pluginHandle)) {
+            log::error("{}: Plugin {} must call RegisterPlugin() before RegisterTimeline()", __FUNCTION__, a_pluginHandle);
+            return 0;
+        }
+        
         size_t newID = m_nextTimelineID.fetch_add(1);
-        log::info("{}: Generated new ID {} (counter now at {})", __FUNCTION__, newID, m_nextTimelineID.load());
         
         TimelineState state;
         state.m_id = newID;
@@ -1078,13 +1144,11 @@ state->m_timeline.GetRotationPointCount(), a_timelineID, a_filePath);
         state.m_ownerHandle = a_pluginHandle;
         
         state.m_ownerName = std::format("Plugin_{}", a_pluginHandle);
-        log::info("{}: Created state with owner name '{}'", __FUNCTION__, state.m_ownerName);
         
-        // Log before move to avoid use-after-move undefined behavior
-        log::info("{}: Timeline {} registered by plugin '{}' (handle {})", __FUNCTION__, newID, state.m_ownerName, a_pluginHandle);
+//  Log before move to avoid use-after-move undefined behavior
+log::info("{}: Timeline {} registered by plugin '{}' (handle {})", __FUNCTION__, newID, state.m_ownerName, a_pluginHandle);
         
         m_timelines[newID] = std::move(state);
-        log::info("{}: Inserted into map, returning ID {}", __FUNCTION__, newID);
         
         return newID;
     }
@@ -1114,6 +1178,10 @@ state->m_timeline.GetRotationPointCount(), a_timelineID, a_filePath);
     }
 
     TimelineState* TimelineManager::GetTimeline(size_t a_timelineID, SKSE::PluginHandle a_pluginHandle) {
+        if (a_pluginHandle == 0 || a_timelineID == 0) {
+            return nullptr;
+        }
+
         auto it = m_timelines.find(a_timelineID);
         if (it == m_timelines.end()) {
             log::error("{}: Timeline {} not found", __FUNCTION__, a_timelineID);
@@ -1130,19 +1198,7 @@ state->m_timeline.GetRotationPointCount(), a_timelineID, a_filePath);
     }
 
     const TimelineState* TimelineManager::GetTimeline(size_t a_timelineID, SKSE::PluginHandle a_pluginHandle) const {
-        auto it = m_timelines.find(a_timelineID);
-        if (it == m_timelines.end()) {
-            log::error("{}: Timeline {} not found", __FUNCTION__, a_timelineID);
-            return nullptr;
-        }
-        
-        if (it->second.m_ownerHandle != a_pluginHandle) {
-            log::error("{}: Plugin handle {} does not own timeline {} (owned by handle {})", 
-                       __FUNCTION__, a_pluginHandle, a_timelineID, it->second.m_ownerHandle);
-            return nullptr;
-        }
-        
-        return &it->second;
+        return const_cast<TimelineManager*>(this)->GetTimeline(a_timelineID, a_pluginHandle);
     }
 
     // Overloads for internal use (no ownership validation)

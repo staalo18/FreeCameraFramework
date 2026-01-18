@@ -5,10 +5,22 @@ Scriptname FCFW_SKSEFunctions
 ; Example: version 1.2.3 returns 10203
 int Function GetPluginVersion() global native
 
+; ===== Plugin Registration =====
+
+; Register your plugin with FCFW (required before RegisterTimeline)
+; This function should be called during plugin initialization (OnInit/OnPlayerLoadGame)
+; If your plugin was already registered, this will clean up any orphaned timelines
+; from previous game sessions (eg when loading a savegame while in-game)
+; and prepare for fresh timeline registration
+; modName: name of your mod's ESP/ESL file (e.g., "MyMod.esp")
+; Returns: true on success, false on failure
+bool Function RegisterPlugin(string modName) global native
+
 ; ===== Timeline Management =====
 
 ; Register a new timeline and get its unique ID
 ; Each mod can register multiple independent timelines
+; IMPORTANT: You must call RegisterPlugin() first before calling this function
 ; IMPORTANT: Timeline IDs are permanent once registered. To update a timeline's
 ; content, use ClearTimeline() followed by Add...Point() calls. Only unregister
 ; when you no longer need the timeline at all (e.g., plugin shutdown).

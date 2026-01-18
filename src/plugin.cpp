@@ -12,6 +12,21 @@ namespace FCFW {
                    static_cast<int>(Plugin::VERSION[2]);
         }
 
+        bool RegisterPlugin(RE::StaticFunctionTag*, RE::BSFixedString a_modName) {
+            if (a_modName.empty()) {
+                log::error("{}: Empty mod name provided", __FUNCTION__);
+                return false;
+            }
+
+            SKSE::PluginHandle handle = FCFW::ModNameToHandle(a_modName.c_str());
+            if (handle == 0) {
+                log::error("{}: Invalid mod name '{}' - mod not loaded or doesn't exist", __FUNCTION__, a_modName.c_str());
+                return false;
+            }
+
+            return FCFW::TimelineManager::GetSingleton().RegisterPlugin(handle);
+        }
+
         int RegisterTimeline(RE::StaticFunctionTag*, RE::BSFixedString a_modName) {
             if (a_modName.empty()) {
                 log::error("{}: Empty mod name provided", __FUNCTION__);
@@ -535,6 +550,7 @@ log::error("{}: Invalid mod name '{}' or timeline ID {}", __FUNCTION__, a_modNam
 
         bool FCFWFunctions(RE::BSScript::Internal::VirtualMachine * a_vm){
             a_vm->RegisterFunction("GetPluginVersion", "FCFW_SKSEFunctions", GetFCFWPluginVersion);
+            a_vm->RegisterFunction("RegisterPlugin", "FCFW_SKSEFunctions", RegisterPlugin);
             a_vm->RegisterFunction("RegisterTimeline", "FCFW_SKSEFunctions", RegisterTimeline);
             a_vm->RegisterFunction("UnregisterTimeline", "FCFW_SKSEFunctions", UnregisterTimeline);
             a_vm->RegisterFunction("AddTranslationPointAtCamera", "FCFW_SKSEFunctions", AddTranslationPointAtCamera);

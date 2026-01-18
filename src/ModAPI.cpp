@@ -20,6 +20,10 @@ int Messaging::FCFWInterface::GetFCFWPluginVersion() const noexcept {
 	       static_cast<int>(Plugin::VERSION[2]);
 }
 
+bool Messaging::FCFWInterface::RegisterPlugin(SKSE::PluginHandle a_pluginHandle) const noexcept {
+	return FCFW::TimelineManager::GetSingleton().RegisterPlugin(a_pluginHandle);
+}
+
 size_t Messaging::FCFWInterface::RegisterTimeline(SKSE::PluginHandle a_pluginHandle) const noexcept {
 	size_t result = FCFW::TimelineManager::GetSingleton().RegisterTimeline(a_pluginHandle);
 	log::info("{}: API wrapper returning timeline ID {}", __FUNCTION__, result);

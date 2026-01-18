@@ -209,9 +209,28 @@ This prevents conflicts when multiple mods use FCFW simultaneously.
 
 ## Timeline Management
 
+### Plugin Registration (Required First Step)
+
+**Before registering any timelines, you must register your plugin with FCFW:**
+
+```papyrus
+; Call this in OnInit() and OnPlayerLoadGame()
+bool success = FCFW_SKSEFunctions.RegisterPlugin(ModName)
+
+if !success
+    Debug.Notification("Failed to register plugin with FCFW")
+    return
+endif
+```
+
+**What RegisterPlugin() does:**
+- Registers your plugin with FCFW for the first time
+- If already registered, unregisters all timelines previously registered by that plugin, then re-registers the plugin.
+- Must register plugin before any `RegisterTimeline()` calls
+
 ### Registering Timelines
 
-**Every timeline must be registered before use:**
+**Every timeline must be registered before use. After plugin registration, you can register timelines:**
 
 ```papyrus
 int timelineID = FCFW_SKSEFunctions.RegisterTimeline(ModName)
@@ -227,7 +246,7 @@ endif
 **Important Notes:**
 - Timeline IDs are NOT preserved between savegames! That means you will need to ensure that your timelines are (re-)registered when a savegame is loaded
 - Each mod can register multiple timelines
-- Timeline IDs are unique and never reused
+- Timeline IDs are unique within a game session
 - Registration can fail if mod name is invalid
 
 ### Managing Multiple Timelines
@@ -244,7 +263,19 @@ int approachTimelineID = -1
 int orbitTimelineID = -1
 int returnTimelineID = -1
 
+Event OnInit()
+    InitializeTimelines()
+EndEvent
+
+Event OnPlayerLoadGame()
+    InitializeTimelines()
+EndEvent
+
 Function InitializeTimelines()
+    ; First, register plugin (cleans up orphaned timelines from previous sessions, if any)
+    FCFW_SKSEFunctions.RegisterPlugin(ModName)
+    
+    ; Now register fresh timelines
     approachTimelineID = FCFW_SKSEFunctions.RegisterTimeline(ModName)
     orbitTimelineID = FCFW_SKSEFunctions.RegisterTimeline(ModName)
     returnTimelineID = FCFW_SKSEFunctions.RegisterTimeline(ModName)

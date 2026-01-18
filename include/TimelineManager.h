@@ -4,6 +4,7 @@
 #include <atomic>
 #include <mutex>
 #include <unordered_map>
+#include <unordered_set>
 
 namespace FCFW {
     // Per-timeline state container
@@ -87,6 +88,7 @@ namespace FCFW {
             bool AddTimelineFromFile(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, const char* a_filePath, float a_timeOffset = 0.0f); // Requires ownership
             bool ExportTimeline(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, const char* a_filePath) const;
 
+            bool RegisterPlugin(SKSE::PluginHandle a_pluginHandle);
             size_t RegisterTimeline(SKSE::PluginHandle a_pluginHandle);
             bool UnregisterTimeline(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID);
             
@@ -106,7 +108,10 @@ namespace FCFW {
 
             TimelineState* GetTimeline(size_t a_timelineID, SKSE::PluginHandle a_pluginHandle);
             const TimelineState* GetTimeline(size_t a_timelineID, SKSE::PluginHandle a_pluginHandle) const;
+            
+            void CleanupPluginTimelines(SKSE::PluginHandle a_pluginHandle);
 
+            std::unordered_set<SKSE::PluginHandle> m_registeredPlugins; // Track registered plugins
             std::unordered_map<size_t, TimelineState> m_timelines;
             mutable std::recursive_mutex m_timelineMutex;  // Protect map operations (recursive for reentrant safety)
             std::atomic<size_t> m_nextTimelineID{ 1 };     // ID generator

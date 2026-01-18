@@ -21,6 +21,7 @@ namespace Messaging
 		// InterfaceVersion1
         virtual unsigned long GetFCFWThreadId(void) const noexcept override;
 		virtual int GetFCFWPluginVersion() const noexcept override;
+		virtual bool RegisterPlugin(SKSE::PluginHandle a_pluginHandle) const noexcept override;
 		virtual size_t RegisterTimeline(SKSE::PluginHandle a_pluginHandle) const noexcept override;
 		virtual bool UnregisterTimeline(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID) const noexcept override;
         virtual int AddTranslationPoint(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, float a_time, const RE::NiPoint3& a_position, bool a_easeIn = false, bool a_easeOut = false, int a_interpolationMode = 2) const noexcept override;

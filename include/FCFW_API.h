@@ -56,9 +56,21 @@ namespace FCFW_API {
 		[[nodiscard]] virtual int GetFCFWPluginVersion() const noexcept = 0;
 
 		/// <summary>
+		/// Register your plugin with FCFW (required before RegisterTimeline).
+		/// This function should be called during plugin initialization.
+		/// If your plugin was already registered, this will clean up any orphaned timelines
+		/// from previous game sessions (eg when loading a savegame while in-game)
+		/// and prepare for fresh timeline registration.
+		/// </summary>
+		/// <param name="a_pluginHandle">Plugin handle of the calling plugin (use SKSE::GetPluginHandle())</param>
+		/// <returns>true on success, false on failure</returns>
+		[[nodiscard]] virtual bool RegisterPlugin(SKSE::PluginHandle a_pluginHandle) const noexcept = 0;
+
+		/// <summary>
 		/// Register a new timeline and get its unique ID.
 		/// Each plugin can register multiple timelines for independent camera paths.
 		/// 
+		/// IMPORTANT: You must call RegisterPlugin() first before calling this function.
 		/// IMPORTANT: Timeline IDs are permanent once registered. To update a timeline's
 		/// content, use ClearTimeline() followed by Add...Point() calls. Only unregister
 		/// when you no longer need the timeline at all (e.g., plugin shutdown).
