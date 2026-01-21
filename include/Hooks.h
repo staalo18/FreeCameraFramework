@@ -16,6 +16,7 @@ namespace Hooks
 	private:
 		static void Nullsub();
 		static inline REL::Relocation<decltype(Nullsub)> _Nullsub;		
+		static void LogPlayerCellInfo();
 	};
 
 	class LookHook
@@ -53,7 +54,23 @@ namespace Hooks
 		static inline REL::Relocation<decltype(ProcessThumbstick)> _ProcessThumbstick;
 		static inline REL::Relocation<decltype(ProcessButton)> _ProcessButton;
 	};
-	
+
+    // Add the new hook class
+    class GridCellArrayHook
+    {
+    public:
+        static void Hook()
+        {
+            REL::Relocation<std::uintptr_t> GridCellArrayVtbl{ RE::VTABLE_GridCellArray[0] };
+            _SetCenter = GridCellArrayVtbl.write_vfunc(0x3, SetCenter);
+        }
+
+    private:
+        static bool SetCenter(RE::GridCellArray* a_this, std::int32_t a_x, std::int32_t a_y);
+        static inline REL::Relocation<decltype(SetCenter)> _SetCenter;
+    };
+
+
 	void Install();
 } // namespace Hooks	
 

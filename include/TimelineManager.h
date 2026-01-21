@@ -111,6 +111,8 @@ namespace FCFW {
             
             void CleanupPluginTimelines(SKSE::PluginHandle a_pluginHandle);
 
+            void RecenterGridAroundCameraIfNeeded();
+
             std::unordered_set<SKSE::PluginHandle> m_registeredPlugins; // Track registered plugins
             std::unordered_map<size_t, TimelineState> m_timelines;
             mutable std::recursive_mutex m_timelineMutex;  // Protect map operations (recursive for reentrant safety)

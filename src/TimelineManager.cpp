@@ -385,6 +385,79 @@ log::info("{}: Sent Papyrus event '{}' for timeline {} to {} receivers", __FUNCT
         return true;
     }
 
+    std::int32_t cellX = 0;
+    std::int32_t cellY = 0;
+
+    void TimelineManager::RecenterGridAroundCameraIfNeeded()
+    {
+        auto tes = RE::TES::GetSingleton();
+        if (!tes || !tes->gridCells) {
+            log::error("{}: TES or gridCells not available", __FUNCTION__);
+            return;
+        }
+
+        auto cameraPos = _ts_SKSEFunctions::GetCameraPos();
+        // Calculate cell coordinates manually (Skyrim cells are 4096 units)
+        constexpr float CELL_SIZE = 4096.0f;
+        std::int32_t cameraCellX = static_cast<std::int32_t>(std::floor(cameraPos.x / CELL_SIZE));
+        std::int32_t cameraCellY = static_cast<std::int32_t>(std::floor(cameraPos.y / CELL_SIZE));
+
+        if (cameraCellX == cellX && cameraCellY == cellY) {
+            return;
+        }
+        auto playPos = RE::PlayerCharacter::GetSingleton()->GetPosition();
+        std::int32_t playerCellX = static_cast<std::int32_t>(std::floor(playPos.x / CELL_SIZE));
+        std::int32_t playerCellY = static_cast<std::int32_t>(std::floor(playPos.y / CELL_SIZE));
+log::info("{}: Camera is in cell ({}, {}), old cell is ({}, {}), player cell is ({}, {})", __FUNCTION__, cameraCellX, cameraCellY, cellX, cellY, playerCellX, playerCellY);           
+//        RE::PlayerCharacter::GetSingleton()->SetPosition(cameraPos, true);
+
+
+    // The function is likely a MEMBER function of GridCellArray or TES
+    // Signature is probably: void GridCellArray::Unk_Function(int32 cellX, int32 cellY)
+    // or: void TES::Unk_Function(int32 cellX, int32 cellY)
+ /*   
+    auto base = REL::Module::get().base();
+    uintptr_t funcAddr = base + 0x5ECA6A;
+    
+    // Try as a member function of GridCellArray (this pointer is passed in RCX on x64)
+    using GridUpdateFunc = void(*)(RE::GridCellArray*, std::int32_t, std::int32_t);
+    auto updateFunc = reinterpret_cast<GridUpdateFunc>(funcAddr);
+    
+    log::info("{}: Calling master grid update function at 0x{:X} with cells ({}, {})", 
+              __FUNCTION__, funcAddr, cameraCellX, cameraCellY);
+    
+    // Call with gridCells as the 'this' pointer
+    updateFunc(tes->gridCells, cameraCellX, cameraCellY);
+   
+*/
+
+/*
+        cellX = cameraCellX;
+        cellY = cameraCellY;
+        return;
+
+        auto* targetCell = tes->GetCell(cameraPos);
+        if (!targetCell) {
+            log::error("{}: Target cell not found for camera position", __FUNCTION__);
+            return;
+        }
+
+        auto coords = targetCell->GetCoordinates();
+        if (!coords) {
+            log::error("{}: Cell coordinates not available", __FUNCTION__);
+            return;
+        }
+
+log::info("{}: Camera is in cell ({}, {}), current cell is ({}, {})", __FUNCTION__, coords->cellX-1, coords->cellY, tes->currentGridX, tes->currentGridY);
+
+        // Only re-center if we've moved significantly from current center
+        if (coords->cellX-1 != tes->currentGridX || coords->cellY != tes->currentGridY) {
+log::info("{}: Recentering grid to cell ({}, {})", __FUNCTION__, coords->cellX-1, coords->cellY);
+            tes->gridCells->SetCenter(coords->cellX-1, coords->cellY);
+        }
+*/
+    }
+
     void TimelineManager::PlayTimeline(TimelineState* a_state) {
         if (!a_state || !a_state->m_isPlaybackRunning) {
             return;
@@ -432,7 +505,9 @@ log::info("{}: Sent Papyrus event '{}' for timeline {} to {} receivers", __FUNCT
 
         float deltaTime = _ts_SKSEFunctions::GetRealTimeDeltaTime() * a_state->m_playbackSpeed;
         a_state->m_timeline.UpdatePlayback(deltaTime);
-        
+
+        RecenterGridAroundCameraIfNeeded();
+
         // Apply global easing
         float sampleTime = a_state->m_timeline.GetPlaybackTime();
         if (a_state->m_globalEaseIn || a_state->m_globalEaseOut) {
