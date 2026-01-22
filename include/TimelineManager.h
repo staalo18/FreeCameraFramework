@@ -96,6 +96,10 @@ namespace FCFW {
             void RegisterForTimelineEvents(RE::TESForm* a_form);
             void UnregisterForTimelineEvents(RE::TESForm* a_form);
             
+            // Save/load handlers
+            void OnPreSaveGame();
+            void OnPostSaveGame();
+
         private:
             TimelineManager() = default;
             ~TimelineManager() = default;
@@ -116,13 +120,18 @@ namespace FCFW {
             std::unordered_set<SKSE::PluginHandle> m_registeredPlugins; // Track registered plugins
             std::unordered_map<size_t, TimelineState> m_timelines;
             mutable std::recursive_mutex m_timelineMutex;  // Protect map operations (recursive for reentrant safety)
-            std::atomic<size_t> m_nextTimelineID{ 1 };     // ID generator
-            size_t m_activeTimelineID{ 0 };            // Which timeline is active (0 = none)
+            std::atomic<size_t> m_nextTimelineID = 1;     // ID generator
+            size_t m_activeTimelineID = 0;            // Which timeline is active (0 = none)
                         
             // Playback
             bool m_isShowingMenus = true;         // Whether menus were showing before playback started
             bool m_userTurning = false;           // Whether user is manually controlling camera during playback
-            RE::NiPoint2 m_lastFreeRotation;           // camera free rotation before playback started (third-person only)            // Papyrus event registration
+            RE::NiPoint2 m_lastFreeRotation;           // camera free rotation before playback started (third-person only)
+            
+            // Papyrus event registration
             std::vector<RE::TESForm*> m_eventReceivers;  // Forms registered for timeline events
+            
+            // Savegame handling
+            bool m_isSaveInProgress = false; // Flag to indicate save is in progress
     }; // class TimelineManager
 } // namespace FCFW

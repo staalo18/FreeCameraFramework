@@ -638,6 +638,18 @@ extern "C" DLLEXPORT bool SKSEAPI SKSEPlugin_Load(const SKSE::LoadInterface* sks
 
     Hooks::Install();
 
+    auto* messaging = SKSE::GetMessagingInterface();
+    if (messaging) {
+        messaging->RegisterListener([](SKSE::MessagingInterface::Message* msg) {
+            if (msg->type == SKSE::MessagingInterface::kSaveGame) {
+                // Save about to start - handle ongoing playback / recording
+                FCFW::TimelineManager::GetSingleton().OnPreSaveGame();
+            }
+        });
+    } else {
+        log::warn("{}: Failed to get messaging interface for save handler", __FUNCTION__);
+    }
+
     return true;
 }
 

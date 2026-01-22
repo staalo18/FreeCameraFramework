@@ -24,6 +24,9 @@ FreeCameraFramework (FCFW) is an SKSE plugin for Skyrim Anniversary Edition that
 - **Event Callback System**: Notify consumers when timeline playback starts/stops/completes
   - **SKSE Messaging Interface**: C++ plugins receive events via SKSE messaging system
   - **Papyrus Events**: Scripts receive `OnPlaybackStart`, `OnPlaybackStop`, and `OnPlaybackWait` events with timeline ID
+- **Save/Load Integration**: Seamless playback and recording preservation across savegame cycles
+  - Pre-save: set flag isSaveInProgress and exit free camera (clean savegame). Flag stops recording and playback updates.
+  - Post-save: unset flag isSaveInProgress and re-enter free camera (zero user disruption)
 - **Three API Surfaces**:
   - **Papyrus Scripts**: Full scripting integration with mod name + timeline ID parameters
   - **C++ Mod API**: Native plugin-to-plugin communication with SKSE plugin handle validation
@@ -109,6 +112,9 @@ TimelineTrack<PathType>::AddPoint() (internal: stores in m_path directly)
 MainUpdateHook (every frame)
   ↓
 TimelineManager::Update()
+  ├─ Check if save in progress (m_isSaveInProgress flag)
+  │   ├─ If GameIsPaused() → skip update (save ongoing)
+  │   └─ If !GameIsPaused() → OnPostSaveGame() (save completed)
   ├─ RecordTimeline(TimelineState*) → sample camera @ 1Hz → Timeline::AddPoint()
   ├─ PlayTimeline(TimelineState*) → Timeline::UpdatePlayback(deltaTime) 
   │                 → Timeline::GetTranslation/Rotation(time)
@@ -117,7 +123,26 @@ TimelineManager::Update()
   └─ Point queries available via GetTranslationPoint/GetRotationPoint API
   ↓
 Apply to RE::FreeCameraState (position/rotation)
+
+**Save/Load Handling:**
 ```
+kSaveGame event (SKSE message)
+  ↓
+OnPreSaveGame()
+  ├─ Exit free camera mode (ensures clean savegame without FreeCameraState)
+  └─ Set m_isSaveInProgress flag
+  ↓
+TimelineManager::Update() (next frame)
+  └─ Skip timeline updates while GameIsPaused() (save in progress)
+  ↓
+When !GameIsPaused() detected
+  ↓
+OnPostSaveGame()
+  ├─ Clear m_isSaveInProgress flag
+  └─ Re-enter free camera mode (resume playback)
+```
+**Note:** Save detection uses `GameIsPaused()` polling. This creates a 1-frame glitch during resume. 
+Future improvement: Use direct save completion hook for seamless transition.
 
 **Encapsulation Boundaries:**
 - **TimelineManager** → sees only Timeline public API
@@ -130,6 +155,11 @@ Apply to RE::FreeCameraState (position/rotation)
 - **File Format Changes**: Update `CameraPath::ExportPath()` and `AddPathFromFile()` in `CameraPath.cpp`
 - **New Point Types**: Extend `PointType` enum in `CameraTypes.h`, add cases in `TranslationPoint::GetPoint()` / `RotationPoint::GetPoint()` methods
 - **Querying Timeline Data**: Use `GetTranslationPointCount()`/`GetRotationPointCount()` to get point counts, then `GetTranslationPoint()`/`GetRotationPoint()` (C++) or individual coordinate functions (Papyrus) to iterate through points by index
+- **Save/Load Integration**: 
+  - `OnPreSaveGame()` exits free camera and sets `m_isSaveInProgress` flag
+  - `Update()` skips timeline updates while `GameIsPaused()` during save
+  - `OnPostSaveGame()` re-enters free camera when save completes
+  - Prevents FreeCameraState persistence in savegames
 
 **Build Dependencies:**
 - **CommonLibSSE-NG**: SKSE plugin framework (set `COMMONLIBSSE_PATH` env var)

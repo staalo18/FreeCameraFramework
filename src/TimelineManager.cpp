@@ -82,6 +82,21 @@ log::info("{}: Sent Papyrus event '{}' for timeline {} to {} receivers", __FUNCT
         // This ensures the timeline cannot be deleted/modified while we're using it
         std::lock_guard<std::recursive_mutex> lock(m_timelineMutex);
         
+        auto* ui = RE::UI::GetSingleton();  
+        if (!ui) {
+            log::error("{}: UI singleton not available", __FUNCTION__);
+            return;
+        }
+
+        if (m_isSaveInProgress) {
+            // Indirectly check for ongoing Save (did not find event or hook that triggers at completion of save)
+            if (ui->GameIsPaused()) {
+                return;
+            } else { // save completed
+                OnPostSaveGame();
+            }         
+        }
+
         // Check for active timeline
         if (m_activeTimelineID == 0) {
             return;
@@ -506,7 +521,7 @@ log::info("{}: Recentering grid to cell ({}, {})", __FUNCTION__, coords->cellX-1
         float deltaTime = _ts_SKSEFunctions::GetRealTimeDeltaTime() * a_state->m_playbackSpeed;
         a_state->m_timeline.UpdatePlayback(deltaTime);
 
-        RecenterGridAroundCameraIfNeeded();
+//        RecenterGridAroundCameraIfNeeded();
 
         // Apply global easing
         float sampleTime = a_state->m_timeline.GetPlaybackTime();
@@ -1333,6 +1348,39 @@ log::info("{}: Timeline {} registered by plugin '{}' (handle {})", __FUNCTION__,
             a_state->m_timeline.AddRotationPoint(rotationPoint);
             
             a_state->m_lastRecordedPointTime = a_state->m_currentRecordingTime;
+        }
+    }
+
+    void TimelineManager::OnPreSaveGame() {
+        if (!m_activeTimelineID) {
+            return;
+        }
+
+        // Temporarily exit free camera
+        auto* playerCamera = RE::PlayerCamera::GetSingleton();
+        if (playerCamera && playerCamera->IsInFreeCameraMode()) {
+            playerCamera->ToggleFreeCameraMode(false);
+        }
+        
+        m_isSaveInProgress = true;
+    }
+
+    void TimelineManager::OnPostSaveGame() {
+
+        if (!m_isSaveInProgress) {
+            return;
+        }
+
+        m_isSaveInProgress = false;
+
+        if (!m_activeTimelineID) {
+            return;
+        }
+
+        // Re-enter free camera mode
+        auto* playerCamera = RE::PlayerCamera::GetSingleton();
+        if (playerCamera && !playerCamera->IsInFreeCameraMode()) {
+            playerCamera->ToggleFreeCameraMode(false);
         }
     }
 
