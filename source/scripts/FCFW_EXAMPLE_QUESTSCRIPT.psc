@@ -74,7 +74,7 @@ int exportTimeline_Key = 5 ; "4"
 int importTimeline_Key = 6 ; "5"
 
 ; timeline configuration
-float CircleRadius = 1000.0 ; radius of orbit around marker
+float CircleRadius = 2000.0 ; radius of orbit around marker
 float PositionOffset = 500.0 ; position offset of marker relative to reference
 int NumPoints = 16 ; number of sample points in orbit
 float Duration = 8.0 ; time for one complete rotation (seconds)
@@ -316,7 +316,7 @@ Event OnKeyDown(int keyCode)
             BuildReturnTimeline(timeline3ID)
 
             ; Start playback
-            if !FCFW_SKSEFunctions.StartPlayback(ModName, timeline1ID)
+            if !FCFW_SKSEFunctions.StartPlayback(ModName, timeline1ID, minHeightAboveGround = 100.0)
                 Debug.Trace("FCFW_EXAMPLE: ERROR - Failed to start playback")
                 Debug.Notification("FCFW Example: Failed to start playback")
             endif

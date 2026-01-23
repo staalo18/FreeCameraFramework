@@ -536,7 +536,18 @@ log::info("{}: Recentering grid to cell ({}, {})", __FUNCTION__, coords->cellX-1
         }
         
         // Get interpolated points
-        cameraState->translation = a_state->m_timeline.GetTranslation(sampleTime);
+        RE::NiPoint3 cameraPos = a_state->m_timeline.GetTranslation(sampleTime);
+        // Apply ground-following if enabled
+        if (a_state->m_followGround) {
+            float landHeight = _ts_SKSEFunctions::GetLandHeightWithWater(cameraPos);
+            float cameraHeight = cameraPos.z - landHeight;
+            if (cameraHeight < a_state->m_minHeightAboveGround) {
+                cameraPos.z = landHeight + a_state->m_minHeightAboveGround;
+            }
+        }
+        
+        cameraState->translation = cameraPos;
+        
         RE::BSTPoint2<float> rotation = a_state->m_timeline.GetRotation(sampleTime);
         
         // Handle user rotation
@@ -595,7 +606,7 @@ log::info("{}: Recentering grid to cell ({}, {})", __FUNCTION__, coords->cellX-1
         return true;
     }
 
-    bool TimelineManager::StartPlayback(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, float a_speed, bool a_globalEaseIn, bool a_globalEaseOut, bool a_useDuration, float a_duration) {
+    bool TimelineManager::StartPlayback(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, float a_speed, bool a_globalEaseIn, bool a_globalEaseOut, bool a_useDuration, float a_duration, bool a_followGround, float a_minHeightAboveGround) {
         std::lock_guard<std::recursive_mutex> lock(m_timelineMutex);
         
         // Check if any timeline is already active
@@ -661,6 +672,8 @@ log::info("{}: Recentering grid to cell ({}, {})", __FUNCTION__, coords->cellX-1
         // Set playback parameters
         state->m_globalEaseIn = a_globalEaseIn;
         state->m_globalEaseOut = a_globalEaseOut;
+        state->m_followGround = a_followGround;
+        state->m_minHeightAboveGround = a_minHeightAboveGround;
         
         // Set as active timeline
         m_activeTimelineID = a_timelineID;
@@ -848,20 +861,8 @@ log::info("{}: Recentering grid to cell ({}, {})", __FUNCTION__, coords->cellX-1
         toState->m_timeline.ResetPlayback();
         toState->m_timeline.StartPlayback();
         
-        // Copy playback settings from source timeline
-        toState->m_playbackSpeed = fromState->m_playbackSpeed;
-        
-        // Only preserve rotation offset if target timeline allows user rotation
-        // If target doesn't allow user rotation, reset to zero so timeline plays its intended rotation
-        if (toState->m_allowUserRotation) {
-            toState->m_rotationOffset = fromState->m_rotationOffset;
-        } else {
-            toState->m_rotationOffset = { 0.0f, 0.0f };
-        }
-        
-        toState->m_showMenusDuringPlayback = fromState->m_showMenusDuringPlayback;
-        toState->m_globalEaseIn = fromState->m_globalEaseIn;
-        toState->m_globalEaseOut = fromState->m_globalEaseOut;
+        // Copy all runtime playback state from source to target timeline
+        CopyPlaybackState(fromState, toState);
         
         // Activate target timeline (camera stays in free mode)
         m_activeTimelineID = a_toTimelineID;
@@ -878,6 +879,23 @@ log::info("{}: Recentering grid to cell ({}, {})", __FUNCTION__, coords->cellX-1
 
     void TimelineManager::SetUserTurning(bool a_turning) {
         m_userTurning = a_turning;
+    }
+
+    void TimelineManager::CopyPlaybackState(TimelineState* a_fromState, TimelineState* a_toState) {        
+        a_toState->m_playbackSpeed = a_fromState->m_playbackSpeed;
+        a_toState->m_showMenusDuringPlayback = a_fromState->m_showMenusDuringPlayback;
+        a_toState->m_globalEaseIn = a_fromState->m_globalEaseIn;
+        a_toState->m_globalEaseOut = a_fromState->m_globalEaseOut;
+        a_toState->m_followGround = a_fromState->m_followGround;
+        a_toState->m_minHeightAboveGround = a_fromState->m_minHeightAboveGround;
+        
+        // Only preserve rotation offset if target timeline allows user rotation
+        // If target doesn't allow user rotation, reset to zero so timeline plays its intended rotation
+        if (a_toState->m_allowUserRotation) {
+            a_toState->m_rotationOffset = a_fromState->m_rotationOffset;
+        } else {
+            a_toState->m_rotationOffset = { 0.0f, 0.0f };
+        }
     }
 
     bool TimelineManager::PausePlayback(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID) {

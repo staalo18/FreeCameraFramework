@@ -94,8 +94,8 @@ RE::BSTPoint2<float> Messaging::FCFWInterface::GetRotationPoint(SKSE::PluginHand
 	return FCFW::TimelineManager::GetSingleton().GetRotationPoint(a_pluginHandle, a_timelineID, a_index);
 }
 
-bool Messaging::FCFWInterface::StartPlayback(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, float a_speed, bool a_globalEaseIn, bool a_globalEaseOut, bool a_useDuration, float a_duration) const noexcept {
-	return FCFW::TimelineManager::GetSingleton().StartPlayback(a_pluginHandle, a_timelineID, a_speed, a_globalEaseIn, a_globalEaseOut, a_useDuration, a_duration);
+bool Messaging::FCFWInterface::StartPlayback(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, float a_speed, bool a_globalEaseIn, bool a_globalEaseOut, bool a_useDuration, float a_duration, bool a_followGround, float a_minHeightAboveGround) const noexcept {
+	return FCFW::TimelineManager::GetSingleton().StartPlayback(a_pluginHandle, a_timelineID, a_speed, a_globalEaseIn, a_globalEaseOut, a_useDuration, a_duration, a_followGround, a_minHeightAboveGround);
 }
 
 bool Messaging::FCFWInterface::StopPlayback(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID) const noexcept {

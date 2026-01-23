@@ -205,13 +205,6 @@ float Function GetRotationPointPitch(string modName, int timelineID, int index) 
 ; Returns: yaw in radians, or 0.0 if timeline not found or index out of range
 float Function GetRotationPointYaw(string modName, int timelineID, int index) global native
 
-; Start playback with advanced options
-; speed: playback speed multiplier (only used if useDuration=false)
-; useDuration: if true, plays timeline over duration seconds
-;              if false, plays timeline with speed as speed multiplier
-; duration: total duration in seconds for entire timeline (only used if useDuration=true)
-; globalEaseIn: apply ease-in at the start of entire playback
-; globalEaseOut: apply ease-out at the end of entire playback
 ; Start playback of a camera path timeline
 ; modName: name of your mod's ESP/ESL file (e.g., "MyMod.esp")
 ; timelineID: timeline ID to play
@@ -221,8 +214,10 @@ float Function GetRotationPointYaw(string modName, int timelineID, int index) gl
 ; useDuration: if true, plays timeline over duration seconds
 ;              if false (default), plays timeline with speed as speed multiplier
 ; duration: total duration in seconds for entire timeline, only used if useDuration=true (default: 0.0)
+; followGround: if true, keeps camera above ground/water level during playback (default: true)
+; minHeightAboveGround: minimum height above ground when following ground (default: 0.0)
 ; Returns: true on success, false on failure
-bool Function StartPlayback(string modName, int timelineID, float speed = 1.0, bool globalEaseIn = false, bool globalEaseOut = false, bool useDuration = false, float duration = 0.0) global native
+bool Function StartPlayback(string modName, int timelineID, float speed = 1.0, bool globalEaseIn = false, bool globalEaseOut = false, bool useDuration = false, float duration = 0.0, bool followGround = true, float minHeightAboveGround = 0.0) global native
 
 ; Stop playback of the camera timeline
 ; Stop playback of a camera path timeline

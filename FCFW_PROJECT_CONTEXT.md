@@ -1,5 +1,5 @@
 # **FreeCameraFramework (FCFW) - Project Context Document**
-*Complete technical reference for architectural understanding and refactoring*
+*Technical reference for architecture and implementation*
 
 ---
 
@@ -98,51 +98,9 @@ include/
 ```
 
 **Data Flow:**
-```
-User Input (Papyrus/ModAPI)
-  ↓
-TimelineManager (validate timeline ID + ownership, orchestrate)
-  ↓
-GetTimeline(timelineID, pluginHandle) → TimelineState*
-  ↓
-TimelineState->m_timeline.AddTranslationPoint() / AddRotationPoint()
-  ↓
-TimelineTrack<PathType>::AddPoint() (internal: stores in m_path directly)
-  ↓
-MainUpdateHook (every frame)
-  ↓
-TimelineManager::Update()
-  ├─ Check if save in progress (m_isSaveInProgress flag)
-  │   ├─ If GameIsPaused() → skip update (save ongoing)
-  │   └─ If !GameIsPaused() → OnPostSaveGame() (save completed)
-  ├─ RecordTimeline(TimelineState*) → sample camera @ 1Hz → Timeline::AddPoint()
-  ├─ PlayTimeline(TimelineState*) → Timeline::UpdatePlayback(deltaTime) 
-  │                 → Timeline::GetTranslation/Rotation(time)
-  │                 → TimelineTrack::GetPointAtTime(t)
-  │                 → (internal: m_path access for interpolation)
-  └─ Point queries available via GetTranslationPoint/GetRotationPoint API
-  ↓
-Apply to RE::FreeCameraState (position/rotation)
-
-**Save/Load Handling:**
-```
-kSaveGame event (SKSE message)
-  ↓
-OnPreSaveGame()
-  ├─ Exit free camera mode (ensures clean savegame without FreeCameraState)
-  └─ Set m_isSaveInProgress flag
-  ↓
-TimelineManager::Update() (next frame)
-  └─ Skip timeline updates while GameIsPaused() (save in progress)
-  ↓
-When !GameIsPaused() detected
-  ↓
-OnPostSaveGame()
-  ├─ Clear m_isSaveInProgress flag
-  └─ Re-enter free camera mode (resume playback)
-```
-**Note:** Save detection uses `GameIsPaused()` polling. This creates a 1-frame glitch during resume. 
-Future improvement: Use direct save completion hook for seamless transition.
+- Papyrus/ModAPI → TimelineManager (validate ownership) → TimelineState → Timeline → TimelineTrack → CameraPath
+- MainUpdateHook → TimelineManager::Update() → RecordTimeline/PlayTimeline → FreeCameraState
+- Save handling: OnPreSaveGame (exit camera, set flag) → Update skips while paused → OnPostSaveGame (resume)
 
 **Encapsulation Boundaries:**
 - **TimelineManager** → sees only Timeline public API
@@ -150,37 +108,21 @@ Future improvement: Use direct save completion hook for seamless transition.
 - **TimelineTrack** → directly accesses m_path member (Path fully encapsulated)
 
 **Common Tasks:**
-- **Adding New API Functions**: Bind in `plugin.cpp` (Papyrus), implement in `TimelineManager`, expose in `FCFW_API.h` (Mod API), add to `ModAPI.h` overrides
-- **Changing Interpolation**: Modify `TimelineTrack<T>::GetPointAtTime()` in `Timeline.inl` (calls interpolation helpers)
-- **File Format Changes**: Update `CameraPath::ExportPath()` and `AddPathFromFile()` in `CameraPath.cpp`
-- **New Point Types**: Extend `PointType` enum in `CameraTypes.h`, add cases in `TranslationPoint::GetPoint()` / `RotationPoint::GetPoint()` methods
-- **Querying Timeline Data**: Use `GetTranslationPointCount()`/`GetRotationPointCount()` to get point counts, then `GetTranslationPoint()`/`GetRotationPoint()` (C++) or individual coordinate functions (Papyrus) to iterate through points by index
-- **Save/Load Integration**: 
-  - `OnPreSaveGame()` exits free camera and sets `m_isSaveInProgress` flag
-  - `Update()` skips timeline updates while `GameIsPaused()` during save
-  - `OnPostSaveGame()` re-enters free camera when save completes
-  - Prevents FreeCameraState persistence in savegames
-
+- **New API**: Bind in `plugin.cpp`, implement in `TimelineManager`, expose in `FCFW_API.h`
+- **Interpolation**: Modify `TimelineTrack<T>::GetPointAtTime()` in `TimelineTrack.h`
+- **File Format**: Update `CameraPath::ExportPath()` and `AddPathFromFile()`
+- **Point Types**: Extend `PointType` enum, update `TranslationPoint::GetPoint()` / `RotationPoint::GetPoint()`
 **Build Dependencies:**
 - **CommonLibSSE-NG**: SKSE plugin framework (set `COMMONLIBSSE_PATH` env var)
-- **_ts_SKSEFunctions**: Utility library (must be sibling directory) - provides interpolation/easing functions
-- **vcpkg**: Dependency manager (fmt, spdlog, yaml-cpp)
+- **_ts_SKSEFunctions**: Utility library (must be sibling directory) - provides interpolation/easing functions and camera utilities
+- **vcpkg dependencies**: 
+  - **yaml-cpp**: YAML file parsing for timeline import/export (FCFW)
+  - **spdlog**: Logging (FCFW + _ts_SKSEFunctions)
+  - **simpleini**: INI file parsing (_ts_SKSEFunctions)
+  - **directxtk**: Required by CommonLibSSE-NG (transitive)
+  - **rapidcsv**: Required by CommonLibSSE-NG (transitive)
 - **CMake 3.29+**: Build system with MSVC presets
-
-**Testing Entry Points:**
-1. Launch Skyrim AE with SKSE
-2. Open console: `tfc` (enable free camera)
-3. From Papyrus: Call `RegisterTimeline("YourMod.esp")` to get a timeline ID
-4. Call `StartRecording("YourMod.esp", timelineID)` to begin recording
-5. Move camera, then call `StopRecording("YourMod.esp", timelineID)` to stop
-6. Exit free camera (`tfc`), then call `StartPlayback("YourMod.esp", timelineID, ...)` to play timeline
-7. Check logs: `Documents/My Games/Skyrim Special Edition/SKSE/FreeCameraFramework.log`
-
-**Common Pitfalls & Debugging:**
-- **C++ API Returns 0 or -1**: Check that `RegisterTimeline()` succeeded before using returned ID. ID of 0 indicates registration failure (check logs for errors).
-- **Crash on API Call**: All API functions validate timeline ID and ownership before proceeding. If crashing, check for use-after-move bugs or null pointer dereferences in wrapper code.
-- **Timeline Operations Fail Silently**: Verify ownership - only the plugin that registered a timeline can access it. ALL operations (queries, playback control, modification) require ownership validation and will fail if the timeline doesn't belong to the calling plugin.
-- **Missing Log Output**: Ensure `FreeCameraFramework.ini` has correct `LogLevel` (0-6, default 3=info). Use-after-move bugs can cause logging to crash before return values propagate.
+**Testing**: Enable free camera (`tfc`), call `RegisterPlugin` → `RegisterTimeline` → `StartRecording` → move camera → `StopRecording` → `StartPlayback`. Check logs at `Documents/My Games/Skyrim Special Edition/SKSE/FreeCameraFramework.log`
 
 ---
 
@@ -236,21 +178,9 @@ Update Loop (Hooks.cpp):
 
 ---
 
-## **1. Project Overview**
-- **Purpose**: Skyrim Special Edition SKSE plugin for cinematographic camera control
-- **Core Feature**: Multi-timeline camera movement system with keyframe interpolation
-- **Language**: C++ (SKSE CommonLibSSE-NG framework)
-- **Architecture**: Multi-timeline system with unlimited independent timelines per mod/plugin
-  - Ownership validation via SKSE plugin handles
-  - Timeline ID + mod name/plugin handle required for all API calls
-  - Exclusive playback/recording enforcement (one active timeline at a time)
-  - Full API support: Papyrus scripts and C++ plugins
+## **1. Entry Points & API Surface**
 
----
-
-## **2. Entry Points & API Surface**
-
-### **2.1 Plugin Initialization (`plugin.cpp`)**
+### **1.1 Plugin Initialization (`plugin.cpp`)**
 ```
 SKSEPlugin_Load()
 ├─> _ts_SKSEFunctions::InitializeLogging() [log level from INI]
@@ -268,7 +198,7 @@ RequestPluginAPI(InterfaceVersion) [Mod API entry]
 
 ---
 
-### **2.2 Papyrus API (`plugin.cpp` - FCFW::Interface namespace)**
+### **1.2 Papyrus API (`plugin.cpp` - FCFW::Interface namespace)**
 **Registration:** All functions bound to `FCFW_SKSEFunctions` Papyrus script
 
 **Plugin & Timeline Management:**
@@ -322,7 +252,7 @@ RequestPluginAPI(InterfaceVersion) [Mod API entry]
 **Playback Functions:**
 | Papyrus Function | Return | Parameters | Notes |
 |-----------------|--------|------------|-------|
-| `StartPlayback` | bool | **modName, timelineID**, speed, globalEaseIn, globalEaseOut, useDuration, duration | Begin timeline playback (validates ownership) |
+| `StartPlayback` | bool | **modName, timelineID**, speed, globalEaseIn, globalEaseOut, useDuration, duration, followGround, minHeightAboveGround | Begin timeline playback (validates ownership). followGround (default: true) keeps camera above ground/water. minHeightAboveGround (default: 0.0) sets minimum clearance above terrain |
 | `StopPlayback` | bool | **modName, timelineID** | Stop playback (validates ownership) |
 | `SwitchPlayback` | bool | **modName, fromTimelineID, toTimelineID** | Glitch-free timeline switch (validates ownership of both source and target timelines) |
 | `PausePlayback` | bool | **modName, timelineID** | Pause playback (validates ownership) |
@@ -423,7 +353,7 @@ EndEvent
 
 ---
 
-### **2.3 Mod API (`ModAPI.h`, `FCFW_API.h`)**
+### **1.3 Mod API (`ModAPI.h`, `FCFW_API.h`)**
 **Purpose:** Binary interface for other SKSE plugins to call FCFW functions
 
 **Access Pattern:**
@@ -434,156 +364,24 @@ auto api = reinterpret_cast<FCFW_API::IVFCFW1*>(
 ```
 
 **SKSE Messaging Interface:**
-C++ plugins can receive timeline playback events via the SKSE messaging system:
-
-**Event Types (FCFW_API.h):**
-```cpp
-enum class FCFWMessage : uint32_t {
-    kPlaybackStart = 0,
-    kPlaybackStop = 1,
-    kPlaybackWait = 2  // kWait mode: reached end, staying at final position
-};
-
-struct FCFWTimelineEventData {
-    size_t timelineID;
-};
-```
-
-**Example Usage:**
-```cpp
-void MessageHandler(SKSE::MessagingInterface::Message* msg) {
-    if (msg->sender && strcmp(msg->sender, FCFW_API::FCFWPluginName) == 0) {
-        switch (msg->type) {
-            case static_cast<uint32_t>(FCFW_API::FCFWMessage::kPlaybackStart): {
-                auto* data = static_cast<FCFW_API::FCFWTimelineEventData*>(msg->data);
-                // Handle timeline data->timelineID started
-                break;
-            }
-            case static_cast<uint32_t>(FCFW_API::FCFWMessage::kPlaybackStop): {
-                auto* data = static_cast<FCFW_API::FCFWTimelineEventData*>(msg->data);
-                // Handle timeline data->timelineID stopped
-                break;
-            }
-        }
-    }
-}
-
-// In SKSEPlugin_Load():
-SKSE::GetMessagingInterface()->RegisterListener(MessageHandler);
-```
+C++ plugins receive timeline events via SKSE messaging. Event types: `kPlaybackStart` (0), `kPlaybackStop` (1), `kPlaybackWait` (2). Register listener in SKSEPlugin_Load() to receive `FCFWTimelineEventData{size_t timelineID}` messages.
 
 **Interface: `IVFCFW1`** (pure virtual, defined in `FCFW_API.h`)
-- **Thread Safety:** `GetFCFWThreadId()` returns TID for thread validation
-- **Version Check:** `GetFCFWPluginVersion()` returns encoded version
-- **Plugin & Timeline Management:**
-  - `RegisterPlugin(pluginHandle)` - **Required first step** - Register plugin and cleanup orphaned timelines
-  - `RegisterTimeline(pluginHandle)` - Returns new timeline ID (size_t, >0) for your plugin (requires RegisterPlugin first)
-  - `UnregisterTimeline(timelineID, pluginHandle)` - Frees timeline resources (stops active operations first)
-- **Multi-Timeline API:** All functions require `size_t timelineID` and `SKSE::PluginHandle` parameters
-  - External plugins pass their own plugin handle (via `SKSE::GetPluginHandle()` in their code)
-  - Timeline manipulation requires ownership validation (Register/Unregister/Add/Remove/Clear/SetPlaybackMode)
-- **Point Addition Functions:** Accept point structs directly (C++ API only)
-  - `AddTranslationPoint(pluginHandle, timelineID, time, const RE::NiPoint3& position, ...)` - Pass position as struct
-  - `AddRotationPoint(pluginHandle, timelineID, time, const RE::BSTPoint2<float>& rotation, ...)` - Pass rotation as struct (x=pitch, y=yaw)
-  - Note: Papyrus API continues to accept individual coordinates (posX/Y/Z or pitch/yaw) for script convenience
-- **Point Query Functions:** Returns point data directly with zero sentinel values on error (matches Papyrus pattern)
-  - `RE::NiPoint3 GetTranslationPoint(pluginHandle, timelineID, index)` - Returns (0,0,0) on error
-  - `RE::BSTPoint2<float> GetRotationPoint(pluginHandle, timelineID, index)` - Returns (0,0) on error
-  - Consistent with Papyrus API: error conditions return zero values, check `GetTranslationPointCount()` first to validate index
-- **Signatures:** Similar to Papyrus but with native C++ types (`size_t`, `SKSE::PluginHandle` instead of `string`, `int`)
-  - All functions marked `const noexcept`
-  - `SetPlaybackMode(pluginHandle, timelineID, playbackMode, loopTimeOffset = 0.0f)` - playbackMode as int (0=kEnd, 1=kLoop, 2=kWait), loopTimeOffset defaults to 0.0f
-  - `int interpolationMode` converted via `ToInterpolationMode()` at API boundary
-  - All functions delegate to `TimelineManager::GetSingleton()`
+- **Required Sequence**: `RegisterPlugin(pluginHandle)` → `RegisterTimeline(pluginHandle)` → returns timeline ID
+- **Point Functions**: Accept `RE::NiPoint3` (translation) and `RE::BSTPoint2<float>` (rotation, x=pitch y=yaw)
+- **Query Functions**: Return zero on error - validate index with `GetTranslationPointCount()` first
+- **All functions**: Require `SKSE::PluginHandle` and `size_t timelineID`, marked `const noexcept`
 
-**Example: Building a Camera Path (C++ API):**
-```cpp
-auto api = reinterpret_cast<FCFW_API::IVFCFW1*>(
-    FCFW_API::RequestPluginAPI(FCFW_API::InterfaceVersion::V1)
-);
+**Implementation: `FCFWInterface`** (in `ModAPI.h`, implemented in `Messaging` namespace)a rotation during playback (unless `IsUserRotationAllowed()`), sets `SetUserTurning(true)` flag
+3. **MovementHook** (VTable on `RE::MovementHandler`, vfunc 0x2/0x4) - Blocks WASD/gamepad movement during playback
 
-// First, register plugin (cleans up orphaned timelines from previous sessions)
-api->RegisterPlugin(SKSE::GetPluginHandle());
-
-// Now register a timeline
-size_t timelineID = api->RegisterTimeline(SKSE::GetPluginHandle());
-
-// Add translation points using RE::NiPoint3
-RE::NiPoint3 pos1(100.0f, 200.0f, 300.0f);
-RE::NiPoint3 pos2(400.0f, 500.0f, 600.0f);
-api->AddTranslationPoint(SKSE::GetPluginHandle(), timelineID, 0.0f, pos1, false, false, 2);
-api->AddTranslationPoint(SKSE::GetPluginHandle(), timelineID, 5.0f, pos2, false, false, 2);
-
-// Add rotation points using RE::BSTPoint2<float> (x=pitch, y=yaw in radians)
-RE::BSTPoint2<float> rot1(0.0f, 1.57f);  // Looking east
-RE::BSTPoint2<float> rot2(0.5f, 3.14f);  // Looking south with slight pitch
-api->AddRotationPoint(SKSE::GetPluginHandle(), timelineID, 0.0f, rot1, false, false, 2);
-api->AddRotationPoint(SKSE::GetPluginHandle(), timelineID, 5.0f, rot2, false, false, 2);
-
-// Add reference-based point with offset struct
-RE::TESObjectREFR* target = RE::TESForm::LookupByID<RE::TESObjectREFR>(0x14);
-RE::NiPoint3 offset(50.0f, 0.0f, 100.0f);  // 50 units right, 100 units up
-api->AddTranslationPointAtRef(SKSE::GetPluginHandle(), timelineID, 10.0f, target, offset, false, false, false, 2);
-
-// Add rotation point looking at reference with pitch/yaw offset
-RE::BSTPoint2<float> rotOffset(0.1f, 0.0f);  // Slight pitch up, looking directly at target
-api->AddRotationPointAtRef(SKSE::GetPluginHandle(), timelineID, 10.0f, target, rotOffset, false, false, false, 2);
-
-// Start playback
-api->StartPlayback(SKSE::GetPluginHandle(), timelineID, 1.0f);
-```
-
-**Implementation: `FCFWInterface`** (in `ModAPI.h`, implemented in `Messaging` namespace)
-- Singleton pattern: `GetSingleton()` returns static instance
-- Private constructor/destructor
-- Stores `apiTID` member for thread tracking
-- All methods marked `const noexcept override`
+**Cross-Plugin Support**: Hooks use `IsPlaybackRunning(timelineID)` / `IsUserRotationAllowed(timelineID)` overloads without pluginHandle - must block input for ANY active timeline regardless of owner.
 
 ---
 
-### **2.5 Hooks (`Hooks.h/cpp`)**
-**Purpose:** Intercept Skyrim game loop and input handling
+## **2. Type System & Conventions**
 
-**Installed Hooks:**
-1. **MainUpdateHook** (RELOCATION_ID 35565/36564)
-   - Calls `TimelineManager::Update()` every frame
-   - Uses trampoline pattern with `write_call<5>()`
-
-2. **LookHook** (VTable hooks on `RE::LookHandler`)
-   - **ProcessThumbstick** (vfunc 0x2): Gamepad camera rotation
-   - **ProcessMouseMove** (vfunc 0x3): Mouse camera rotation
-   - **Multi-Timeline Behavior:**
-     * Gets active timeline ID: `activeID = GetActiveTimelineID()`
-     * Blocks input ONLY if: `activeID != 0 && IsPlaybackRunning(activeID) && !IsUserRotationAllowed(activeID)`
-     * Uses overloaded methods WITHOUT pluginHandle (checks ANY active timeline, not just FCFW-owned)
-     * Critical: Must work for timelines owned by external plugins (e.g., plugin A plays timeline, hooks must block input)
-   - Sets `SetUserTurning(true)` when input detected during playback
-
-3. **MovementHook** (VTable hooks on `RE::MovementHandler`)
-   - **ProcessThumbstick** (vfunc 0x2): Gamepad movement
-   - **ProcessButton** (vfunc 0x4): WASD movement keys
-   - **Multi-Timeline Behavior:**
-     * Gets active timeline ID: `activeID = GetActiveTimelineID()`
-     * Blocks forward/back/strafe input ONLY if: `activeID != 0 && IsPlaybackRunning(activeID)`
-     * Uses overloaded method WITHOUT pluginHandle (checks ANY active timeline)
-     * Critical: Allows movement during recording, blocks only during playback (regardless of timeline owner)
-   - Checks against `userEvents->forward/back/strafeLeft/strafeRight`
-
-**Hook Philosophy:**
-- Preserve original behavior via `_OriginalFunction` pattern
-- **Cross-Plugin Support:** Hooks use `IsPlaybackRunning(timelineID)` / `IsUserRotationAllowed(timelineID)` overloads WITHOUT pluginHandle
-  - Rationale: External plugins can start playback, hooks must block input for ANY active timeline
-  - Design: Overloaded methods bypass ownership validation (internal operations)
-  - Example: Plugin A owns timeline ID 5 and starts playback → hooks check `IsPlaybackRunning(5)` and block input
-- Only intercept when `IsPlaybackRunning(activeID)` and game not paused
-- Recording vs Playback: `m_activeTimelineID` is set for BOTH, use `IsPlaybackRunning()` to distinguish
-- Track user interaction state (`SetUserTurning(activeID, true)`) for recording
-
----
-
-## **3. Type System & Conventions**
-
-### **3.1 Core Enums (CameraTypes.h)**
+### **2.1 Core Enums (CameraTypes.h)**
 
 **InterpolationMode:**
 ```cpp
@@ -620,29 +418,39 @@ enum class PlaybackMode : int {
 - **Applied to both tracks:** Timeline class synchronizes mode across translation and rotation
 - **kWait Behavior:** Timeline reaches end, dispatches kPlaybackWait event, then continues playing at final frame position (allowing dynamic reference tracking). User must call StopPlayback() to end playback.
 
-### **3.2 Naming Conventions**
+### **2.2 Naming Conventions**
     - **Member Variables:** `m_` prefix (e.g., `m_translationTrack`, `m_isPlaying`)
 - **Function Parameters:** `a_` prefix (e.g., `a_time`, `a_reference`, `a_point`)
 - **Logger:** Uses `log::info`, `log::warn`, `log::error` (CommonLib pattern)
 - **Error Handling:** Return error codes (negative `int`) or `false`, log errors to file
 
-### **3.3 Singleton Pattern**
+### **2.3 Singleton Pattern**
 - **TimelineManager**, **FCFWInterface**
 - All use `GetSingleton()` returning static instance reference
 
 ---
 
-## **4. Dependencies & Build System**
+## **3. Dependencies & Build System**
 
-### **4.1 External Libraries (vcpkg)**
-- **CommonLibSSE-NG**: SKSE plugin framework
-- **spdlog**: Logging
-- **fmt**: String formatting
-- **simpleini**: INI file parsing
-- **rapidcsv**: CSV parsing (unused?)
-- **DirectXMath**, **DirectXTK**: Math utilities
+### **3.1 External Libraries**
 
-### **4.2 Build Configuration**
+**SKSE Framework:**
+- **CommonLibSSE-NG**: SKSE plugin framework (main interface to Skyrim)
+
+**Custom Dependencies:**
+- **_ts_SKSEFunctions**: External utility library (sibling directory)
+  - Provides interpolation functions (cubic Hermite, linear, easing)
+  - Camera position/rotation utilities
+  - Timing functions
+
+**vcpkg Dependencies:**
+- **yaml-cpp**: YAML file parsing for timeline import/export (FCFW)
+- **spdlog**: Logging framework (FCFW + _ts_SKSEFunctions)
+- **simpleini**: INI file parsing (_ts_SKSEFunctions)
+- **directxtk**: Required by CommonLibSSE-NG (transitive)
+- **rapidcsv**: Required by CommonLibSSE-NG (transitive)
+
+### **3.2 Build Configuration**
 - **CMake + Ninja**: Build system
 - **MSVC compiler**: cl.exe
 - **Precompiled Header:** `PCH.h`
@@ -650,9 +458,9 @@ enum class PlaybackMode : int {
 
 ---
 
-## **5. Core Architecture: TimelineManager & Timeline System**
+## **4. Core Architecture: TimelineManager & Timeline System**
 
-### **5.1 TimelineManager Overview**
+### **4.1 TimelineManager Overview**
 **Role:** Orchestrates multi-timeline recording, playback, and timeline manipulation  
 **Pattern:** Singleton with map-based timeline storage (unlimited independent timelines)
 
@@ -661,7 +469,7 @@ enum class PlaybackMode : int {
 // Plugin Registry (for lifecycle management)
 std::unordered_set<SKSE::PluginHandle> m_registeredPlugins;  // Track registered plugins
 
-// Multi-Timeline Storage (Phase 4 Complete)
+// Multi-Timeline Storage
 std::unordered_map<size_t, TimelineState> m_timelines;  // Timeline ID → state
 std::atomic<size_t> m_nextTimelineID{ 1 };              // Auto-incrementing ID generator
 size_t m_activeTimelineID{ 0 };                         // Currently active timeline (0 = none)
@@ -702,6 +510,8 @@ struct TimelineState {
     float m_playbackSpeed{ 1.0f };         // Computed time multiplier (runtime only, NOT persisted)
     float m_playbackDuration{ 0.0f };      // Computed total duration (runtime only, NOT persisted)
     bool m_isCompletedAndWaiting{ false }; // kWait mode completion flag (runtime only)
+    bool m_followGround{ true };           // Keep camera above ground level during playback (runtime only)
+    float m_minHeightAboveGround{ 0.0f }; // Minimum height above ground when following ground (runtime only)
     RE::BSTPoint2<float> m_rotationOffset{ 0.0f, 0.0f }; // Accumulated user rotation (runtime only)
 };
 ```
@@ -713,37 +523,70 @@ struct TimelineState {
 - **Playback State:** Runtime variables, cleared when StopPlayback() is called
   - `m_playbackSpeed` and `m_playbackDuration` are **computed dynamically** in StartPlayback() based on parameters, NOT persisted
 
-**Architecture Changes:**
-- **Before Phase 4:** Single `Timeline m_timeline`, all state in TimelineManager
-- **After Phase 4 (✅ Complete - January 2, 2026):** Map of `TimelineState` objects, each containing timeline + per-timeline state
-- **Old Code Removed:** All single-timeline functions and obsolete member variables cleaned up
-- **Plugin Registration (✅ Complete - January 18, 2026):** Required initialization step for all plugins
+**Maintaining Playback State Fields - Anti-Omission Patterns:**
+
+When adding new playback state fields to `TimelineState`, follow these patterns to prevent forgetting updates:
+
+1. **Documentation Comment in Header (TimelineManager.h):**
+   ```cpp
+   // ===== PLAYBACK STATE (runtime, reset on StopPlayback) =====
+   // NOTE: When adding new playback state fields, update these locations:
+   // 1. StartPlayback() - Initialize from parameters
+   // 2. SwitchPlayback() - Copy from source timeline to preserve state
+   // 3. StopPlayback() - Reset to default values
+   ```
+
+2. **Centralized Helper Method:**
+   - Use `CopyPlaybackState(fromState, toState)` helper in SwitchPlayback()
+   - This centralizes all state copying logic in ONE place
+   - Add prominent comment in helper: "IMPORTANT: When adding new playback state fields, add them here!"
+   - Single location to update = less chance of forgetting
+
+3. **Field Organization:**
+   - Group related fields together with clear section comments
+   - Separate persisted vs runtime-only fields
+   - Use consistent naming patterns (e.g., `m_playback*`, `m_recording*`)
+
+4. **Code Review Checklist:**
+   When adding new playback state field `m_newField`:
+   - [ ] Add to TimelineState struct with default value
+   - [ ] Add parameter to StartPlayback() signature (if user-configurable)
+   - [ ] Initialize in StartPlayback() implementation
+   - [ ] Add to CopyPlaybackState() helper method
+   - [ ] Reset in StopPlayback() implementation
+   - [ ] Update API documentation (FCFW_API.h)
+   - [ ] Update Papyrus binding if applicable
+   - [ ] Update project context documentation
+
+**Current Architecture:**
+- Multi-timeline storage via `std::unordered_map<size_t, TimelineState>`
+- Plugin registration required before timeline creation
   - `RegisterPlugin(pluginHandle)` must be called before `RegisterTimeline()` (typically in OnInit/OnPlayerLoadGame)
   - First call: Registers plugin in `m_registeredPlugins` set
-  - Subsequent calls: Automatically cleans up orphaned timelines from previous sessions
-  - Solves timeline accumulation problem when loading savegames (Papyrus properties reset but FCFW state persists)
+  - Subsequent calls: Cleans up orphaned timelines from previous sessions
+  - Solves timeline accumulation when loading savegames (Papyrus properties reset but FCFW state persists)
   - `RegisterTimeline()` validates plugin registration before creating new timelines
-- **Ownership:** Every timeline has `ownerPluginHandle`, validated on all operations
-- **Active Timeline:** Only ONE timeline can be recording/playing at a time (enforced by `m_activeTimelineID`)
-- **Helper Pattern:** All public API functions call `GetTimeline(timelineID, pluginHandle)` to validate ownership + existence before operations
-- **Internal Query Methods (✅ Complete - January 5, 2026):** Overloaded methods for internal FCFW operations
+- Ownership validation: Every timeline has `ownerPluginHandle`, validated on all operations
+- Exclusive active timeline: Only ONE timeline can record/play at a time (enforced by `m_activeTimelineID`)
+- Helper pattern: All public API functions call `GetTimeline(timelineID, pluginHandle)` to validate ownership + existence
+- Internal query methods: Overloaded methods for internal FCFW operations
   - `IsPlaybackRunning(size_t timelineID)` - No ownership check, used by hooks to check ANY active timeline
   - `IsUserRotationAllowed(size_t timelineID)` - No ownership check, used by hooks for input blocking
-  - External API variants still require pluginHandle: `IsPlaybackRunning(SKSE::PluginHandle, size_t)`
+  - External API variants require pluginHandle: `IsPlaybackRunning(SKSE::PluginHandle, size_t)`
   - Rationale: Hooks must block input during playback regardless of which plugin owns the timeline
-- **Event System (✅ Complete - January 2, 2026):** Dual notification system for timeline playback events
+- Dual event notification system:
   - SKSE Messaging: Broadcasts to all C++ plugins via `SKSE::GetMessagingInterface()->Dispatch()`
   - Papyrus Events: Queues events to registered forms via `SKSE::GetTaskInterface()->AddTask()`
-- **Global vs Per-Timeline State:**
-  - **Global (shared):** `m_registeredPlugins`, `m_recordingInterval`, `m_isShowingMenus`, `m_userTurning`, `m_lastFreeRotation`, `m_eventReceivers`
+- State organization:
+  - **Global (shared):** `m_registeredPlugins`, `m_isShowingMenus`, `m_userTurning`, `m_lastFreeRotation`, `m_eventReceivers`, `m_isSaveInProgress`
   - **Per-Timeline (in TimelineState):**
     - **Static config (persisted):** `m_globalEaseIn`, `m_globalEaseOut`, `m_showMenusDuringPlayback`, `m_allowUserRotation`
-    - **Runtime only (NOT persisted):** `m_isRecording`, `m_currentRecordingTime`, `m_lastRecordedPointTime`, `m_isPlaybackRunning`, `m_playbackSpeed`, `m_playbackDuration`, `m_isCompletedAndWaiting`, `m_rotationOffset`
-  - **Note:** `m_playbackSpeed` and `m_playbackDuration` are **computed at runtime** in `StartPlayback()` based on function parameters, and are intentionally NOT persisted to YAML files.
+    - **Runtime only (NOT persisted):** `m_isRecording`, `m_currentRecordingTime`, `m_lastRecordedPointTime`, `m_recordingInterval`, `m_isPlaybackRunning`, `m_playbackSpeed`, `m_playbackDuration`, `m_isCompletedAndWaiting`, `m_followGround`, `m_minHeightAboveGround`, `m_rotationOffset`
+  - **Note:** `m_playbackSpeed` and `m_playbackDuration` are computed at runtime in `StartPlayback()` based on parameters, NOT persisted to YAML.
 
 ---
 
-### **5.2 Update Loop (Frame-by-Frame)**
+### **4.2 Update Loop (Frame-by-Frame)**
 **Called by:** `MainUpdateHook::Nullsub()` every frame
 
 ```cpp
@@ -778,7 +621,7 @@ void TimelineManager::Update() {
 
 ---
 
-### **5.3 Recording System**
+### **4.3 Recording System**
 
 #### **Recording Lifecycle:**
 ```
@@ -849,7 +692,7 @@ The following Papyrus API functions provide convenient access to current camera 
 
 ---
 
-### **5.4 Playback System**
+### **4.4 Playback System**
 
 #### **Playback Lifecycle:**
 ```
@@ -880,16 +723,26 @@ PlayTimeline(TimelineState* state) [called every frame]
 │   ├─> linearProgress = playbackTime / timelineDuration
 │   ├─> easedProgress = ApplyEasing(linearProgress, state->globalEaseIn, state->globalEaseOut)
 │   └─> sampleTime = easedProgress * timelineDuration
-├─> Sample interpolated points:
-│   ├─> position = state->timeline.m_translationTrack.GetPointAtTime(sampleTime)
-│   └─> rotation = state->timeline.m_rotationTrack.GetPointAtTime(sampleTime)
+├─> Sample interpolated translation:
+│   └─> position = state->timeline.m_translationTrack.GetPointAtTime(sampleTime)
+├─> Apply ground-following correction (if enabled):
+│   ├─> Get land height at interpolated position
+│   ├─> IF cameraHeight < minHeightAboveGround: adjust position.z
+│   └─> Ensures camera stays above terrain/water with minimum clearance
+├─> Set corrected camera position to FreeCameraState
+│   └─> **CRITICAL: Must be set BEFORE getting rotation**
+├─> Sample interpolated rotation:
+│   ├─> rotation = state->timeline.m_rotationTrack.GetPointAtTime(sampleTime)
+│   └─> **For kReference rotation points (isOffsetRelative=false):**
+│       └─> GetPoint() reads current camera position to calculate camera-to-ref direction
+│       └─> Must use ground-corrected position, not interpolated position
 ├─> Handle user rotation:
 │   ├─> IF (state->userTurning && state->allowUserRotation):
 │   │   ├─> Update state->rotationOffset = current - timeline
 │   │   ├─> Reset state->userTurning flag
 │   │   └─> Don't override camera (user controls rotation)
 │   └─> ELSE: Apply rotation = timeline + state->rotationOffset
-├─> Write to FreeCameraState: translation, rotation.x (pitch), rotation.y (yaw)
+├─> Write rotation to FreeCameraState: rotation.x (pitch), rotation.y (yaw)
 └─> Check completion: if both tracks stopped → StopPlayback(timelineID, pluginHandle)
 
 StopPlayback(timelineID, pluginHandle)
@@ -928,13 +781,14 @@ SwitchPlayback(fromTimelineID, toTimelineID, pluginHandle)
 ├─> Initialize target timeline (camera already in free mode):
 │   ├─> toState->timeline.ResetPlayback()
 │   └─> toState->timeline.StartPlayback() (bakes kCamera points internally)
-├─> Copy playback settings from source to target:
+├─> Copy playback settings from source to target via CopyPlaybackState():
 │   ├─> playbackSpeed
-│   ├─> rotationOffset (conditional: only if target allows user rotation, otherwise reset to zero)
 │   ├─> showMenusDuringPlayback
 │   ├─> globalEaseIn, globalEaseOut
-│   └─> Reset isCompletedAndWaiting flag
-│   Note: allowUserRotation uses target timeline's existing setting (not copied)
+│   ├─> followGround, minHeightAboveGround
+│   ├─> rotationOffset (conditional: only if target allows user rotation, otherwise reset to zero)
+│   └─> Note: Uses centralized CopyPlaybackState() helper to ensure all fields are copied
+│   └─> Note: allowUserRotation uses target timeline's existing setting (not copied)
 ├─> Activate target timeline:
 │   ├─> Set m_activeTimelineID = toTimelineID
 │   ├─> Set toState->isPlaybackRunning = true
@@ -996,7 +850,7 @@ SwitchPlayback(fromTimelineID, toTimelineID, pluginHandle)
 
 ---
 
-### **5.5 Timeline & TimelineTrack Architecture**
+### **4.5 Timeline & TimelineTrack Architecture**
 
 #### **Timeline Class (Non-Template Wrapper)**
 **Purpose:** High-level coordinator for paired translation + rotation tracks  
@@ -1187,7 +1041,7 @@ ValueType GetInterpolatedPoint(index, progress) {
 
 ---
 
-### **5.6 CameraPath<T> Template (Storage Layer)**
+### **4.6 CameraPath<T> Template (Storage Layer)**
 
 **Purpose:** Point collection with type-specific I/O operations  
 **Location:** `CameraPath.h` (declaration), `CameraPath.cpp` (implementation)
@@ -1280,7 +1134,7 @@ public:
 
 ---
 
-### **5.7 Point Construction Patterns**
+### **4.7 Point Construction Patterns**
 
 #### **Transition Object:**
 ```cpp
@@ -1344,7 +1198,7 @@ RotationPoint(
 
 ---
 
-### **5.8 Import/Export System**
+### **4.8 Import/Export System**
 
 #### **YAML File Format:**
 FreeCameraFramework uses YAML for timeline import/export, providing human-readable, compact camera path definitions.
@@ -1492,7 +1346,7 @@ ExportTimeline(timelineID, pluginHandle, path)
 
 ---
 
-### **5.9 Point Query API**
+### **4.9 Point Query API**
 
 **Purpose:** Allow external plugins to query timeline point data for custom visualization or analysis.
 
@@ -1510,7 +1364,7 @@ ExportTimeline(timelineID, pluginHandle, path)
 
 ---
 
-### **5.10 Event Callback System**
+### **4.10 Event Callback System**
 
 **Purpose:** Notify external consumers when timeline playback starts/stops
 
@@ -1667,7 +1521,7 @@ EndEvent
 
 ---
 
-### **5.11 Point Modification Rules**
+### **4.11 Point Modification Rules**
 
 **Thread Safety:** 
 - TimelineManager uses `std::mutex m_timelineMutex` for thread-safe timeline map access
@@ -1701,14 +1555,13 @@ if (state->isPlaybackRunning) {
 
 ---
 
-## **6. Supporting Systems**
+## **5. Supporting Systems**
 
-### **6.1 Import/Export Implementation (CameraPath.cpp)**
+### **5.1 Import/Export Implementation (CameraPath.cpp)**
 
 **Hardcoded Defaults:**
 - Import functions use hardcoded defaults: `InterpolationMode::kCubicHermite`, `easeIn = false`, `easeOut = false`
 - Points can override these individually in YAML (point-level values take precedence)
-- No separate "defaults" section in YAML files (removed for simplicity - redundant with hardcoded values)
 - Export optimization: Points only write non-default values to minimize file size
 
 **Reference Resolution Strategy:**
@@ -1731,7 +1584,7 @@ if (state->isPlaybackRunning) {
 
 ---
 
-### **6.2 Timeline Architecture: Current Structure**
+### **5.2 Timeline Architecture: Current Structure**
 
 **File Organization:**
 - **TimelineTrack.h**: Complete template implementation (declaration + all methods)
@@ -1745,23 +1598,15 @@ if (state->isPlaybackRunning) {
   - All non-template Timeline methods
 
 **Design Rationale:**
-- **Single-file templates**: TimelineTrack.h contains both declaration and implementation (no .inl split)
+- **Single-file templates**: TimelineTrack.h contains both declaration and implementation
 - **Clean separation**: Template code (TimelineTrack) in one file, non-template code (Timeline) in another
 - **Automatic dependencies**: Timeline.h includes TimelineTrack.h, so users only need to include Timeline.h
+- **Current structure**: `Timeline` is a non-template wrapper class coordinating paired `TimelineTrack<TranslationPath>` and `TimelineTrack<RotationPath>` tracks
+- **Benefits**: Better encapsulation, clearer API, multi-timeline support
 
-**Historical Notes:**
-- **Previous structure** (Timeline_old.h, now deleted):
-  - Original design: Single template `Timeline<PathType>` (all-in-one)
-  - Type aliases: `TranslationTimeline`, `RotationTimeline` 
-  - TimelineManager stored two separate timeline instances
-- **Refactoring migration**:
-  - Renamed `Timeline<T>` → `TimelineTrack<T>` (emphasizes engine role)
-  - Created new `Timeline` wrapper class (paired track coordination)
-  - Split implementation: Timeline.inl (deleted) → merged into TimelineTrack.h
-  - Benefits: Better encapsulation, clearer API, multi-timeline ready
 ---
 
-### **6.3 Utility Functions (_ts_SKSEFunctions)**
+### **5.3 Utility Functions (_ts_SKSEFunctions)**
 
 **Camera Functions:**
 ```cpp
@@ -1801,7 +1646,7 @@ T GetValueFromINI(vm, stackId, "key:section", filePath, defaultValue)
 
 ---
 
-### **6.4 Helper Functions (FCFW_Utils)**
+### **5.4 Helper Functions (FCFW_Utils)**
 
 **YAML Enum Conversion Helpers:**
 ```cpp
@@ -1867,7 +1712,7 @@ CubicHermiteInterpolateAngular(a0, a1, a2, a3, t)
 
 ---
 
-## **7. Critical Implementation Details**
+## **6. Critical Implementation Details**
 
 ### **Multi-Timeline Architecture**
 
@@ -1923,27 +1768,11 @@ CubicHermiteInterpolateAngular(a0, a1, a2, a3, t)
 
 ---
 
-## **8. Known Limitations**
+## **7. Known Limitations**
 - ⚠️ **Reference Deletion Safety:** No validation if `m_reference` becomes invalid during playback (dangling pointer risk)
   - `GetPoint()` will crash if reference deleted
   - No RefHandle tracking or validity checks
 - ⚠️ **Loop + kCamera:** Baked values don't update on loop wrap (snapshot taken once at StartPlayback)
 - ⚠️ **Gimbal Lock:** GetYaw/GetPitch functions unreliable near ±90° pitch (documented in _ts_SKSEFunctions.h)
 - ⚠️ **Thread Safety:** None - all operations assume SKSE main thread (single-threaded by design)
-
----
-
-## **9. External Dependencies**
-
-**Required:**
-- CommonLibSSE-NG (SKSE framework)
-- spdlog (logging)
-- SimpleIni (INI parsing with comment support)
-
-**Optional:**
-- po3's Tweaks (for reliable EditorID in exports)
-
-**Build Tools:**
-- CMake 3.29+, Ninja, MSVC (cl.exe)
-- vcpkg for dependencies
 

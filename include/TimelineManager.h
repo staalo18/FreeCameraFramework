@@ -28,10 +28,16 @@ namespace FCFW {
         float m_recordingInterval{ 1.0f };     // Sample interval for this recording session (0.0 = every frame)
         
         // ===== PLAYBACK STATE (runtime, reset on StopPlayback) =====
+        // NOTE: When adding new playback state fields, update these locations:
+        // 1. StartPlayback() - Initialize from parameters
+        // 2. SwitchPlayback() - Copy from source timeline to preserve state
+        // 3. StopPlayback() - Reset to default values
         bool m_isPlaybackRunning{ false };     // Active playback
         float m_playbackSpeed{ 1.0f };         // Computed time multiplier (runtime only, NOT persisted)
         float m_playbackDuration{ 0.0f };      // Computed total duration (runtime only, NOT persisted)
         bool m_isCompletedAndWaiting{ false }; // kWait mode completion flag (runtime only)
+        bool m_followGround{ true };           // Keep camera above ground level during playback (runtime only)
+        float m_minHeightAboveGround{ 0.0f }; // Minimum height above ground when following ground (runtime only)
         RE::BSTPoint2<float> m_rotationOffset{ 0.0f, 0.0f }; // Accumulated user rotation (runtime only)
     };
 
@@ -67,7 +73,7 @@ namespace FCFW {
             RE::NiPoint3 GetTranslationPoint(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, size_t a_index) const;
             RE::BSTPoint2<float> GetRotationPoint(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, size_t a_index) const;
             
-            bool StartPlayback(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, float a_speed = 1.0f, bool a_globalEaseIn = false, bool a_globalEaseOut = false, bool a_useDuration = false, float a_duration = 0.0f);
+            bool StartPlayback(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, float a_speed = 1.0f, bool a_globalEaseIn = false, bool a_globalEaseOut = false, bool a_useDuration = false, float a_duration = 0.0f, bool a_followGround = true, float a_minHeightAboveGround = 0.0f);
             bool StopPlayback(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID);
             bool SwitchPlayback(SKSE::PluginHandle a_pluginHandle, size_t a_fromTimelineID, size_t a_toTimelineID);
             bool IsPlaybackRunning(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID) const;
@@ -109,6 +115,10 @@ namespace FCFW {
 
             void RecordTimeline(TimelineState* a_state);
             void PlayTimeline(TimelineState* a_state);
+            
+            // Copy runtime playback state from source to target timeline
+            // Used by SwitchPlayback to preserve playback settings across timeline transitions
+            void CopyPlaybackState(TimelineState* a_fromState, TimelineState* a_toState);
 
             TimelineState* GetTimeline(size_t a_timelineID, SKSE::PluginHandle a_pluginHandle);
             const TimelineState* GetTimeline(size_t a_timelineID, SKSE::PluginHandle a_pluginHandle) const;

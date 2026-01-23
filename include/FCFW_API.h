@@ -287,7 +287,9 @@ namespace FCFW_API {
 		/// <param name="a_globalEaseOut">Apply ease-out at the end of entire playback (default: false)</param>
 		/// <param name="a_useDuration">If true, plays complete timeline with total time a_duration seconds; if false, uses a_speed multiplier (default: false)</param>
 		/// <param name="a_duration">Total duration in seconds for entire timeline, only used if a_useDuration is true (default: 0.0)</param>
-		[[nodiscard]] virtual bool StartPlayback(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, float a_speed = 1.0f, bool a_globalEaseIn = false, bool a_globalEaseOut = false, bool a_useDuration = false, float a_duration = 0.0f) const noexcept = 0;
+		/// <param name="a_followGround">If true, keeps camera above ground/water level during playback (default: true)</param>
+		/// <param name="a_minHeightAboveGround">Minimum height above ground when following ground (default: 0.0)</param>
+		[[nodiscard]] virtual bool StartPlayback(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, float a_speed = 1.0f, bool a_globalEaseIn = false, bool a_globalEaseOut = false, bool a_useDuration = false, float a_duration = 0.0f, bool a_followGround = true, float a_minHeightAboveGround = 0.0f) const noexcept = 0;
 
 		/// <summary>
 		/// Stop playback of a camera timeline.

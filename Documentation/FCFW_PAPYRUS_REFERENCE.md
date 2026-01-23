@@ -38,7 +38,7 @@ Test the FCFW_EXAMPLE features by pressing the following keys:
 
 Review `Source/Scripts/FCFW_EXAMPLE_QUESTSCRIPT.psc` to get an understanding on how the various features are implemented using the FCFW API. Look at the proposed exercises in the comment section and start modifying the script / YAML files.
 
-The complete API documentation can be found in the API file (which you need to include in your mod if you want to use FCFW's functions): `Source/Scripts/FCFW_SKSEFunctions.psc`
+The complete API documentation can be found in the API file: `Source/Scripts/FCFW_SKSEFunctions.psc`
 
 To understand the timeline YAML file format, check out the timeline example files in `Documentation/TimelineFileExample/*.yaml`:
 - FCFW_Timeline_orbitReference.yaml - a looping orbit around a reference
@@ -195,6 +195,38 @@ FCFW_SKSEFunctions.AddTranslationPoint(..., easeIn=false, easeOut=false, ...)
 - `OnPlaybackWait` event fires (not `OnPlaybackStop`)
 - Useful for chaining timelines via `FCFW_SKSEFunctions.SwitchPlayback()`
 - Must manually call `FCFW_SKSEFunctions.StopPlayback()` to exit
+
+### Ground-Following
+
+**Ground-following** prevents the camera from going underground during playback:
+
+**Parameters:**
+- `followGround` (bool, default: true): Enable/disable ground-following
+- `minHeightAboveGround` (float, default: 0.0): Minimum clearance above terrain in units
+
+**Behavior:**
+- When `followGround = true`, the camera's Z position is adjusted each frame to ensure it stays above ground/water level
+- If the interpolated camera height is below `minHeightAboveGround`, the camera is raised to maintain the minimum clearance
+- Ground height includes water surfaces (uses `GetLandHeightWithWater`)
+- Only affects vertical (Z) position; horizontal (X, Y) movement is unchanged
+
+**Example Usage:**
+```papyrus
+; Enable ground-following with default minimum height (0.0) - this is the default
+FCFW_SKSEFunctions.StartPlayback(ModName, timelineID, 1.0, false, false, false, 0.0, true, 0.0)
+
+; Keep camera at least 100 units above ground
+FCFW_SKSEFunctions.StartPlayback(ModName, timelineID, 1.0, false, false, false, 0.0, true, 100.0)
+
+; Disable ground-following (allow underground camera)
+FCFW_SKSEFunctions.StartPlayback(ModName, timelineID, 1.0, false, false, false, 0.0, false, 0.0)
+```
+
+**Use Cases:**
+- Terrain-following flight cameras
+- Prevent camera from clipping through ground when terrain has changed
+- Maintain minimum clearance for better visibility
+- Underwater sequences (disable ground-following)
 
 ### Ownership
 
