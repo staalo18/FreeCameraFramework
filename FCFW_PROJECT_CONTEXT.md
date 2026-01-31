@@ -252,7 +252,7 @@ RequestPluginAPI(InterfaceVersion) [Mod API entry]
 **Playback Functions:**
 | Papyrus Function | Return | Parameters | Notes |
 |-----------------|--------|------------|-------|
-| `StartPlayback` | bool | **modName, timelineID**, speed, globalEaseIn, globalEaseOut, useDuration, duration, followGround, minHeightAboveGround | Begin timeline playback (validates ownership). followGround (default: true) keeps camera above ground/water. minHeightAboveGround (default: 0.0) sets minimum clearance above terrain |
+| `StartPlayback` | bool | **modName, timelineID**, speed, globalEaseIn, globalEaseOut, useDuration, duration, followGround, minHeightAboveGround, showMenusDuringPlayback | Begin timeline playback (validates ownership). followGround (default: true) keeps camera above ground/water. minHeightAboveGround (default: 0.0) sets minimum clearance above terrain. showMenusDuringPlayback (default: false) controls menu visibility |
 | `StopPlayback` | bool | **modName, timelineID** | Stop playback (validates ownership) |
 | `SwitchPlayback` | bool | **modName, fromTimelineID, toTimelineID** | Glitch-free timeline switch (validates ownership of both source and target timelines) |
 | `PausePlayback` | bool | **modName, timelineID** | Pause playback (validates ownership) |
@@ -696,7 +696,7 @@ The following Papyrus API functions provide convenient access to current camera 
 
 #### **Playback Lifecycle:**
 ```
-StartPlayback(timelineID, pluginHandle, speed, globalEaseIn, globalEaseOut, useDuration, duration)
+StartPlayback(timelineID, pluginHandle, speed, globalEaseIn, globalEaseOut, useDuration, duration, followGround, minHeightAboveGround, showMenusDuringPlayback)
 ├─> Validate ownership: GetTimeline(timelineID, pluginHandle)
 ├─> Validate: ≥1 point, not in free camera, not recording/playing, duration > 0
 ├─> Calculate playback speed:

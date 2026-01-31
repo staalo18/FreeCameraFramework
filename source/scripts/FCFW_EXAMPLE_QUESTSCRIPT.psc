@@ -118,9 +118,6 @@ Function IntializeTimelines()
     timeline5ID = RegisterTimeline()
 
     FCFW_SKSEFunctions.RegisterForTimelineEvents(self as Form)
-
-    BuildTimeline2() 
-    ; The other timelines will be built dynamically on playback start, or will be recorded by the user
 EndFunction
 
 
@@ -207,6 +204,7 @@ Function BuildTimeline2()
 
     if ref && marker
         marker.MoveTo(ref, -PositionOffset, 0.0 , PositionOffset)
+        marker.SetAngle(60.0, 0.0, 135.0) ; add tilt to the marker to get tilted orbit
     else
         Debug.Trace("FCFW_EXAMPLE: ERROR - Could not get references for aliases!")
     endif
@@ -311,8 +309,9 @@ Event OnKeyDown(int keyCode)
         ; Toggle playback
         if currentTimelineID < 0 ; not currently playing, start playback
 
-            ; build timelines 1 and 3 dynamically to capture camera position at start of playback
+            ; build timelines dynamically to capture camera position at start of playback
             BuildTimeline1()
+            BuildTimeline2() 
             BuildReturnTimeline(timeline3ID)
 
             ; Start playback

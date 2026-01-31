@@ -216,8 +216,9 @@ float Function GetRotationPointYaw(string modName, int timelineID, int index) gl
 ; duration: total duration in seconds for entire timeline, only used if useDuration=true (default: 0.0)
 ; followGround: if true, keeps camera above ground/water level during playback (default: true)
 ; minHeightAboveGround: minimum height above ground when following ground (default: 0.0)
+; showMenusDuringPlayback: if true, keeps menus visible during playback; if false, hides menus (default: false)
 ; Returns: true on success, false on failure
-bool Function StartPlayback(string modName, int timelineID, float speed = 1.0, bool globalEaseIn = false, bool globalEaseOut = false, bool useDuration = false, float duration = 0.0, bool followGround = true, float minHeightAboveGround = 0.0) global native
+bool Function StartPlayback(string modName, int timelineID, float speed = 1.0, bool globalEaseIn = false, bool globalEaseOut = false, bool useDuration = false, float duration = 0.0, bool followGround = true, float minHeightAboveGround = 0.0, bool showMenusDuringPlayback = false) global native
 
 ; Stop playback of the camera timeline
 ; Stop playback of a camera path timeline

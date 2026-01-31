@@ -606,7 +606,7 @@ log::info("{}: Recentering grid to cell ({}, {})", __FUNCTION__, coords->cellX-1
         return true;
     }
 
-    bool TimelineManager::StartPlayback(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, float a_speed, bool a_globalEaseIn, bool a_globalEaseOut, bool a_useDuration, float a_duration, bool a_followGround, float a_minHeightAboveGround) {
+    bool TimelineManager::StartPlayback(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, float a_speed, bool a_globalEaseIn, bool a_globalEaseOut, bool a_useDuration, float a_duration, bool a_followGround, float a_minHeightAboveGround, bool a_showMenusDuringPlayback) {
         std::lock_guard<std::recursive_mutex> lock(m_timelineMutex);
         
         // Check if any timeline is already active
@@ -674,6 +674,7 @@ log::info("{}: Recentering grid to cell ({}, {})", __FUNCTION__, coords->cellX-1
         state->m_globalEaseOut = a_globalEaseOut;
         state->m_followGround = a_followGround;
         state->m_minHeightAboveGround = a_minHeightAboveGround;
+        state->m_showMenusDuringPlayback = a_showMenusDuringPlayback;
         
         // Set as active timeline
         m_activeTimelineID = a_timelineID;
