@@ -1,5 +1,8 @@
 Scriptname FCFW_SKSEFunctions
 
+; For Debug/Testing: Toggle display of body part rotation matrix for the specified actor
+function ToggleBodyPartRotationMatrixDisplay(actor a_actor, int a_bodyPart) global native
+
 ; Get plugin version
 ; Encoded as: major * 10000 + minor * 100 + patch
 ; Example: version 1.2.3 returns 10203
@@ -55,6 +58,7 @@ int Function AddTranslationPoint(string modName, int timelineID, float time, flo
 ; timelineID: timeline ID to add the point to
 ; time: time in seconds when this point occurs
 ; reference: the object reference to track
+; bodyPart: body part to track for actors (0=kNone/root, 1=kHead, 2=kTorso). Non-actors always use root. Each has fallback logic if unavailable.
 ; offsetX, offsetY, offsetZ: offset from reference position
 ; isOffsetRelative: if true, offset is relative to reference's heading (local space), otherwise world space
 ; easeIn: ease in at the start of interpolation
@@ -63,7 +67,7 @@ int Function AddTranslationPoint(string modName, int timelineID, float time, flo
 ; Returns: index of the added point, or -1 on failure
 ; NOTE: Both easeIn and easeOut control the INCOMING segment (previous->current point), not the outgoing segment.
 ; For smooth transition through a point, set easeOut=false for the current point AND easeIn=false for the next point.
-int Function AddTranslationPointAtRef(string modName, int timelineID, float time, ObjectReference reference, float offsetX, float offsetY, float offsetZ, bool isOffsetRelative = false, bool easeIn = false, bool easeOut = false, int interpolationMode = 2) global native
+int Function AddTranslationPointAtRef(string modName, int timelineID, float time, ObjectReference reference, int bodyPart = 0, float offsetX = 0.0, float offsetY = 0.0, float offsetZ = 0.0, bool isOffsetRelative = false, bool easeIn = false, bool easeOut = false, int interpolationMode = 2) global native
 
 ; Add a translation point that captures camera position at the start of playback
 ; This point can be used to start playback smoothly from the last camera position, and return to it later.
@@ -94,6 +98,7 @@ int Function AddRotationPoint(string modName, int timelineID, float time, float 
 ; Add a rotation point that sets the rotation relative to camera-to-reference direction, or alternatively the ref's heading
 ; time: time in seconds when this point occurs
 ; reference: the object reference to track
+; bodyPart: which body part to track rotation from (0=root, 1=eye, 2=head, 3=torso, default: 0=root)
 ; offsetPitch: pitch offset from camera-to-reference direction (isOffsetRelative == false) / the ref's heading (isOffsetRelative == true)
 ; offsetYaw: isOffsetRelative == false - yaw offset from camera-to-reference direction. A value of 0 means looking directly at the reference.
 ;            isOffsetRelative == true - yaw offset from reference's heading. A value of 0 means looking into the direction the ref is heading.
@@ -104,7 +109,7 @@ int Function AddRotationPoint(string modName, int timelineID, float time, float 
 ; Returns: index of the added point on success, -1 on failure
 ; NOTE: Both easeIn and easeOut control the INCOMING segment (previous->current point), not the outgoing segment.
 ; For smooth transition through a point, set easeOut=false for the current point AND easeIn=false for the next point.
-int Function AddRotationPointAtRef(string modName, int timelineID, float time, ObjectReference reference, float offsetPitch, float offsetYaw, bool isOffsetRelative = false, bool easeIn = false, bool easeOut = false, int interpolationMode = 2) global native
+int Function AddRotationPointAtRef(string modName, int timelineID, float time, ObjectReference reference, int bodyPart = 0, float offsetPitch = 0.0, float offsetYaw = 0.0, bool isOffsetRelative = false, bool easeIn = false, bool easeOut = false, int interpolationMode = 2) global native
 
 ; Add a rotation point that captures camera rotation at the start of playback
 ; This point can be used to start playback smoothly from the last camera rotation, and return to it later.

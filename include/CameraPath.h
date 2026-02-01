@@ -15,13 +15,15 @@ namespace FCFW {
             const RE::NiPoint3& a_point = {0.f, 0.f, 0.f},
             const RE::NiPoint3& a_offset = {0.f, 0.f, 0.f},
             RE::TESObjectREFR* a_reference = nullptr,
-            bool a_isOffsetRelative = false)
+            bool a_isOffsetRelative = false,
+            BodyPart a_bodyPart = BodyPart::kNone)
             : m_transition(a_transition)
             , m_point(a_point)           // world coordinates (kWorld and kCamera(baked))
             , m_pointType(a_pointType)   // kWorld, kReference, kCamera
             , m_reference(a_reference)   // used for kReference type
             , m_offset(a_offset)         // offset for kReference and kCamera types
-            , m_isOffsetRelative(a_isOffsetRelative) {} // unused for kWorld type
+            , m_isOffsetRelative(a_isOffsetRelative)
+            , m_bodyPart(a_bodyPart) {}
 
         RE::NiPoint3 GetPointAtCamera() const {
             RE::NiPoint3 cameraPos = _ts_SKSEFunctions::GetCameraPos();
@@ -34,42 +36,82 @@ namespace FCFW {
                 
                 // If offset is relative to reference heading, rotate it
                 if (m_isOffsetRelative) {
-                    float pitch = 0.0f;
-                    float yaw = 0.0f;
+                    RE::Actor* actor = m_reference->As<RE::Actor>();
+                    
+                    // If bodyPart is specified and reference is an actor, use body part's coordinate frame
+                    if (m_bodyPart != BodyPart::kNone && actor) {
+                        auto targetPoint = _ts_SKSEFunctions::GetTargetPoint(actor, BodyPartToLimbEnum(m_bodyPart));
+                        if (targetPoint) {
+                            // Get body part's local coordinate frame (forward, right, up) in world space
+                            RE::NiPoint3 forward, right, up;
+                            _ts_SKSEFunctions::GetBodyPartCoordinateFrame(actor, BodyPartToLimbEnum(m_bodyPart), forward, right, up);
+                            
+                            // Transform offset from standard local frame (right=X, forward=Y, up=Z) to world space
+                            // offset.x = right component, offset.y = forward component, offset.z = up component
+                            offset.x = m_offset.x * right.x + m_offset.y * forward.x + m_offset.z * up.x;
+                            offset.y = m_offset.x * right.y + m_offset.y * forward.y + m_offset.z * up.y;
+                            offset.z = m_offset.x * right.z + m_offset.y * forward.z + m_offset.z * up.z;
+                        } else {
+                            // Fallback to actor root rotation using Euler angles
+                            float yaw = actor->GetHeading(false);
+                            float cosYaw = std::cos(yaw);
+                            float sinYaw = std::sin(yaw);
+                            offset.x = m_offset.y * sinYaw + m_offset.x * cosYaw;
+                            offset.y = m_offset.y * cosYaw - m_offset.x * sinYaw;
+                            offset.z = m_offset.z;
+                        }
+                    } else if (actor) {
+                        // No body part specified, use actor heading (yaw only)
+                        float yaw = actor->GetHeading(false);
+                        float cosYaw = std::cos(yaw);
+                        float sinYaw = std::sin(yaw);
+                        offset.x = m_offset.y * sinYaw + m_offset.x * cosYaw;
+                        offset.y = m_offset.y * cosYaw - m_offset.x * sinYaw;
+                        offset.z = m_offset.z;
+                    } else {
+                        // Not an actor, use reference angles
+                        float pitch = m_reference->GetAngleX();
+                        float yaw = m_reference->GetAngleZ();
+                        
+                        // Yaw rotation (around Z axis)
+                        float cosYaw = std::cos(yaw);
+                        float sinYaw = std::sin(yaw);
+                        RE::NiPoint3 yawRotated;
+                        yawRotated.x = m_offset.y * sinYaw + m_offset.x * cosYaw;
+                        yawRotated.y = m_offset.y * cosYaw - m_offset.x * sinYaw;
+                        yawRotated.z = m_offset.z;
+                        
+                        // Pitch rotation (around X axis)
+                        float cosPitch = std::cos(pitch);
+                        float sinPitch = std::sin(pitch);
+                        offset.x = yawRotated.x;
+                        offset.y = yawRotated.z * sinPitch + yawRotated.y * cosPitch;
+                        offset.z = yawRotated.z * cosPitch - yawRotated.y * sinPitch;
+                    }
+                }
+                
+                // Get base position (either from target point or root position)
+                RE::NiPoint3 basePosition;
+                if (m_bodyPart != BodyPart::kNone) {
                     RE::Actor* actor = m_reference->As<RE::Actor>();
                     if (actor) {
-                        yaw = actor->GetHeading(false);
+                        auto targetPoint = _ts_SKSEFunctions::GetTargetPoint(actor, BodyPartToLimbEnum(m_bodyPart));
+                        if (targetPoint) {
+                            basePosition = targetPoint->world.translate;
+                        } else {
+                            // Fallback to root position if target point not found
+                            basePosition = m_reference->GetPosition();
+                        }
                     } else {
-                        pitch = m_reference->GetAngleX();
-                        yaw = m_reference->GetAngleZ();
+                        // Non-actor reference: use root position
+                        basePosition = m_reference->GetPosition();
                     }
-                    
-                    // Rotate offset by reference's orientation
-                    // First rotate around Z axis (yaw), then around X axis (pitch)
-                    // Original offset is in reference's local space (forward=Y, right=X, up=Z)
-                    
-                    // Yaw rotation (around Z axis)
-                    float cosYaw = std::cos(yaw);
-                    float sinYaw = std::sin(yaw);
-                    RE::NiPoint3 yawRotated;
-                    yawRotated.x = m_offset.y * sinYaw + m_offset.x * cosYaw;
-                    yawRotated.y = m_offset.y * cosYaw - m_offset.x * sinYaw;
-                    yawRotated.z = m_offset.z;
-                    
-                    // Pitch rotation (around X axis)
-                    // Pitch rotates in the Y-Z plane
-                    float cosPitch = std::cos(pitch);
-                    float sinPitch = std::sin(pitch);
-                    RE::NiPoint3 rotatedOffset;
-                    rotatedOffset.x = yawRotated.x;
-                    rotatedOffset.y = yawRotated.z * sinPitch + yawRotated.y * cosPitch;
-                    rotatedOffset.z = yawRotated.z * cosPitch - yawRotated.y * sinPitch;
-                    
-                    offset = rotatedOffset;
+                } else {
+                    basePosition = m_reference->GetPosition();
                 }
                 
                 // Cache last valid position in m_point for fallback if reference becomes invalid
-                m_point = m_reference->GetPosition() + offset;
+                m_point = basePosition + offset;
                 return m_point;
             }
             return m_point;  // Return cached position if reference is null/invalid
@@ -132,6 +174,7 @@ namespace FCFW {
         RE::TESObjectREFR* m_reference; // Reference object for dynamic positioning (kReference only)
         RE::NiPoint3 m_offset;          // Offset from reference position (kReference and kCamera)
         bool m_isOffsetRelative;        // If true, offset is rotated by reference's heading (kReference only)
+        BodyPart m_bodyPart;            // Which body part to use for actors (kReference actors only): kNone=root, kHead/kTorso=target point
     };
 
     class RotationPoint {
@@ -142,13 +185,15 @@ namespace FCFW {
             const RE::BSTPoint2<float>& a_point = {0.f, 0.f},
             const RE::BSTPoint2<float>& a_offset = {0.f, 0.f},
             RE::TESObjectREFR* a_reference = nullptr,
-            bool a_isOffsetRelative = false)
+            bool a_isOffsetRelative = false,
+            BodyPart a_bodyPart = BodyPart::kNone)
             : m_transition(a_transition)
             , m_point(a_point)           // rotation (kWorld and kCamera(baked))
             , m_pointType(a_pointType)   // kWorld, kReference, kCamera
             , m_reference(a_reference)   // used for kReference type
             , m_offset(a_offset)         // offset for kReference and kCamera types
-            , m_isOffsetRelative(a_isOffsetRelative) {} // unused for kWorld type
+            , m_isOffsetRelative(a_isOffsetRelative) // unused for kWorld type
+            , m_bodyPart(a_bodyPart) {}     // Body part to extract rotation from (kReference only, requires m_isOffsetRelative=true)
 
         RE::BSTPoint2<float> GetPointAtCamera() const {
             auto rotation = _ts_SKSEFunctions::GetCameraRotation();
@@ -161,9 +206,24 @@ namespace FCFW {
                     float pitch = 0.0f;
                     float yaw = 0.0f;
                     RE::Actor* actor = m_reference->As<RE::Actor>();
-                    if (actor) {
+                    
+                    // If bodyPart is specified and reference is an actor, try to get rotation from body part
+                    if (m_bodyPart != BodyPart::kNone && actor) {
+                        auto targetPoint = _ts_SKSEFunctions::GetTargetPoint(actor, BodyPartToLimbEnum(m_bodyPart));
+                        if (targetPoint) {
+                            // Extract rotation from body part node
+                            auto rotation = _ts_SKSEFunctions::GetBodyPartRotation(actor, BodyPartToLimbEnum(m_bodyPart));
+                            pitch = rotation.x;
+                            yaw = rotation.z;
+                        } else {
+                            // Fallback to actor root rotation
+                            yaw = actor->GetHeading(false);
+                        }
+                    } else if (actor) {
+                        // No body part specified, use actor heading
                         yaw = actor->GetHeading(false);
                     } else {
+                        // Not an actor, use reference angles
                         pitch = m_reference->GetAngleX();
                         yaw = m_reference->GetAngleZ();
                     }
@@ -174,7 +234,21 @@ namespace FCFW {
                         _ts_SKSEFunctions::NormalRelativeAngle(yaw + m_offset.y)};
                     return m_point;
                 } else { // camera looks at reference with offset
-                    RE::NiPoint3 refPos = m_reference->GetPosition();                
+                    // Get target position (body part if specified for actors, otherwise root position)
+                    RE::NiPoint3 refPos;
+                    RE::Actor* actor = m_reference->As<RE::Actor>();
+                    if (m_bodyPart != BodyPart::kNone && actor) {
+                        auto targetPoint = _ts_SKSEFunctions::GetTargetPoint(actor, BodyPartToLimbEnum(m_bodyPart));
+                        if (targetPoint) {
+                            refPos = targetPoint->world.translate;
+                        } else {
+                            // Fallback to root position if target point not found
+                            refPos = m_reference->GetPosition();
+                        }
+                    } else {
+                        refPos = m_reference->GetPosition();
+                    }
+                    
                     RE::NiPoint3 cameraPos = _ts_SKSEFunctions::GetCameraPos();
                     
                     RE::NiPoint3 toRef = refPos - cameraPos;
@@ -325,6 +399,7 @@ namespace FCFW {
         RE::TESObjectREFR* m_reference;        // Reference object for dynamic rotation (kReference only)
         RE::BSTPoint2<float> m_offset;         // Offset from camera-to-reference direction (kReference and kCamera)
         bool m_isOffsetRelative;               // If true, offset is relative to reference's facing direction (kReference only)
+        BodyPart m_bodyPart;                   // Body part to extract rotation from (kReference only, requires m_isOffsetRelative=true)
     };
 
     template<typename TransitionPoint>

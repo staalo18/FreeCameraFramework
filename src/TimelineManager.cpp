@@ -1,8 +1,56 @@
 #include "TimelineManager.h"
 #include "FCFW_Utils.h"
 #include <yaml-cpp/yaml.h>
-
+#include "APIManager.h"
 namespace FCFW {
+
+    void TimelineManager::ToggleBodyPartRotationMatrixDisplay(RE::Actor* a_actor, BodyPart a_bodyPart) {
+        m_displayRotationMatrix = !m_displayRotationMatrix;
+        m_rotationMatrixActor = a_actor;
+        m_rotationMatrixBodyPart = a_bodyPart;
+    }
+
+    void TimelineManager::UpdateBodyPartRotationMatrixDisplay() {
+        if (!m_displayRotationMatrix || !m_rotationMatrixActor) {
+            return;
+        }
+
+        auto targetPoint = _ts_SKSEFunctions::GetTargetPoint(m_rotationMatrixActor, BodyPartToLimbEnum(m_rotationMatrixBodyPart));
+        if (targetPoint) {
+            // Extract rotation from body part node
+            const RE::NiMatrix3& rotMatrix = targetPoint->world.rotate;
+
+
+            auto rotX = rotMatrix.GetVectorX();
+            auto rotY = rotMatrix.GetVectorY();
+            auto rotZ = rotMatrix.GetVectorZ();
+
+            if (APIs::TrueHUD) {
+                APIs::TrueHUD->DrawLine(targetPoint->world.translate, targetPoint->world.translate + 20.f * rotX, 0.1f, 0xFF0000FF);
+                APIs::TrueHUD->DrawLine(targetPoint->world.translate + 20.f * rotX, targetPoint->world.translate + 40.f * rotX, 0.1f, 0xFFFFFFFF);
+                APIs::TrueHUD->DrawLine(targetPoint->world.translate + 40.f * rotX, targetPoint->world.translate + 60.f * rotX, 0.1f, 0xFF0000FF);
+                APIs::TrueHUD->DrawLine(targetPoint->world.translate + 60.f * rotX, targetPoint->world.translate + 80.f * rotX, 0.1f, 0xFFFFFFFF);
+                APIs::TrueHUD->DrawLine(targetPoint->world.translate + 80.f * rotX, targetPoint->world.translate + 100.f * rotX, 0.1f, 0xFF0000FF);
+
+                APIs::TrueHUD->DrawLine(targetPoint->world.translate, targetPoint->world.translate + 20.f * rotY, 0.1f, 0x00FF00FF);
+                APIs::TrueHUD->DrawLine(targetPoint->world.translate + 20.f * rotY, targetPoint->world.translate + 40.f * rotY, 0.1f, 0xFFFFFFFF);
+                APIs::TrueHUD->DrawLine(targetPoint->world.translate + 40.f * rotY, targetPoint->world.translate + 60.f * rotY, 0.1f, 0x00FF00FF);
+                APIs::TrueHUD->DrawLine(targetPoint->world.translate + 60.f * rotY, targetPoint->world.translate + 80.f * rotY, 0.1f, 0xFFFFFFFF);
+                APIs::TrueHUD->DrawLine(targetPoint->world.translate + 80.f * rotY, targetPoint->world.translate + 100.f * rotY, 0.1f, 0x00FF00FF);
+
+                APIs::TrueHUD->DrawLine(targetPoint->world.translate, targetPoint->world.translate + 20.f * rotZ, 0.1f, 0x0000FFFF);
+                APIs::TrueHUD->DrawLine(targetPoint->world.translate + 20.f * rotZ, targetPoint->world.translate + 40.f * rotZ, 0.1f, 0xFFFFFFFF);
+                APIs::TrueHUD->DrawLine(targetPoint->world.translate + 40.f * rotZ, targetPoint->world.translate + 60.f * rotZ, 0.1f, 0x0000FFFF);
+                APIs::TrueHUD->DrawLine(targetPoint->world.translate + 60.f * rotZ, targetPoint->world.translate + 80.f * rotZ, 0.1f, 0xFFFFFFFF);
+                APIs::TrueHUD->DrawLine(targetPoint->world.translate + 80.f * rotZ, targetPoint->world.translate + 100.f * rotZ, 0.1f, 0x0000FFFF);
+
+            } else {
+                log::info("{}: TrueHUD API not available for debug drawing", __FUNCTION__);
+            }
+        } else {
+            log::info("{}: No target point found for body part {}", __FUNCTION__, static_cast<int>(BodyPart::kHead));
+        }
+    }
 
     void TimelineManager::DispatchTimelineEvent(uint32_t a_messageType, size_t a_timelineID) {
         auto* messaging = SKSE::GetMessagingInterface();
@@ -81,6 +129,9 @@ log::info("{}: Sent Papyrus event '{}' for timeline {} to {} receivers", __FUNCT
         // Hold lock for entire Update() to prevent race conditions
         // This ensures the timeline cannot be deleted/modified while we're using it
         std::lock_guard<std::recursive_mutex> lock(m_timelineMutex);
+        
+        // for debug/testing: update body part rotation matrix display
+        UpdateBodyPartRotationMatrixDisplay(); 
         
         auto* ui = RE::UI::GetSingleton();  
         if (!ui) {
@@ -279,7 +330,7 @@ log::info("{}: Sent Papyrus event '{}' for timeline {} to {} receivers", __FUNCT
         return static_cast<int>(state->m_timeline.AddTranslationPoint(point));
     }
 
-    int TimelineManager::AddTranslationPointAtRef(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, float a_time, RE::TESObjectREFR* a_reference, const RE::NiPoint3& a_offset, bool a_isOffsetRelative, bool a_easeIn, bool a_easeOut, InterpolationMode a_interpolationMode) {
+    int TimelineManager::AddTranslationPointAtRef(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, float a_time, RE::TESObjectREFR* a_reference, BodyPart a_bodyPart, const RE::NiPoint3& a_offset, bool a_isOffsetRelative, bool a_easeIn, bool a_easeOut, InterpolationMode a_interpolationMode) {
         std::lock_guard<std::recursive_mutex> lock(m_timelineMutex);
         
         TimelineState* state = GetTimeline(a_timelineID, a_pluginHandle);
@@ -298,7 +349,7 @@ log::info("{}: Sent Papyrus event '{}' for timeline {} to {} receivers", __FUNCT
         }
         
         Transition transition(a_time, a_interpolationMode, a_easeIn, a_easeOut);
-        TranslationPoint point(transition, PointType::kReference, RE::NiPoint3{}, a_offset, a_reference, a_isOffsetRelative);
+        TranslationPoint point(transition, PointType::kReference, RE::NiPoint3{}, a_offset, a_reference, a_isOffsetRelative, a_bodyPart);
         
         return static_cast<int>(state->m_timeline.AddTranslationPoint(point));
     }
@@ -342,7 +393,7 @@ log::info("{}: Sent Papyrus event '{}' for timeline {} to {} receivers", __FUNCT
         return static_cast<int>(state->m_timeline.AddRotationPoint(point));
     }
 
-    int TimelineManager::AddRotationPointAtRef(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, float a_time, RE::TESObjectREFR* a_reference, const RE::BSTPoint2<float>& a_offset, bool a_isOffsetRelative, bool a_easeIn, bool a_easeOut, InterpolationMode a_interpolationMode) {
+    int TimelineManager::AddRotationPointAtRef(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, float a_time, RE::TESObjectREFR* a_reference, BodyPart a_bodyPart, const RE::BSTPoint2<float>& a_offset, bool a_isOffsetRelative, bool a_easeIn, bool a_easeOut, InterpolationMode a_interpolationMode) {
         std::lock_guard<std::recursive_mutex> lock(m_timelineMutex);
         
         TimelineState* state = GetTimeline(a_timelineID, a_pluginHandle);
@@ -361,7 +412,7 @@ log::info("{}: Sent Papyrus event '{}' for timeline {} to {} receivers", __FUNCT
         }
         
         Transition transition(a_time, a_interpolationMode, a_easeIn, a_easeOut);
-        RotationPoint point(transition, PointType::kReference, RE::BSTPoint2<float>{}, a_offset, a_reference, a_isOffsetRelative);
+        RotationPoint point(transition, PointType::kReference, RE::BSTPoint2<float>{}, a_offset, a_reference, a_isOffsetRelative, a_bodyPart);
         
         return static_cast<int>(state->m_timeline.AddRotationPoint(point));
     }

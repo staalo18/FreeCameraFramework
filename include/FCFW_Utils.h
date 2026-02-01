@@ -17,8 +17,6 @@ namespace FCFW {
         std::function<void(const std::map<std::string, std::string>&)> a_processSection
     );
 
-     RE::NiPointer<RE::NiAVObject> GetTargetPoint(RE::Actor* a_actor);
-
     SKSE::PluginHandle ModNameToHandle(const char* a_modName);
     bool IsPluginHandleValid(SKSE::PluginHandle a_handle);
 
@@ -31,5 +29,8 @@ namespace FCFW {
     
     std::string PlaybackModeToString(PlaybackMode mode);
     PlaybackMode StringToPlaybackMode(const std::string& str);
+    
+    std::string BodyPartToString(BodyPart part);
+    BodyPart StringToBodyPart(const std::string& str);
 } // namespace FCFW
 

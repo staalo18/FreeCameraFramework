@@ -1,5 +1,7 @@
 #include "FCFW_Utils.h"
 #include "Offsets.h"
+#include "_ts_SKSEFunctions.h"
+#include "CLIBUtil/EditorID.hpp"
 
 namespace FCFW {
     // ===== YAML Enum Conversion Helpers =====
@@ -58,6 +60,25 @@ namespace FCFW {
             case PlaybackMode::kLoop: return "loop";
             case PlaybackMode::kWait: return "wait";
             default: return "end";
+        }
+    }
+    
+    // Convert string to BodyPart enum
+    BodyPart StringToBodyPart(const std::string& str) {
+        if (str == "none") return BodyPart::kNone;
+        if (str == "head") return BodyPart::kHead;
+        if (str == "torso") return BodyPart::kTorso;
+        log::warn("Unknown BodyPart '{}', defaulting to 'none'", str);
+        return BodyPart::kNone;
+    }
+    
+    // Convert BodyPart enum to string
+    std::string BodyPartToString(BodyPart part) {
+        switch (part) {
+            case BodyPart::kNone: return "none";
+            case BodyPart::kHead: return "head";
+            case BodyPart::kTorso: return "torso";
+            default: return "none";
         }
     }
 
@@ -217,38 +238,5 @@ namespace FCFW {
         }
 
         return true;
-    }
-
-    RE::NiPointer<RE::NiAVObject> GetTargetPoint(RE::Actor* a_actor) {
-        RE::NiPointer<RE::NiAVObject> targetPoint = nullptr;
-
-        if (!a_actor) {
-            return nullptr;
-        }
-
-        auto race = a_actor->GetRace();
-        if (!race) {
-            return nullptr;
-        }
-
-        RE::BGSBodyPartData* bodyPartData = race->bodyPartData;
-        if (!bodyPartData) {
-            return nullptr;
-        }
-
-        auto actor3D = a_actor->Get3D2();
-        if (!actor3D) {
-            return nullptr;
-        }
-    
-        RE::BGSBodyPart* bodyPart = bodyPartData->parts[RE::BGSBodyPartDefs::LIMB_ENUM::kHead];
-        if (!bodyPart) {
-            bodyPart = bodyPartData->parts[RE::BGSBodyPartDefs::LIMB_ENUM::kTotal];
-        }
-        if (bodyPart) {
-            targetPoint = RE::NiPointer<RE::NiAVObject>(NiAVObject_LookupBoneNodeByName(actor3D, bodyPart->targetName, true));
-        }
-
-        return targetPoint;
     }
 } // namespace FCFW

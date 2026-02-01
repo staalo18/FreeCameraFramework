@@ -2,6 +2,7 @@
 #include "TimelineManager.h"
 #include "ModAPI.h"
 #include "CameraTypes.h"
+#include "APIManager.h"
 
 namespace FCFW {
     namespace Interface {
@@ -85,7 +86,7 @@ namespace FCFW {
             return FCFW::TimelineManager::GetSingleton().AddTranslationPoint(handle, static_cast<size_t>(a_timelineID), a_time, position, a_easeIn, a_easeOut, ToInterpolationMode(a_interpolationMode));
         }
 
-        int AddTranslationPointAtRef(RE::StaticFunctionTag*, RE::BSFixedString a_modName, int a_timelineID, float a_time, RE::TESObjectREFR* a_reference, float a_offsetX, float a_offsetY, float a_offsetZ, bool a_isOffsetRelative, bool a_easeIn, bool a_easeOut, int a_interpolationMode) {
+        int AddTranslationPointAtRef(RE::StaticFunctionTag*, RE::BSFixedString a_modName, int a_timelineID, float a_time, RE::TESObjectREFR* a_reference, int a_bodyPart, float a_offsetX, float a_offsetY, float a_offsetZ, bool a_isOffsetRelative, bool a_easeIn, bool a_easeOut, int a_interpolationMode) {
             if (a_modName.empty() || a_timelineID <= 0) {
 log::error("{}: Invalid mod name '{}' or timeline ID {}", __FUNCTION__, a_modName.c_str(), a_timelineID);
                 return -1;
@@ -98,7 +99,7 @@ log::error("{}: Invalid mod name '{}' or timeline ID {}", __FUNCTION__, a_modNam
             }
 
             RE::NiPoint3 offset(a_offsetX, a_offsetY, a_offsetZ);
-            return FCFW::TimelineManager::GetSingleton().AddTranslationPointAtRef(handle, static_cast<size_t>(a_timelineID), a_time, a_reference, offset, a_isOffsetRelative, a_easeIn, a_easeOut, ToInterpolationMode(a_interpolationMode));
+            return FCFW::TimelineManager::GetSingleton().AddTranslationPointAtRef(handle, static_cast<size_t>(a_timelineID), a_time, a_reference, ToBodyPart(a_bodyPart), offset, a_isOffsetRelative, a_easeIn, a_easeOut, ToInterpolationMode(a_interpolationMode));
         }
 
         int AddRotationPointAtCamera(RE::StaticFunctionTag*, RE::BSFixedString a_modName, int a_timelineID, float a_time, bool a_easeIn, bool a_easeOut, int a_interpolationMode) {
@@ -130,7 +131,7 @@ log::error("{}: Invalid mod name '{}' or timeline ID {}", __FUNCTION__, a_modNam
             return FCFW::TimelineManager::GetSingleton().AddRotationPoint(handle, static_cast<size_t>(a_timelineID), a_time, rotation, a_easeIn, a_easeOut, ToInterpolationMode(a_interpolationMode));
         }
 
-        int AddRotationPointAtRef(RE::StaticFunctionTag*, RE::BSFixedString a_modName, int a_timelineID, float a_time, RE::TESObjectREFR* a_reference, float a_offsetPitch, float a_offsetYaw, bool a_isOffsetRelative, bool a_easeIn, bool a_easeOut, int a_interpolationMode) {
+        int AddRotationPointAtRef(RE::StaticFunctionTag*, RE::BSFixedString a_modName, int a_timelineID, float a_time, RE::TESObjectREFR* a_reference, int a_bodyPart, float a_offsetPitch, float a_offsetYaw, bool a_isOffsetRelative, bool a_easeIn, bool a_easeOut, int a_interpolationMode) {
             if (a_modName.empty() || a_timelineID <= 0) {
                 return -1;
             }
@@ -142,7 +143,7 @@ log::error("{}: Invalid mod name '{}' or timeline ID {}", __FUNCTION__, a_modNam
             }
 
             RE::BSTPoint2<float> offset{a_offsetPitch, a_offsetYaw};
-            return FCFW::TimelineManager::GetSingleton().AddRotationPointAtRef(handle, static_cast<size_t>(a_timelineID), a_time, a_reference, offset, a_isOffsetRelative, a_easeIn, a_easeOut, ToInterpolationMode(a_interpolationMode));
+            return FCFW::TimelineManager::GetSingleton().AddRotationPointAtRef(handle, static_cast<size_t>(a_timelineID), a_time, a_reference, ToBodyPart(a_bodyPart), offset, a_isOffsetRelative, a_easeIn, a_easeOut, ToInterpolationMode(a_interpolationMode));
         }
 
         bool StartRecording(RE::StaticFunctionTag*, RE::BSFixedString a_modName, int a_timelineID, float a_recordingInterval, bool a_append, float a_timeOffset) {
@@ -548,7 +549,12 @@ log::error("{}: Invalid mod name '{}' or timeline ID {}", __FUNCTION__, a_modNam
             FCFW::TimelineManager::GetSingleton().UnregisterForTimelineEvents(a_form);
         }
 
+        void ToggleBodyPartRotationMatrixDisplay(RE::StaticFunctionTag*, RE::Actor* a_actor, int a_bodyPart) {
+            FCFW::TimelineManager::GetSingleton().ToggleBodyPartRotationMatrixDisplay(a_actor, static_cast<BodyPart>(a_bodyPart));
+        }
+
         bool FCFWFunctions(RE::BSScript::Internal::VirtualMachine * a_vm){
+            a_vm->RegisterFunction("ToggleBodyPartRotationMatrixDisplay", "FCFW_SKSEFunctions", ToggleBodyPartRotationMatrixDisplay);
             a_vm->RegisterFunction("GetPluginVersion", "FCFW_SKSEFunctions", GetFCFWPluginVersion);
             a_vm->RegisterFunction("RegisterPlugin", "FCFW_SKSEFunctions", RegisterPlugin);
             a_vm->RegisterFunction("RegisterTimeline", "FCFW_SKSEFunctions", RegisterTimeline);
@@ -641,9 +647,26 @@ extern "C" DLLEXPORT bool SKSEAPI SKSEPlugin_Load(const SKSE::LoadInterface* sks
     auto* messaging = SKSE::GetMessagingInterface();
     if (messaging) {
         messaging->RegisterListener([](SKSE::MessagingInterface::Message* msg) {
-            if (msg->type == SKSE::MessagingInterface::kSaveGame) {
+            switch (msg->type) {
+            case SKSE::MessagingInterface::kSaveGame:
                 // Save about to start - handle ongoing playback / recording
                 FCFW::TimelineManager::GetSingleton().OnPreSaveGame();
+                break;
+            case SKSE::MessagingInterface::kDataLoaded:
+                APIs::RequestAPIs();
+                break;
+            case SKSE::MessagingInterface::kPostLoad:
+                APIs::RequestAPIs();
+                break;
+            case SKSE::MessagingInterface::kPostPostLoad:
+                APIs::RequestAPIs();
+                break;
+            case SKSE::MessagingInterface::kPreLoadGame:
+                break;
+            case SKSE::MessagingInterface::kPostLoadGame:
+            case SKSE::MessagingInterface::kNewGame:
+                APIs::RequestAPIs();
+                break;
             }
         });
     } else {

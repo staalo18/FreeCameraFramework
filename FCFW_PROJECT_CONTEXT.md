@@ -228,7 +228,7 @@ RequestPluginAPI(InterfaceVersion) [Mod API entry]
 |-----------------|--------|------------|-------|
 | `AddTranslationPointAtCamera` | int | **modName, timelineID**, time, easeIn, easeOut, interpolationMode | Captures camera position |
 | `AddTranslationPoint` | int | **modName, timelineID**, time, posX, posY, posZ, easeIn, easeOut, interpolationMode | Absolute world position (Papyrus accepts individual coordinates) |
-| `AddTranslationPointAtRef` | int | **modName, timelineID**, time, ref, offsetX/Y/Z, isOffsetRelative, easeIn, easeOut, interpolationMode | Ref-based position |
+| `AddTranslationPointAtRef` | int | **modName, timelineID**, time, ref, **bodyPart=0**, offsetX/Y/Z=0.0, isOffsetRelative, easeIn, easeOut, interpolationMode | Ref-based position with body part tracking (0=kNone, 1=kHead, 2=kTorso). bodyPart and offsets are optional with defaults. |
 | `AddRotationPointAtCamera` | int | **modName, timelineID**, time, easeIn, easeOut, interpolationMode | Captures camera rotation |
 | `AddRotationPoint` | int | **modName, timelineID**, time, pitch, yaw, easeIn, easeOut, interpolationMode | Absolute world rotation (Papyrus accepts individual pitch/yaw) |
 | `AddRotationPointAtRef` | int | **modName, timelineID**, time, ref, offsetPitch/Yaw, isOffsetRelative, easeIn, easeOut, interpolationMode | Ref-based rotation |
@@ -281,8 +281,11 @@ RequestPluginAPI(InterfaceVersion) [Mod API entry]
 - **Return Values**: `-1` for query functions on error, `false` for boolean functions on error
 
 **Type Conversion Layer:**
-- **InterpolationMode**: Papyrus passes `int` (0=None, 1=Linear, 2=CubicHermite), converted via `ToInterpolationMode()` in `CameraTypes.h`
-- **Mod Name to Handle**: `ModNameToHandle(modName)` searches loaded files for matching ESP/ESL, returns `file->compileIndex` as plugin handle
+- **Papyrus → C++**: 
+  - **InterpolationMode**: Papyrus passes `int` (0=None, 1=Linear, 2=CubicHermite), converted via `ToInterpolationMode()` in `CameraTypes.h`
+  - **BodyPart**: Papyrus passes `int` (0=kNone, 1=kHead, 2=kTorso), converted via `ToBodyPart()` in `CameraTypes.h`
+  - **Mod Name to Handle**: `ModNameToHandle(modName)` searches loaded files for matching ESP/ESL, returns `file->compileIndex` as plugin handle
+- **C++ Mod API**: Accepts `FCFW::BodyPart` and `FCFW::InterpolationMode` enums directly (no int conversion needed)
 - **Return Values**: TimelineManager returns `int` for point indices, `bool` for operations
 
 **Event System:**
@@ -369,6 +372,8 @@ C++ plugins receive timeline events via SKSE messaging. Event types: `kPlaybackS
 **Interface: `IVFCFW1`** (pure virtual, defined in `FCFW_API.h`)
 - **Required Sequence**: `RegisterPlugin(pluginHandle)` → `RegisterTimeline(pluginHandle)` → returns timeline ID
 - **Point Functions**: Accept `RE::NiPoint3` (translation) and `RE::BSTPoint2<float>` (rotation, x=pitch y=yaw)
+- **Enum Parameters**: Accept `FCFW::BodyPart` and `FCFW::InterpolationMode` enums directly (no int conversion)
+- **Default Parameters**: `a_bodyPart = BodyPart::kNone`, `a_offset = RE::NiPoint3()`, bools default to `false`, `a_interpolationMode = InterpolationMode::kCubicHermite`
 - **Query Functions**: Return zero on error - validate index with `GetTranslationPointCount()` first
 - **All functions**: Require `SKSE::PluginHandle` and `size_t timelineID`, marked `const noexcept`
 
@@ -393,7 +398,23 @@ enum class InterpolationMode {
 ```
 - **Converter Function:** `ToInterpolationMode(int)` in `CameraTypes.h`
 - **Valid Values:** 0-2 (validator bounds check)
-- **Usage:** API layers pass `int`, convert before calling TimelineManager
+- **Usage:** Papyrus API passes `int`, converted before calling TimelineManager. C++ Mod API uses enum directly.
+
+**BodyPart:**
+```cpp
+enum class BodyPart : int {
+    kNone = 0,   // Use actor root position
+    kHead = 1,   // Head position
+    kTorso = 2   // Torso position
+};
+```
+- **Converter Function:** `ToBodyPart(int)` in `CameraTypes.h`
+- **String Converters:** `BodyPartToString()` / `StringToBodyPart()` in `FCFW_Utils.h` for YAML import/export
+- **Valid Values:** 0-3 (validator bounds check, defaults to kNone on invalid)
+- **Usage:** Specifies which actor body part to track for reference points. Non-actors always use root position. Each part has intelligent fallback logic if unavailable for the actor's race.
+- **Papyrus API:** Accepts `int` (0-3), converted to enum
+- **C++ Mod API:** Accepts `FCFW::BodyPart` enum directly
+- **YAML Format:** Stored as strings ("none", "eye", "head", "torso")
 
 **PointType:**
 ```cpp
@@ -1691,18 +1712,6 @@ CubicHermiteInterpolateAngular(a0, a1, a2, a3, t)
   ├─> Interpolate in 2D space
   └─> Convert back via atan2(sin, cos)
 ```
-
-**GetTargetPoint(actor)** - Returns head bone position:
-```cpp
-1. Get race->bodyPartData
-2. Find kHead body part (fallback: kTotal)
-3. Lookup bone node: NiAVObject_LookupBoneNodeByName(actor3D, targetName)
-4. Returns NiPointer<RE::NiAVObject> (world transform)
-```
-**Usage:** Calculate head bone offset for reference-based camera tracking
-- Computes offset from actor's position to head bone world position
-- Adds offset to Y (forward direction relative to actor's heading)
-- Used for local-space kReference translation points
 
 **ParseFCFWTimelineFileSections():**
 - Parses INI sections with callback pattern

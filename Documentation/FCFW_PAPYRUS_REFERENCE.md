@@ -125,8 +125,8 @@ A **timeline** is a container for camera movement data. Each timeline has:
 ; World point at coordinates (1000, 2000, 500) at time 0.0
 FCFW_SKSEFunctions.AddTranslationPoint(modName, timelineID, 0.0, 1000.0, 2000.0, 500.0)
 
-; Reference point 200 units in front of actor at time 5.0
-FCFW_SKSEFunctions.AddTranslationPointAtRef(modName, timelineID, 5.0, actorRef, 0.0, 200.0, 0.0, isOffsetRelative=true)
+; Reference point 200 units in front of actor at time 5.0 (bodyPart defaults to 0=kNone, offsets default to 0.0)
+FCFW_SKSEFunctions.AddTranslationPointAtRef(modName, timelineID, 5.0, actorRef, bodyPart=0, offsetY=200.0, isOffsetRelative=true)
 
 ; Camera point capturing camera position at the start of playback. Camera translates to this position at time 10.0
 FCFW_SKSEFunctions.AddTranslationPointAtCamera(modName, timelineID, 10.0)
@@ -137,8 +137,8 @@ FCFW_SKSEFunctions.AddTranslationPointAtCamera(modName, timelineID, 10.0)
 ; Look at specific pitch/yaw at time 0.0 (world coords)
 FCFW_SKSEFunctions.AddRotationPoint(modName, timelineID, 0.0, pitch, yaw)
 
-; Look directly at actor at time 5.0
-FCFW_SKSEFunctions.AddRotationPointAtRef(modName, timelineID, 5.0, actorRef, 0.0, 0.0)
+; Look directly at actor at time 5.0 (bodyPart defaults to 0=kNone, offsets default to 0.0)
+FCFW_SKSEFunctions.AddRotationPointAtRef(modName, timelineID, 5.0, actorRef, bodyPart=0, offsetPitch=0.0, offsetYaw=0.0)
 
 ; Camera point capturing camera rotation at the start of playback. Camera rotates to this angle at time 10.0
 FCFW_SKSEFunctions.AddRotationPointAtCamera(modName, timelineID, 10.0)
@@ -423,9 +423,10 @@ FCFW_SKSEFunctions.AddTranslationPointAtRef(
     timelineID,
     time = 5.0,
     reference = targetActor,
-    offsetX = 0.0,       ; Right/left offset
-    offsetY = 200.0,     ; Forward/back offset
-    offsetZ = 50.0,      ; Up/down offset
+    bodyPart = 0,        ; kNone = use root position (0=kNone, 1=kHead, 2=kTorso)
+    offsetX = 0.0,       ; Right/left offset (optional, defaults to 0.0)
+    offsetY = 200.0,     ; Forward/back offset (optional, defaults to 0.0)
+    offsetZ = 50.0,      ; Up/down offset (optional, defaults to 0.0)
     isOffsetRelative = true,  ; Rotate offset with actor heading
     easeIn = false,
     easeOut = false,
@@ -438,8 +439,9 @@ FCFW_SKSEFunctions.AddRotationPointAtRef(
     timelineID,
     time = 5.0,
     reference = targetActor,
-    offsetPitch = 0.0,   ; No pitch offset
-    offsetYaw = 0.0,     ; No yaw offset (look straight at target)
+    bodyPart = 0,        ; kNone = use root rotation (0=kNone, 1=kHead, 2=kTorso)
+    offsetPitch = 0.0,   ; No pitch offset (optional, defaults to 0.0)
+    offsetYaw = 0.0,     ; No yaw offset - look straight at target (optional, defaults to 0.0)
     isOffsetRelative = false,  ; Offset from camera-to-ref direction
     easeIn = false,
     easeOut = false,
@@ -534,7 +536,8 @@ Function BuildCircularPath(ObjectReference center, float radius, int numPoints, 
     ; Only a single rotation point is needed because the camera is always facing the center (isOffsetRelative=false).
     FCFW_SKSEFunctions.AddRotationPointAtRef(
         ModName, timelineID, 0.0,
-        center, 0.0, 0.0,
+        center, 0,           ; bodyPart = 0 (kNone, default)
+        0.0, 0.0,           ; offsetPitch, offsetYaw
         isOffsetRelative = false
     )
 EndFunction

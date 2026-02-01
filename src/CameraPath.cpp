@@ -133,6 +133,10 @@ namespace FCFW {
                     }
                     
                     bool isOffsetRelative = pointNode["isOffsetRelative"] ? pointNode["isOffsetRelative"].as<bool>() : false;
+                    BodyPart bodyPart = BodyPart::kNone;
+                    if (pointNode["bodyPart"]) {
+                        bodyPart = StringToBodyPart(pointNode["bodyPart"].as<std::string>());
+                    }
                     
                     RE::TESObjectREFR* reference = nullptr;
                     
@@ -174,7 +178,7 @@ namespace FCFW {
                     
                     if (reference) {
                         PointType point(transition, FCFW::PointType::kReference, typename Traits::ValueType{}, 
-                                      offset, reference, isOffsetRelative);
+                                      offset, reference, isOffsetRelative, bodyPart);
                         path->AddPoint(point);
                     } else {
                         log::warn("{}: Failed to resolve reference at time {}, using offset as absolute value", __FUNCTION__, time);
@@ -249,6 +253,7 @@ namespace FCFW {
                     out << YAML::EndMap;
                     
                     out << YAML::Key << "isOffsetRelative" << YAML::Value << (point.m_isOffsetRelative ? true : false);
+                    out << YAML::Key << "bodyPart" << YAML::Value << BodyPartToString(point.m_bodyPart);
                 }
                 
                 out << YAML::Key << "interpolationMode" << YAML::Value << InterpolationModeToString(point.m_transition.m_mode);

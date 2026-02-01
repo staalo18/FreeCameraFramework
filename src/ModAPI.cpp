@@ -34,28 +34,28 @@ bool Messaging::FCFWInterface::UnregisterTimeline(SKSE::PluginHandle a_pluginHan
 	return FCFW::TimelineManager::GetSingleton().UnregisterTimeline(a_pluginHandle, a_timelineID);
 }
 
-int Messaging::FCFWInterface::AddTranslationPoint(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, float a_time, const RE::NiPoint3& a_position, bool a_easeIn, bool a_easeOut, int a_interpolationMode) const noexcept {
-	return FCFW::TimelineManager::GetSingleton().AddTranslationPoint(a_pluginHandle, a_timelineID, a_time, a_position, a_easeIn, a_easeOut, FCFW::ToInterpolationMode(a_interpolationMode));
+int Messaging::FCFWInterface::AddTranslationPoint(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, float a_time, const RE::NiPoint3& a_position, bool a_easeIn, bool a_easeOut, FCFW_API::InterpolationMode a_interpolationMode) const noexcept {
+	return FCFW::TimelineManager::GetSingleton().AddTranslationPoint(a_pluginHandle, a_timelineID, a_time, a_position, a_easeIn, a_easeOut, static_cast<FCFW::InterpolationMode>(a_interpolationMode));
 }
 
-int Messaging::FCFWInterface::AddTranslationPointAtRef(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, float a_time, RE::TESObjectREFR* a_reference, const RE::NiPoint3& a_offset, bool a_isOffsetRelative, bool a_easeIn, bool a_easeOut, int a_interpolationMode) const noexcept {
-	return FCFW::TimelineManager::GetSingleton().AddTranslationPointAtRef(a_pluginHandle, a_timelineID, a_time, a_reference, a_offset, a_isOffsetRelative, a_easeIn, a_easeOut, FCFW::ToInterpolationMode(a_interpolationMode));
+int Messaging::FCFWInterface::AddTranslationPointAtRef(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, float a_time, RE::TESObjectREFR* a_reference, FCFW_API::BodyPart a_bodyPart, const RE::NiPoint3& a_offset, bool a_isOffsetRelative, bool a_easeIn, bool a_easeOut, FCFW_API::InterpolationMode a_interpolationMode) const noexcept {
+	return FCFW::TimelineManager::GetSingleton().AddTranslationPointAtRef(a_pluginHandle, a_timelineID, a_time, a_reference, static_cast<FCFW::BodyPart>(a_bodyPart), a_offset, a_isOffsetRelative, a_easeIn, a_easeOut, static_cast<FCFW::InterpolationMode>(a_interpolationMode));
 }
 
-int Messaging::FCFWInterface::AddTranslationPointAtCamera(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, float a_time, bool a_easeIn, bool a_easeOut, int a_interpolationMode) const noexcept {
-	return FCFW::TimelineManager::GetSingleton().AddTranslationPointAtCamera(a_pluginHandle, a_timelineID, a_time, a_easeIn, a_easeOut, FCFW::ToInterpolationMode(a_interpolationMode));
+int Messaging::FCFWInterface::AddTranslationPointAtCamera(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, float a_time, bool a_easeIn, bool a_easeOut, FCFW_API::InterpolationMode a_interpolationMode) const noexcept {
+	return FCFW::TimelineManager::GetSingleton().AddTranslationPointAtCamera(a_pluginHandle, a_timelineID, a_time, a_easeIn, a_easeOut, static_cast<FCFW::InterpolationMode>(a_interpolationMode));
 }
 
-int Messaging::FCFWInterface::AddRotationPoint(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, float a_time, const RE::BSTPoint2<float>& a_rotation, bool a_easeIn, bool a_easeOut, int a_interpolationMode) const noexcept {
-	return FCFW::TimelineManager::GetSingleton().AddRotationPoint(a_pluginHandle, a_timelineID, a_time, a_rotation, a_easeIn, a_easeOut, FCFW::ToInterpolationMode(a_interpolationMode));
+int Messaging::FCFWInterface::AddRotationPoint(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, float a_time, const RE::BSTPoint2<float>& a_rotation, bool a_easeIn, bool a_easeOut, FCFW_API::InterpolationMode a_interpolationMode) const noexcept {
+	return FCFW::TimelineManager::GetSingleton().AddRotationPoint(a_pluginHandle, a_timelineID, a_time, a_rotation, a_easeIn, a_easeOut, static_cast<FCFW::InterpolationMode>(a_interpolationMode));
 }
 
-int Messaging::FCFWInterface::AddRotationPointAtRef(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, float a_time, RE::TESObjectREFR* a_reference, const RE::BSTPoint2<float>& a_offset, bool a_isOffsetRelative, bool a_easeIn, bool a_easeOut, int a_interpolationMode) const noexcept {
-	return FCFW::TimelineManager::GetSingleton().AddRotationPointAtRef(a_pluginHandle, a_timelineID, a_time, a_reference, a_offset, a_isOffsetRelative, a_easeIn, a_easeOut, FCFW::ToInterpolationMode(a_interpolationMode));
+int Messaging::FCFWInterface::AddRotationPointAtRef(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, float a_time, RE::TESObjectREFR* a_reference, FCFW_API::BodyPart a_bodyPart, const RE::BSTPoint2<float>& a_offset, bool a_isOffsetRelative, bool a_easeIn, bool a_easeOut, FCFW_API::InterpolationMode a_interpolationMode) const noexcept {
+	return FCFW::TimelineManager::GetSingleton().AddRotationPointAtRef(a_pluginHandle, a_timelineID, a_time, a_reference, static_cast<FCFW::BodyPart>(a_bodyPart), a_offset, a_isOffsetRelative, a_easeIn, a_easeOut, static_cast<FCFW::InterpolationMode>(a_interpolationMode));
 }
 
-int Messaging::FCFWInterface::AddRotationPointAtCamera(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, float a_time, bool a_easeIn, bool a_easeOut, int a_interpolationMode) const noexcept {
-    return FCFW::TimelineManager::GetSingleton().AddRotationPointAtCamera(a_pluginHandle, a_timelineID, a_time, a_easeIn, a_easeOut, FCFW::ToInterpolationMode(a_interpolationMode));
+int Messaging::FCFWInterface::AddRotationPointAtCamera(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, float a_time, bool a_easeIn, bool a_easeOut, FCFW_API::InterpolationMode a_interpolationMode) const noexcept {
+    return FCFW::TimelineManager::GetSingleton().AddRotationPointAtCamera(a_pluginHandle, a_timelineID, a_time, a_easeIn, a_easeOut, static_cast<FCFW::InterpolationMode>(a_interpolationMode));
 }
 
 bool Messaging::FCFWInterface::StartRecording(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, float a_recordingInterval, bool a_append, float a_timeOffset) const noexcept {

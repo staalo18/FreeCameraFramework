@@ -166,7 +166,7 @@ Function BuildTimeline1()
     endif
 
     ; Add translation point at first point of timeline 2 (entry point for timeline 2 circular path)    
-    if FCFW_SKSEFunctions.AddTranslationPointAtRef(ModName, timeline1ID, time = transitionTime, reference = marker, offsetX = CircleRadius, offsetY = 0.0, offsetZ = 0.0, isOffsetRelative = true, easeIn = true, easeOut = false) < 0
+    if FCFW_SKSEFunctions.AddTranslationPointAtRef(ModName, timeline1ID, time = transitionTime, reference = marker, bodyPart = 0, offsetX = CircleRadius, offsetY = 0.0, offsetZ = 0.0, isOffsetRelative = true, easeIn = true, easeOut = false) < 0
         Debug.Trace("FCFW_EXAMPLE: ERROR - Failed to add translation point")
     endif
 
@@ -234,7 +234,7 @@ Function BuildTimeline2()
 
         ; Add translation point relative to marker
         ; isOffsetRelative = true means offset is relative to marker's position
-        if FCFW_SKSEFunctions.AddTranslationPointAtRef(ModName, timeline2ID, time, marker, offsetX, offsetY, offsetZ, isOffsetRelative = true) < 0
+        if FCFW_SKSEFunctions.AddTranslationPointAtRef(ModName, timeline2ID, time, marker, bodyPart = 0, offsetX = offsetX, offsetY = offsetY, offsetZ = offsetZ, isOffsetRelative = true) < 0
             Debug.Trace("FCFW_EXAMPLE: ERROR - Failed to add translation point " + i)
         endif
         

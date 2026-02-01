@@ -24,6 +24,12 @@ namespace FCFW {
         kWait = 2   // Stay at final position indefinitely (requires manual StopPlayback)
     };
 
+    enum class BodyPart : int {
+        kNone = 0,   // Use actor root position (GetPosition())
+        kHead = 1,   // Head position
+        kTorso = 2   // Torso position
+    };
+
     
     struct Transition {
         float m_time;                           // Absolute time at which this point is reached (0 = start of playback)
@@ -52,6 +58,22 @@ namespace FCFW {
             return PointType::kWorld;
         }
         return static_cast<PointType>(a_mode);
+    }
+
+    inline BodyPart ToBodyPart(int a_bodyPart) {
+        if (a_bodyPart < 0 || a_bodyPart > static_cast<int>(BodyPart::kTorso)) {
+            log::warn("Invalid body part {} passed, defaulting to kNone", a_bodyPart);
+            return BodyPart::kNone;
+        }
+        return static_cast<BodyPart>(a_bodyPart);
+    }
+
+    inline RE::BGSBodyPartDefs::LIMB_ENUM BodyPartToLimbEnum(BodyPart a_bodyPart) {
+        switch (a_bodyPart) {
+            case BodyPart::kHead: return RE::BGSBodyPartDefs::LIMB_ENUM::kHead;
+            case BodyPart::kTorso: return RE::BGSBodyPartDefs::LIMB_ENUM::kTorso;
+            default: return RE::BGSBodyPartDefs::LIMB_ENUM::kTorso;
+        }
     }
 
 } // namespace FCFW
