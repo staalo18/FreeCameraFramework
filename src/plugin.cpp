@@ -319,7 +319,7 @@ log::error("{}: Invalid mod name '{}' or timeline ID {}", __FUNCTION__, a_modNam
             return point.y;
         }
 
-        bool StartPlayback(RE::StaticFunctionTag*, RE::BSFixedString a_modName, int a_timelineID, float a_speed, bool a_globalEaseIn, bool a_globalEaseOut, bool a_useDuration, float a_duration, bool a_followGround, float a_minHeightAboveGround, bool a_showMenusDuringPlayback) {
+        bool StartPlayback(RE::StaticFunctionTag*, RE::BSFixedString a_modName, int a_timelineID, float a_speed, bool a_globalEaseIn, bool a_globalEaseOut, bool a_useDuration, float a_duration, bool a_followGround, float a_minHeightAboveGround, bool a_showMenusDuringPlayback, float a_startTime) {
             if (a_modName.empty() || a_timelineID <= 0) {
                 return false;
             }
@@ -330,7 +330,7 @@ log::error("{}: Invalid mod name '{}' or timeline ID {}", __FUNCTION__, a_modNam
                 return false;
             }
 
-            return FCFW::TimelineManager::GetSingleton().StartPlayback(handle, static_cast<size_t>(a_timelineID), a_speed, a_globalEaseIn, a_globalEaseOut, a_useDuration, a_duration, a_followGround, a_minHeightAboveGround, a_showMenusDuringPlayback);
+            return FCFW::TimelineManager::GetSingleton().StartPlayback(handle, static_cast<size_t>(a_timelineID), a_speed, a_globalEaseIn, a_globalEaseOut, a_useDuration, a_duration, a_followGround, a_minHeightAboveGround, a_showMenusDuringPlayback, a_startTime);
         }
         
         bool StopPlayback(RE::StaticFunctionTag*, RE::BSFixedString a_modName, int a_timelineID) {
@@ -435,6 +435,20 @@ log::error("{}: Invalid mod name '{}' or timeline ID {}", __FUNCTION__, a_modNam
             return static_cast<std::int32_t>(FCFW::TimelineManager::GetSingleton().GetActiveTimelineID());
         }
 
+        float GetPlaybackTime(RE::StaticFunctionTag*, RE::BSFixedString a_modName, std::int32_t a_timelineID) {
+            if (a_modName.empty() || a_timelineID <= 0) {
+                return -1.0f;
+            }
+
+            SKSE::PluginHandle handle = FCFW::ModNameToHandle(a_modName.c_str());
+            if (handle == 0) {
+                log::error("{}: Invalid mod name '{}' - mod not loaded or doesn't exist", __FUNCTION__, a_modName.c_str());
+                return -1.0f;
+            }
+        
+            return FCFW::TimelineManager::GetSingleton().GetPlaybackTime(handle, static_cast<size_t>(a_timelineID));
+        }
+
         bool AllowUserRotation(RE::StaticFunctionTag*, RE::BSFixedString a_modName, std::int32_t a_timelineID, bool a_allow) {
             if (a_modName.empty() || a_timelineID <= 0) {
                 return false;
@@ -474,7 +488,14 @@ log::error("{}: Invalid mod name '{}' or timeline ID {}", __FUNCTION__, a_modNam
                 return false;
             }
 
-            return FCFW::TimelineManager::GetSingleton().SetPlaybackMode(handle, static_cast<size_t>(a_timelineID), a_playbackMode, a_loopTimeOffset);
+            // Validate and convert int to PlaybackMode enum
+            if (a_playbackMode < 0 || a_playbackMode > 2) {
+                log::error("{}: Invalid playback mode {} for timeline {}", __FUNCTION__, a_playbackMode, a_timelineID);
+                return false;
+            }
+            FCFW::PlaybackMode mode = static_cast<FCFW::PlaybackMode>(a_playbackMode);
+
+            return FCFW::TimelineManager::GetSingleton().SetPlaybackMode(handle, static_cast<size_t>(a_timelineID), mode, a_loopTimeOffset);
         }
 
         bool AddTimelineFromFile(RE::StaticFunctionTag*, RE::BSFixedString a_modName, std::int32_t a_timelineID, RE::BSFixedString a_filePath, float a_timeOffset) {
@@ -586,6 +607,7 @@ log::error("{}: Invalid mod name '{}' or timeline ID {}", __FUNCTION__, a_modNam
             a_vm->RegisterFunction("IsPlaybackRunning", "FCFW_SKSEFunctions", IsPlaybackRunning);
             a_vm->RegisterFunction("IsRecording", "FCFW_SKSEFunctions", IsRecording);
             a_vm->RegisterFunction("GetActiveTimelineID", "FCFW_SKSEFunctions", GetActiveTimelineID);
+            a_vm->RegisterFunction("GetPlaybackTime", "FCFW_SKSEFunctions", GetPlaybackTime);
             a_vm->RegisterFunction("AllowUserRotation", "FCFW_SKSEFunctions", AllowUserRotation);
             a_vm->RegisterFunction("IsUserRotationAllowed", "FCFW_SKSEFunctions", IsUserRotationAllowed);
             a_vm->RegisterFunction("SetPlaybackMode", "FCFW_SKSEFunctions", SetPlaybackMode);

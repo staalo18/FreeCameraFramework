@@ -222,8 +222,9 @@ float Function GetRotationPointYaw(string modName, int timelineID, int index) gl
 ; followGround: if true, keeps camera above ground/water level during playback (default: true)
 ; minHeightAboveGround: minimum height above ground when following ground (default: 0.0)
 ; showMenusDuringPlayback: if true, keeps menus visible during playback; if false, hides menus (default: false)
+; startTime: start playback at this time in seconds (default: 0.0 = start from beginning). Useful for resuming playback after save/load.
 ; Returns: true on success, false on failure
-bool Function StartPlayback(string modName, int timelineID, float speed = 1.0, bool globalEaseIn = false, bool globalEaseOut = false, bool useDuration = false, float duration = 0.0, bool followGround = true, float minHeightAboveGround = 0.0, bool showMenusDuringPlayback = false) global native
+bool Function StartPlayback(string modName, int timelineID, float speed = 1.0, bool globalEaseIn = false, bool globalEaseOut = false, bool useDuration = false, float duration = 0.0, bool followGround = true, float minHeightAboveGround = 0.0, bool showMenusDuringPlayback = false, float startTime = 0.0) global native
 
 ; Stop playback of the camera timeline
 ; Stop playback of a camera path timeline
@@ -274,6 +275,13 @@ bool Function IsPlaybackPaused(string modName, int timelineID) global native
 ; Get the ID of the currently active timeline (recording or playing)
 ; Returns: timeline ID if active (>0), or 0 if no timeline is active
 int Function GetActiveTimelineID() global native
+
+; Get the current playback time for a timeline
+; Useful for saving playback state to resume after loading a save
+; modName: name of your mod's ESP/ESL file (e.g., "MyMod.esp")
+; timelineID: timeline ID to query
+; Returns: current playback time in seconds, or -1.0 if timeline not found or not owned
+float Function GetPlaybackTime(string modName, int timelineID) global native
 
 ; Enable or disable user rotation control during playback for a specific timeline
 ; This setting is stored per-timeline and applied when that timeline is playing

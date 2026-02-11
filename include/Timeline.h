@@ -28,6 +28,7 @@ namespace FCFW
 		size_t GetRotationPointCount() const;
 		float GetDuration() const;
 		float GetPlaybackTime() const;
+		void SetPlaybackTime(float a_time);
 		bool IsPlaying() const;
 		bool IsPaused() const;
 

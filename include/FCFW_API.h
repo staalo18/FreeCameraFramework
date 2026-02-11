@@ -22,6 +22,13 @@ namespace FCFW_API {
 		kTorso = 2   // Torso position
 	};
 
+	// Playback mode for timeline behavior at completion
+	enum class PlaybackMode : int {
+		kEnd = 0,   // Stop at end of timeline (default)
+		kLoop = 1,  // Restart from beginning when timeline completes
+		kWait = 2   // Stay at final position indefinitely (requires manual StopPlayback)
+	};
+
 	// SKSE Messaging Interface - Timeline Event Types
 	// Consumers can register a listener with SKSE::GetMessagingInterface()->RegisterListener()
 	// and receive these messages from FCFW
@@ -306,7 +313,9 @@ namespace FCFW_API {
 		/// <param name="a_followGround">If true, keeps camera above ground/water level during playback (default: true)</param>
 		/// <param name="a_minHeightAboveGround">Minimum height above ground when following ground (default: 0.0)</param>
 		/// <param name="a_showMenusDuringPlayback">If true, keeps menus visible during playback; if false, hides menus (default: false)</param>
-		[[nodiscard]] virtual bool StartPlayback(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, float a_speed = 1.0f, bool a_globalEaseIn = false, bool a_globalEaseOut = false, bool a_useDuration = false, float a_duration = 0.0f, bool a_followGround = true, float a_minHeightAboveGround = 0.0f, bool a_showMenusDuringPlayback = false) const noexcept = 0;
+		/// <param name="a_startTime">Start playback at this time in seconds (default: 0.0 = start from beginning). Useful for resuming playback after save/load.</param>
+		/// <returns>true on success, false on failure</returns>
+		[[nodiscard]] virtual bool StartPlayback(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, float a_speed = 1.0f, bool a_globalEaseIn = false, bool a_globalEaseOut = false, bool a_useDuration = false, float a_duration = 0.0f, bool a_followGround = true, float a_minHeightAboveGround = 0.0f, bool a_showMenusDuringPlayback = false, float a_startTime = 0.0f) const noexcept = 0;
 
 		/// <summary>
 		/// Stop playback of a camera timeline.
@@ -368,6 +377,15 @@ namespace FCFW_API {
 		[[nodiscard]] virtual bool IsPlaybackPaused(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID) const noexcept = 0;
 
 		/// <summary>
+		/// Get the current playback time for a timeline.
+		/// Useful for saving playback state to resume after loading a save.
+		/// </summary>
+		/// <param name="a_pluginHandle">Plugin handle for ownership validation</param>
+		/// <param name="a_timelineID">Timeline ID to query</param>
+		/// <returns>Current playback time in seconds, or -1.0f if timeline not found or not owned</returns>
+		[[nodiscard]] virtual float GetPlaybackTime(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID) const noexcept = 0;
+
+		/// <summary>
 		/// Get the ID of the currently active timeline (recording or playing).
 		/// </summary>
 		/// <returns>Timeline ID if active (>0), or 0 if no timeline is active</returns>
@@ -394,10 +412,10 @@ namespace FCFW_API {
 		/// </summary>
 		/// <param name="a_pluginHandle">Plugin handle for ownership validation</param>
 		/// <param name="a_timelineID">Timeline ID to configure</param>
-		/// <param name="a_playbackMode">Playback mode: 0=kEnd (stop at end), 1=kLoop (wrap to beginning), 2=kWait (stay at final point until StopPlayback is called)</param>
+		/// <param name="a_playbackMode">Playback mode (PlaybackMode::kEnd, kLoop, or kWait)</param>
 		/// <param name="a_loopTimeOffset">Time offset in seconds when looping back (only used in kLoop mode, default: 0.0)</param>
 		/// <returns>True if successfully set, false on failure</returns>
-		[[nodiscard]] virtual bool SetPlaybackMode(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, int a_playbackMode, float a_loopTimeOffset = 0.0f) const noexcept = 0;
+		[[nodiscard]] virtual bool SetPlaybackMode(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, FCFW_API::PlaybackMode a_playbackMode, float a_loopTimeOffset = 0.0f) const noexcept = 0;
 
 		/// <summary>
 		/// Adds camera timeline imported from a_filePath at time a_timeOffset to the specified timeline.

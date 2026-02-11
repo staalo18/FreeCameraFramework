@@ -99,6 +99,12 @@ namespace FCFW
 		return m_translationTrack.GetPlaybackTime();
 	}
 
+	void Timeline::SetPlaybackTime(float a_time)
+	{
+		m_translationTrack.SetPlaybackTime(a_time);
+		m_rotationTrack.SetPlaybackTime(a_time);
+	}
+
 	bool Timeline::IsPlaying() const
 	{
 		return m_translationTrack.IsPlaying() || m_rotationTrack.IsPlaying();

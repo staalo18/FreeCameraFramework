@@ -30,6 +30,7 @@ namespace FCFW
 		size_t GetPointCount() const;
 		float GetDuration() const;
 		float GetPlaybackTime() const { return m_playbackTime; }
+		void SetPlaybackTime(float a_time) { m_playbackTime = std::clamp(a_time, 0.0f, GetDuration()); }
 		bool IsPlaying() const { return m_isPlaying; }
 		bool IsPaused() const { return m_isPaused; }
 

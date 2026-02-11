@@ -40,6 +40,7 @@ Scriptname FCFW_EXAMPLE_QUESTSCRIPT extends Quest
 ; - Manual playback interruption with smooth return paths
 ; - Looping vs. wait playback modes
 ; - Event handling for playback state tracking
+; - Save/load state preservation example (playback state is saved before save and restored after load)
 ;
 ; First exercise: Change the reference in markerAlias to an actor reference (other than the player)
 ;                 and watch how the camera orbits around that actor, while the actor keeps moving.
@@ -88,6 +89,13 @@ int timeline4ID = -1
 int timeline5ID = -1
 int currentTimelineID = -1
 
+; ===== Save/Load State Preservation =====
+; These properties demonstrate how to preserve playback state across saves
+; The properties are automatically saved/loaded by Skyrim's save system
+int savedActiveTimeline = -1      ; Which timeline was playing when saved
+float savedPlaybackTime = -1.0      ; Where in the timeline playback was
+float savedMinHeightAboveGround = 0.0
+
 
 Event OnInit()
     Initalize()
@@ -110,6 +118,10 @@ endFunction
 
 
 Function IntializeTimelines()
+    ; Stop any existing update loops from previous session
+    UnregisterForUpdate()
+    
+    currentTimelineID = -1 ; no active timeline at start
     FCFW_SKSEFunctions.RegisterPlugin(ModName)
     timeline1ID = RegisterTimeline()
     timeline2ID = RegisterTimeline()
@@ -446,6 +458,13 @@ Event OnPlaybackStart(int eventtimelineID)
        eventtimelineID == timeline5ID
         
         currentTimelineID = eventtimelineID
+        Debug.Trace("FCFW_EXAMPLE: Playback started for timeline " + eventtimelineID)
+
+        UpdatePlaybackState() ; store initial playback state 
+        
+        ; Unregister any existing updates first to prevent multiple concurrent loops (eg leftover timelines from before loading current save)
+        UnregisterForUpdate()
+        RegisterForSingleUpdate(0.5) ; start a new update loop to document timeline progress for potential savegame events during playback
     endif
 EndEvent
 
@@ -454,6 +473,11 @@ Event OnPlaybackStop(int eventtimelineID)
        eventtimelineID == timeline3ID || eventtimelineID == timeline4ID || \
        eventtimelineID == timeline5ID
        
+        Debug.Trace("FCFW_EXAMPLE: Playback stopped for timeline " + eventtimelineID)
+        
+        ; Stop the update loop since playback ended
+        UnregisterForUpdate()
+        
         currentTimelineID = -1
     endif
 EndEvent
@@ -478,4 +502,139 @@ Event OnPlaybackWait(int eventtimelineID)
             return
         endif
     endif
-EndEvent   
+EndEvent
+
+Event OnUpdate()
+    if currentTimelineID > 0
+        UpdatePlaybackState() ; store current playback state 
+        RegisterForSingleUpdate(0.5) ; continue update loop while playback is active
+    else
+        ; Safety: if currentTimelineID is invalid, stop the update loop
+        UnregisterForUpdate()
+    endif
+EndEvent
+
+; ============================================================================
+; Save/Load State Preservation Example
+; ============================================================================
+; These functions demonstrate how to preserve timeline playback state across
+; save/load cycles. This is useful when the player saves during active playback.
+;
+; The workflow is:
+; 1. UpdatePlaybackState stores current playback state in Papyrus properties in regular intervals
+; 2. If user triggers a save, the current playback state parameters are saved automatically 
+; 3. After load: OnPlayerLoadGame() (in the player script) calls RestorePlaybackState()
+; 4. If timeline was active, resume playback at saved time
+;
+; ============================================================================
+
+Function UpdatePlaybackState()
+    ; Store away the current playback state
+    ; This would typically be called before the game saves
+    
+    savedActiveTimeline = -1
+    if currentTimelineID > 0
+        ; Store which timeline is active and its progress
+        if currentTimelineID == timeline1ID
+            savedActiveTimeline = 1
+            savedMinHeightAboveGround = 100.0
+        elseif currentTimelineID == timeline2ID
+            savedActiveTimeline = 2
+            savedMinHeightAboveGround = 100.0
+        elseif currentTimelineID == timeline3ID
+            savedActiveTimeline = 3
+            savedMinHeightAboveGround = 100.0
+        elseif currentTimelineID == timeline4ID
+            savedActiveTimeline = 4
+            savedMinHeightAboveGround = 0.0
+        elseif currentTimelineID == timeline5ID
+            savedActiveTimeline = 5
+            savedMinHeightAboveGround = 0.0
+        else 
+            Debug.Trace("FCFW_EXAMPLE: ERROR - Unknown active timeline ID " + currentTimelineID)
+            return
+        endif
+        
+        savedPlaybackTime = FCFW_SKSEFunctions.GetPlaybackTime(ModName, currentTimelineID)
+    endif
+EndFunction
+
+Function RestorePlaybackState()
+    ; Restore playback if a timeline was active when the save was made
+    ; Called from OnPlayerLoadGame()
+    
+    if savedActiveTimeline <= 0 || savedPlaybackTime < 0.0
+        ; No active timeline when saved, nothing to restore
+        Debug.Trace("FCFW_EXAMPLE: No playback state to restore")
+        return
+    endif
+    
+    Debug.Trace("FCFW_EXAMPLE: Restoring playback - Timeline " + savedActiveTimeline + " at time " + savedPlaybackTime)
+    
+    ; Determine which timeline to restore (map old ID to new ID after re-registration)
+    int timelineToRestore = -1
+
+    ; NOTE: Timeline IDs may change after re-registration on load!
+    ; Assume that timelines have been re-registered via in IntializeTimelines() already.
+    if savedActiveTimeline == 1
+        timelineToRestore = timeline1ID
+        ; Rebuild timelines 1-3 since they're dynamically generated
+        BuildTimeline1()
+        BuildTimeline2() 
+        BuildReturnTimeline(timeline3ID)
+    elseif savedActiveTimeline == 2
+        timelineToRestore = timeline2ID
+        ; Rebuild timelines 1-3 since they're dynamically generated
+        BuildTimeline1()
+        BuildTimeline2() 
+        BuildReturnTimeline(timeline3ID)
+    elseif savedActiveTimeline == 3
+        timelineToRestore = timeline3ID
+        ; Rebuild timelines 1-3 since they're dynamically generated
+        BuildTimeline1()
+        BuildTimeline2() 
+        BuildReturnTimeline(timeline3ID)
+    elseif savedActiveTimeline == 4 || savedActiveTimeline == 5
+        ; Timeline 4 (recorded/imported) and Timeline 5 (return path after Timeline 4)
+        ; are NOT supported for save/load restoration in this example.
+        ; 
+        ; Reason: Timeline 4's content exists only in memory (recorded or imported during session).
+        ; After game load, Timeline 4 is empty and cannot be restored without additional persistence.
+        ;
+        ; A possible way to add support:
+        ; 1. Auto-export Timeline 4 when recording stops or import completes:
+        ;    FCFW_SKSEFunctions.ExportTimeline(ModName, timeline4ID, "Timeline4_AutoSave.yaml")
+        ; 2. Re-import on load before restoring playback:
+        ;    FCFW_SKSEFunctions.AddTimelineFromFile(ModName, timeline4ID, "Timeline4_AutoSave.yaml")
+        ; 3. Then proceed with StartPlayback(startTime = savedPlaybackTime)
+        
+        Debug.MessageBox("FCFW Example: Timeline 4/5 playback cannot be restored from save.\n\n" + \
+                         "Timeline 4 content (recorded/imported) is not persisted across saves.")
+        Debug.Trace("FCFW_EXAMPLE: Timeline 4/5 restoration not supported - timeline content not persisted")
+        
+        ; Clear saved state and return without starting playback
+        savedActiveTimeline = -1
+        savedPlaybackTime = -1.0
+        return
+    endif
+    
+    if timelineToRestore <= 0
+        Debug.Trace("FCFW_EXAMPLE: ERROR - Could not map saved timeline ID to current timeline ID!")
+        return
+    endif
+           
+    ; Resume playback at the saved time
+    bool success = FCFW_SKSEFunctions.StartPlayback(modName = ModName, timelineID = timelineToRestore, \
+        minHeightAboveGround = savedMinHeightAboveGround, \
+        startTime = savedPlaybackTime)  ; <-- Resume at saved time!
+    
+    if success
+        currentTimelineID = timelineToRestore
+    else
+        Debug.Trace("FCFW_EXAMPLE: ERROR - Failed to restore playback")
+    endif
+    
+    ; Clear saved state after restoration
+    savedActiveTimeline = -1
+    savedPlaybackTime = -1.0
+EndFunction

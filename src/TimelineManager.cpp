@@ -657,7 +657,7 @@ log::info("{}: Recentering grid to cell ({}, {})", __FUNCTION__, coords->cellX-1
         return true;
     }
 
-    bool TimelineManager::StartPlayback(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, float a_speed, bool a_globalEaseIn, bool a_globalEaseOut, bool a_useDuration, float a_duration, bool a_followGround, float a_minHeightAboveGround, bool a_showMenusDuringPlayback) {
+    bool TimelineManager::StartPlayback(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, float a_speed, bool a_globalEaseIn, bool a_globalEaseOut, bool a_useDuration, float a_duration, bool a_followGround, float a_minHeightAboveGround, bool a_showMenusDuringPlayback, float a_startTime) {
         std::lock_guard<std::recursive_mutex> lock(m_timelineMutex);
         
         // Check if any timeline is already active
@@ -748,6 +748,16 @@ log::info("{}: Recentering grid to cell ({}, {})", __FUNCTION__, coords->cellX-1
         // Initialize timeline playback
         state->m_timeline.ResetPlayback();
         state->m_timeline.StartPlayback();
+        
+        // Set start time if specified (for save/load resume)
+        if (a_startTime > 0.0f) {
+            float clampedTime = std::clamp(a_startTime, 0.0f, state->m_timeline.GetDuration());
+            if (clampedTime != a_startTime) {
+                log::warn("{}: Start time {} exceeds timeline duration {}, clamping to {}",
+                          __FUNCTION__, a_startTime, state->m_timeline.GetDuration(), clampedTime);
+            }
+            state->m_timeline.SetPlaybackTime(clampedTime);
+        }
         
         // Handle UI visibility
         auto* ui = RE::UI::GetSingleton();
@@ -993,6 +1003,18 @@ log::info("{}: Recentering grid to cell ({}, {})", __FUNCTION__, coords->cellX-1
         return state->m_isPlaybackRunning;
     }
 
+    float TimelineManager::GetPlaybackTime(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID) const {
+        std::lock_guard<std::recursive_mutex> lock(m_timelineMutex);
+        
+
+        const TimelineState* state = GetTimeline(a_timelineID, a_pluginHandle);
+        if (!state) {
+            return -1.0f;
+        }
+        
+        return state->m_timeline.GetPlaybackTime();
+    }
+
     bool TimelineManager::IsRecording(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID) const {
         std::lock_guard<std::recursive_mutex> lock(m_timelineMutex);
         
@@ -1072,7 +1094,7 @@ log::info("{}: Recentering grid to cell ({}, {})", __FUNCTION__, coords->cellX-1
         return state->m_allowUserRotation;
     }
 
-    bool TimelineManager::SetPlaybackMode(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, int a_playbackMode, float a_loopTimeOffset) {
+    bool TimelineManager::SetPlaybackMode(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, PlaybackMode a_playbackMode, float a_loopTimeOffset) {
         std::lock_guard<std::recursive_mutex> lock(m_timelineMutex);
         
         TimelineState* state = GetTimeline(a_timelineID, a_pluginHandle);
@@ -1080,13 +1102,7 @@ log::info("{}: Recentering grid to cell ({}, {})", __FUNCTION__, coords->cellX-1
             return false;
         }
         
-        if (a_playbackMode < 0 || a_playbackMode > 2) {
-            log::error("{}: Invalid playback mode {} for timeline {}", __FUNCTION__, a_playbackMode, a_timelineID);
-            return false;
-        }
-        
-        PlaybackMode mode = static_cast<PlaybackMode>(a_playbackMode);
-        state->m_timeline.SetPlaybackMode(mode);
+        state->m_timeline.SetPlaybackMode(a_playbackMode);
         state->m_timeline.SetLoopTimeOffset(a_loopTimeOffset);
         
         return true;

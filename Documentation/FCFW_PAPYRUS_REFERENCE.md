@@ -572,6 +572,51 @@ EndFunction
 
 ---
 
+## Preserving Playback State Across Save/Load
+
+To make an ongoing timeline playback persisent across savegames (ie resume playback at the correct position when loading a savegame that was created during an ongoing playback), use `GetPlaybackTime()` to obtain and save the current playback position, and `StartPlayback()` with the `startTime` parameter to resume playback at the saved position.
+
+Please look into  FCFW_EXAMPLE_QUESTSCRIPT.psc for an example on how to do this.
+
+### Notes on the implementation
+
+**Periodic Update Pattern:**
+- Papyrus doesn't have `OnPlayerSaveGame` event that fires before save
+- Solution: Use `RegisterForSingleUpdate()` to periodically save state during playback
+- Update interval: 0.5-1.0 seconds is recommended (balance between accuracy and performance)
+- Always `UnregisterForUpdate()` before `RegisterForSingleUpdate()` to prevent multiple concurrent loops
+
+**Timeline IDs are Not Persistent:**
+- Timeline IDs change after re-registration on load
+- Don't save timeline IDs themselves - save the playback state and use your own identifier
+- Re-register timelines in `OnPlayerLoadGame()` and get new IDs
+
+**What to Save:**
+- Current playback time (`GetPlaybackTime()`)
+- Playback parameters (`speed`, `globalEaseIn`, `globalEaseOut`, `minHeightAboveGround`, etc.)
+- Which timeline was active (use your own identifier, not the timeline ID)
+- Whether playback was paused (`IsPlaybackPaused()`)
+
+**What Not to Save:**
+- User rotation offset (not exposed in API - known limitation)
+- Timeline IDs (these change on reload)
+
+**Timeline Content Persistence:**
+- **Procedurally-generated timelines:** Rebuild on load (e.g., orbit paths, dynamic paths)
+- **Recorded/imported timelines:** Content is lost on load unless explicitly persisted
+  - **Solution:** Auto-export after recording/import, re-import on load
+  - **Example workflow:**
+    1. After `StopRecording()`: `ExportTimeline(ModName, timelineID, "Timeline_AutoSave.yaml")`
+    2. After `AddTimelineFromFile()`: `ExportTimeline(ModName, timelineID, "Timeline_AutoSave.yaml")`
+    3. On `OnPlayerLoadGame()`: `AddTimelineFromFile(ModName, timelineID, "Timeline_AutoSave.yaml")`
+  - See FCFW_EXAMPLE_QUESTSCRIPT.psc comments in `RestorePlaybackState()` for implementation details
+
+**Resume Limitations:**
+- Camera points (kCamera type) are re-sampled from current camera position, not original saved position
+- User rotation offset is not preserved (will reset to 0 on resume)
+
+---
+
 ## Event Handling
 
 ### Registering for Events

@@ -94,8 +94,8 @@ RE::BSTPoint2<float> Messaging::FCFWInterface::GetRotationPoint(SKSE::PluginHand
 	return FCFW::TimelineManager::GetSingleton().GetRotationPoint(a_pluginHandle, a_timelineID, a_index);
 }
 
-bool Messaging::FCFWInterface::StartPlayback(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, float a_speed, bool a_globalEaseIn, bool a_globalEaseOut, bool a_useDuration, float a_duration, bool a_followGround, float a_minHeightAboveGround, bool a_showMenusDuringPlayback) const noexcept {
-	return FCFW::TimelineManager::GetSingleton().StartPlayback(a_pluginHandle, a_timelineID, a_speed, a_globalEaseIn, a_globalEaseOut, a_useDuration, a_duration, a_followGround, a_minHeightAboveGround, a_showMenusDuringPlayback);
+bool Messaging::FCFWInterface::StartPlayback(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, float a_speed, bool a_globalEaseIn, bool a_globalEaseOut, bool a_useDuration, float a_duration, bool a_followGround, float a_minHeightAboveGround, bool a_showMenusDuringPlayback, float a_startTime) const noexcept {
+	return FCFW::TimelineManager::GetSingleton().StartPlayback(a_pluginHandle, a_timelineID, a_speed, a_globalEaseIn, a_globalEaseOut, a_useDuration, a_duration, a_followGround, a_minHeightAboveGround, a_showMenusDuringPlayback, a_startTime);
 }
 
 bool Messaging::FCFWInterface::StopPlayback(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID) const noexcept {
@@ -122,6 +122,10 @@ bool Messaging::FCFWInterface::IsPlaybackPaused(SKSE::PluginHandle a_pluginHandl
     return FCFW::TimelineManager::GetSingleton().IsPlaybackPaused(a_pluginHandle, a_timelineID);
 }
 
+float Messaging::FCFWInterface::GetPlaybackTime(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID) const noexcept {
+	return FCFW::TimelineManager::GetSingleton().GetPlaybackTime(a_pluginHandle, a_timelineID);
+}
+
 bool Messaging::FCFWInterface::IsRecording(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID) const noexcept {
     return FCFW::TimelineManager::GetSingleton().IsRecording(a_pluginHandle, a_timelineID);
 }
@@ -138,8 +142,8 @@ bool Messaging::FCFWInterface::IsUserRotationAllowed(SKSE::PluginHandle a_plugin
 	return FCFW::TimelineManager::GetSingleton().IsUserRotationAllowed(a_pluginHandle, a_timelineID);
 }
 
-bool Messaging::FCFWInterface::SetPlaybackMode(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, int a_playbackMode, float a_loopTimeOffset) const noexcept {
-	return FCFW::TimelineManager::GetSingleton().SetPlaybackMode(a_pluginHandle, a_timelineID, a_playbackMode, a_loopTimeOffset);
+bool Messaging::FCFWInterface::SetPlaybackMode(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, FCFW_API::PlaybackMode a_playbackMode, float a_loopTimeOffset) const noexcept {
+	return FCFW::TimelineManager::GetSingleton().SetPlaybackMode(a_pluginHandle, a_timelineID, static_cast<FCFW::PlaybackMode>(a_playbackMode), a_loopTimeOffset);
 }bool Messaging::FCFWInterface::AddTimelineFromFile(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, const char* a_filePath, float a_timeOffset) const noexcept {
     return FCFW::TimelineManager::GetSingleton().AddTimelineFromFile(a_pluginHandle, a_timelineID, a_filePath, a_timeOffset);
 }

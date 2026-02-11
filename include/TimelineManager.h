@@ -73,7 +73,7 @@ namespace FCFW {
             RE::NiPoint3 GetTranslationPoint(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, size_t a_index) const;
             RE::BSTPoint2<float> GetRotationPoint(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, size_t a_index) const;
             
-            bool StartPlayback(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, float a_speed = 1.0f, bool a_globalEaseIn = false, bool a_globalEaseOut = false, bool a_useDuration = false, float a_duration = 0.0f, bool a_followGround = true, float a_minHeightAboveGround = 0.0f, bool a_showMenusDuringPlayback = false);
+            bool StartPlayback(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, float a_speed = 1.0f, bool a_globalEaseIn = false, bool a_globalEaseOut = false, bool a_useDuration = false, float a_duration = 0.0f, bool a_followGround = true, float a_minHeightAboveGround = 0.0f, bool a_showMenusDuringPlayback = false, float a_startTime = 0.0f);
             bool StopPlayback(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID);
             bool SwitchPlayback(SKSE::PluginHandle a_pluginHandle, size_t a_fromTimelineID, size_t a_toTimelineID);
             bool IsPlaybackRunning(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID) const;
@@ -81,10 +81,11 @@ namespace FCFW {
             bool PausePlayback(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID);
             bool ResumePlayback(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID);
             bool IsPlaybackPaused(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID) const;
+            float GetPlaybackTime(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID) const;
             void SetUserTurning(bool a_turning);
             bool AllowUserRotation(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, bool a_allow);
             bool IsUserRotationAllowed(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID) const;
-            bool SetPlaybackMode(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, int a_playbackMode, float a_loopTimeOffset = 0.0f);
+            bool SetPlaybackMode(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, PlaybackMode a_playbackMode, float a_loopTimeOffset = 0.0f);
             
             // Overloads for internal use (no ownership validation - for hooks)
             bool IsPlaybackRunning(size_t a_timelineID) const;

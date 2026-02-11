@@ -254,7 +254,7 @@ RequestPluginAPI(InterfaceVersion) [Mod API entry]
 **Playback Functions:**
 | Papyrus Function | Return | Parameters | Notes |
 |-----------------|--------|------------|-------|
-| `StartPlayback` | bool | **modName, timelineID**, speed, globalEaseIn, globalEaseOut, useDuration, duration, followGround, minHeightAboveGround, showMenusDuringPlayback | Begin timeline playback (validates ownership). followGround (default: true) keeps camera above ground/water. minHeightAboveGround (default: 0.0) sets minimum clearance above terrain. showMenusDuringPlayback (default: false) controls menu visibility |
+| `StartPlayback` | bool | **modName, timelineID**, speed, globalEaseIn, globalEaseOut, useDuration, duration, followGround, minHeightAboveGround, showMenusDuringPlayback, startTime | Begin timeline playback (validates ownership). followGround (default: true) keeps camera above ground/water. minHeightAboveGround (default: 0.0) sets minimum clearance above terrain. showMenusDuringPlayback (default: false) controls menu visibility. startTime (default: 0.0) allows resuming playback at specific time (useful for save/load). |
 | `StopPlayback` | bool | **modName, timelineID** | Stop playback (validates ownership) |
 | `SwitchPlayback` | bool | **modName, fromTimelineID, toTimelineID** | Glitch-free timeline switch (validates ownership of both source and target timelines) |
 | `PausePlayback` | bool | **modName, timelineID** | Pause playback (validates ownership) |
@@ -263,6 +263,7 @@ RequestPluginAPI(InterfaceVersion) [Mod API entry]
 | `IsPlaybackRunning` | bool | **modName, timelineID** | Query playback state (validates ownership) |
 | `IsRecording` | bool | **modName, timelineID** | Query recording state (validates ownership) |
 | `GetActiveTimelineID` | int | - | Get ID of currently active timeline (0 if none) |
+| `GetPlaybackTime` | float | **modName, timelineID** | Get current playback time in seconds (validates ownership). Returns -1.0 on error. Useful for saving playback state to resume after loading a save. |
 | `AllowUserRotation` | void | **modName, timelineID**, allow | Enable/disable user camera control (validates ownership) |
 | `IsUserRotationAllowed` | bool | **modName, timelineID** | Query user rotation state (validates ownership) |
 | `SetPlaybackMode` | bool | **modName, timelineID**, playbackMode, loopTimeOffset | Set playback mode (0=kEnd, 1=kLoop, 2=kWait) and loop time offset - requires ownership |
@@ -374,7 +375,7 @@ C++ plugins receive timeline events via SKSE messaging. Event types: `kPlaybackS
 **Interface: `IVFCFW1`** (pure virtual, defined in `FCFW_API.h`)
 - **Required Sequence**: `RegisterPlugin(pluginHandle)` → `RegisterTimeline(pluginHandle)` → returns timeline ID
 - **Point Functions**: Accept `RE::NiPoint3` (translation) and `RE::BSTPoint2<float>` (rotation, x=pitch y=yaw)
-- **Enum Parameters**: Accept `FCFW::BodyPart` and `FCFW::InterpolationMode` enums directly (no int conversion)
+- **Enum Parameters**: Accept `FCFW_API::BodyPart`, `FCFW_API::InterpolationMode`, and `FCFW_API::PlaybackMode` enums directly (no int conversion)
 - **Default Parameters**: `a_bodyPart = BodyPart::kNone`, `a_offset = RE::NiPoint3()`, bools default to `false`, `a_interpolationMode = InterpolationMode::kCubicHermite`
 - **Query Functions**: Return zero on error - validate index with `GetTranslationPointCount()` first
 - **All functions**: Require `SKSE::PluginHandle` and `size_t timelineID`, marked `const noexcept`
