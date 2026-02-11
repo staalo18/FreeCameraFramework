@@ -199,7 +199,7 @@ log::info("{}: Sent Papyrus event '{}' for timeline {} to {} receivers", __FUNCT
             state->m_recordingInterval = a_recordingInterval;
         }
 
-        playerCamera->ToggleFreeCameraMode(false);
+        ToggleFreeCameraNotHooked();
 
         // Calculate start time and easing based on append mode
         float startTime = 0.0f;
@@ -281,7 +281,7 @@ log::info("{}: Sent Papyrus event '{}' for timeline {} to {} receivers", __FUNCT
         RotationPoint rotationPoint(transRotation, PointType::kWorld, RE::BSTPoint2<float>({cameraRot.x, cameraRot.z}));
         state->m_timeline.AddRotationPoint(rotationPoint);
         
-        playerCamera->ToggleFreeCameraMode(false);
+        ToggleFreeCameraNotHooked();
         
         // Clear recording state
         m_activeTimelineID = 0;
@@ -757,7 +757,7 @@ log::info("{}: Recentering grid to cell ({}, {})", __FUNCTION__, coords->cellX-1
         }
         
         // Enter free camera mode
-        playerCamera->ToggleFreeCameraMode(false);
+        ToggleFreeCameraNotHooked();
         
         log::info("{}: Started playback on timeline {}", __FUNCTION__, a_timelineID);
         
@@ -812,7 +812,7 @@ log::info("{}: Recentering grid to cell ({}, {})", __FUNCTION__, coords->cellX-1
         
         auto* playerCamera = RE::PlayerCamera::GetSingleton();
         if (playerCamera && playerCamera->IsInFreeCameraMode()) {
-            playerCamera->ToggleFreeCameraMode(false);
+            ToggleFreeCameraNotHooked();
             
             auto* ui = RE::UI::GetSingleton();
             if (ui) {
@@ -1262,7 +1262,7 @@ state->m_timeline.GetRotationPointCount(), a_timelineID, a_filePath);
                         // Exit free camera and restore UI state
                         auto* playerCamera = RE::PlayerCamera::GetSingleton();
                         if (playerCamera && playerCamera->currentState && playerCamera->currentState->id == RE::CameraState::kFree) {
-                            playerCamera->ToggleFreeCameraMode(false);
+                            ToggleFreeCameraNotHooked();
                             
                             auto* ui = RE::UI::GetSingleton();
                             if (ui && !state.m_showMenusDuringPlayback) {
@@ -1429,7 +1429,7 @@ log::info("{}: Timeline {} registered by plugin '{}' (handle {})", __FUNCTION__,
         // Temporarily exit free camera
         auto* playerCamera = RE::PlayerCamera::GetSingleton();
         if (playerCamera && playerCamera->IsInFreeCameraMode()) {
-            playerCamera->ToggleFreeCameraMode(false);
+            ToggleFreeCameraNotHooked();
         }
         
         m_isSaveInProgress = true;
@@ -1450,7 +1450,7 @@ log::info("{}: Timeline {} registered by plugin '{}' (handle {})", __FUNCTION__,
         // Re-enter free camera mode
         auto* playerCamera = RE::PlayerCamera::GetSingleton();
         if (playerCamera && !playerCamera->IsInFreeCameraMode()) {
-            playerCamera->ToggleFreeCameraMode(false);
+            ToggleFreeCameraNotHooked();
         }
     }
 

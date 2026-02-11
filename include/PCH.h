@@ -6,6 +6,7 @@
 
 #include <spdlog/sinks/basic_file_sink.h>
 #include <spdlog/sinks/msvc_sink.h>
+#include <xbyak/xbyak.h>
 
 using namespace SKSE;
 using namespace SKSE::log;

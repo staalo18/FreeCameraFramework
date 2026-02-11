@@ -85,8 +85,8 @@ src/
   ├─ TimelineManager.cpp  # Recording/playback orchestration (singleton)
   ├─ Timeline.cpp         # Timeline class implementations (paired track coordination)
   ├─ CameraPath.cpp       # Point storage + YAML import/export
-  ├─ Hooks.cpp            # Game loop interception (MainUpdateHook)
-  └─ FCFW_Utils.cpp       # Hermite interpolation + file parsing + YAML enum converters
+  ├─ Hooks.cpp            # Game loop interception + free camera hook
+  └─ FCFW_Utils.cpp       # Hermite interpolation + file parsing + camera utilities
 
 include/
   ├─ TimelineTrack.h      # TimelineTrack<T> template (declaration + implementation)
@@ -94,6 +94,8 @@ include/
   ├─ CameraPath.h         # Point storage templates (TranslationPath, RotationPath)
   ├─ CameraTypes.h        # Core enums (InterpolationMode, PointType, PlaybackMode)
   ├─ TimelineManager.h    # Main orchestrator interface
+  ├─ Hooks.h              # Hook declarations (MainUpdateHook, ToggleFreeCameraHook)
+  ├─ FCFW_Utils.h         # Utility functions (interpolation, camera control)
   └─ FCFW_API.h           # C++ Mod API + event messaging interface definition
 ```
 
@@ -377,10 +379,28 @@ C++ plugins receive timeline events via SKSE messaging. Event types: `kPlaybackS
 - **Query Functions**: Return zero on error - validate index with `GetTranslationPointCount()` first
 - **All functions**: Require `SKSE::PluginHandle` and `size_t timelineID`, marked `const noexcept`
 
-**Implementation: `FCFWInterface`** (in `ModAPI.h`, implemented in `Messaging` namespace)a rotation during playback (unless `IsUserRotationAllowed()`), sets `SetUserTurning(true)` flag
-3. **MovementHook** (VTable on `RE::MovementHandler`, vfunc 0x2/0x4) - Blocks WASD/gamepad movement during playback
+**Implementation: `FCFWInterface`** (in `ModAPI.h`, implemented in `Messaging` namespace)
+
+---
+
+### **1.4 Input Blocking & Camera Control Hooks**
+
+**Purpose:** Prevent player control conflicts during timeline operations.
+
+**Hook Implementations:**
+1. **LookHook** (VTable on `RE::LookHandler`, vfunc 0x1) - Blocks mouse/gamepad rotation during playback (unless `IsUserRotationAllowed()`), sets `SetUserTurning(true)` flag
+2. **MovementHook** (VTable on `RE::MovementHandler`, vfunc 0x2/0x4) - Blocks WASD/gamepad movement during playback
+3. **ToggleFreeCameraHook** (hooks game's `PlayerCamera::ToggleFreeCameraMode`, RELOCATION_ID 49876/50809) - Blocks console TFC commands during recording or playback
 
 **Cross-Plugin Support**: Hooks use `IsPlaybackRunning(timelineID)` / `IsUserRotationAllowed(timelineID)` overloads without pluginHandle - must block input for ANY active timeline regardless of owner.
+
+**ToggleFreeCameraHook Technical Details:**
+- **Implementation:** Xbyak-based hook preserving 6 bytes of function prologue
+- **Trampoline Storage:** Public static member `_ToggleFreeCamera` stores original function address
+- **Blocking Logic:** Returns early (no-op) when timeline is recording or playing back
+- **Internal Bypass:** FCFW code uses `FCFW::ToggleFreeCameraNotHooked()` utility function to toggle camera without triggering the hook
+- **Bypass Architecture:** Trampoline address stored in both `ToggleFreeCameraHook::_ToggleFreeCamera` and `FCFW_Utils::g_freeCameraTrampoline` for hook logic and bypass utility respectively
+- **Usage Locations:** TimelineManager calls bypass function in 7 locations: `StartRecording()`, `StopRecording()`, `StartPlayback()`, `StopPlayback()`, `CleanupPluginTimelines()`, `OnPreSaveGame()`, `OnPostSaveGame()`
 
 ---
 
@@ -727,7 +747,7 @@ StartPlayback(timelineID, pluginHandle, speed, globalEaseIn, globalEaseOut, useD
 │   ├─> state->isShowingMenus = ui->IsShowingMenus()
 │   └─> state->lastFreeRotation = ThirdPersonState->freeRotation
 ├─> Reset timelines: state->timeline.ResetTimeline(), UpdateCameraPoints(state)
-├─> Enter free camera mode: ToggleFreeCameraMode(false)
+├─> Enter free camera mode: ToggleFreeCameraNotHooked(false)  [bypasses hook]
 ├─> Dispatch timeline started events:
 │   ├─> DispatchTimelineEvent(kPlaybackStart, timelineID)  [SKSE messaging]
 │   └─> DispatchTimelineEventPapyrus("OnPlaybackStart", timelineID)  [Papyrus events]

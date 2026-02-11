@@ -55,7 +55,36 @@ namespace Hooks
 		static inline REL::Relocation<decltype(ProcessButton)> _ProcessButton;
 	};
 
-    // Add the new hook class
+	
+	class FreeCameraStateHook
+	{
+	public:
+		static void Hook()
+		{
+			REL::Relocation<std::uintptr_t> FreeCameraStateVtbl{ RE::VTABLE_FreeCameraState[0] };
+			_Update = FreeCameraStateVtbl.write_vfunc(0x3, Update);
+		}
+
+	private:
+		static void Update(RE::FreeCameraState* a_this);
+		
+		static inline REL::Relocation<decltype(Update)> _Update;
+	};
+
+	class ToggleFreeCameraHook
+	{
+	public:
+		static void Hook();
+
+		static void HandleDeferredFreeCameraToggle();
+		
+		static inline std::uintptr_t _ToggleFreeCamera{ 0 };
+		
+	private:
+		static void ToggleFreeCamera(RE::PlayerCamera* a_this, bool a_freezeTime);
+		static inline bool m_reEnterFreeCamera;
+	};
+
     class GridCellArrayHook
     {
     public:

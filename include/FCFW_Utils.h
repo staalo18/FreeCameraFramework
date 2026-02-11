@@ -32,5 +32,9 @@ namespace FCFW {
     
     std::string BodyPartToString(BodyPart part);
     BodyPart StringToBodyPart(const std::string& str);
+
+    // Direct camera toggle that bypasses hooks
+    void ToggleFreeCameraNotHooked(bool a_freezeTime = false);
+    void InitializeFreeCameraTrampoline(std::uintptr_t a_trampolineAddr);
 } // namespace FCFW
 

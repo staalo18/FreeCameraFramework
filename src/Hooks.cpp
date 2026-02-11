@@ -1,6 +1,6 @@
 #include "Hooks.h"
 #include "TimelineManager.h"
-
+#include <_ts_SKSEFunctions.h>
 #include <DbgHelp.h>
 
 namespace Hooks
@@ -12,7 +12,9 @@ namespace Hooks
 		MainUpdateHook::Hook();
 		LookHook::Hook();
 		MovementHook::Hook();
-
+		FreeCameraStateHook::Hook();
+		ToggleFreeCameraHook::Hook();
+		
  //       GridCellArrayHook::Hook();
 
 		log::info("...success");
@@ -21,6 +23,8 @@ namespace Hooks
 	void MainUpdateHook::Nullsub()
 	{
 		_Nullsub();
+
+		ToggleFreeCameraHook::HandleDeferredFreeCameraToggle();
 
 		FCFW::TimelineManager::GetSingleton().Update();
 
@@ -112,11 +116,76 @@ namespace Hooks
 
 		_ProcessButton(a_this, a_event, a_data);
 	}
-	
+
+	void FreeCameraStateHook::Update(RE::FreeCameraState* a_this)
+	{
+		auto player = RE::PlayerCharacter::GetSingleton();
+		if (player && player->Get3D(0)) {
+			auto thirdpersonNode = player->Get3D(0)->AsNode();
+			if (thirdpersonNode) {
+				auto& timelineManager = FCFW::TimelineManager::GetSingleton();
+				size_t activeID = timelineManager.GetActiveTimelineID();
+				
+				if (activeID != 0 && timelineManager.IsPlaybackRunning(activeID)) {
+					// During playback: unhide player model in free camera
+					thirdpersonNode->GetFlags().reset(RE::NiAVObject::Flag::kHidden);
+				}
+			}
+ 		}
+
+		_Update(a_this);
+	}
+
+	void ToggleFreeCameraHook::Hook()
+	{
+		_ToggleFreeCamera = _ts_SKSEFunctions::WriteFunctionHook(
+			REL::VariantID(49876, 50809, 0),
+			6,
+			reinterpret_cast<std::uintptr_t>(ToggleFreeCamera)
+		);
+		
+		// Initialize FCFW_Utils with trampoline address
+		FCFW::InitializeFreeCameraTrampoline(_ToggleFreeCamera);
+	}
+
+	void ToggleFreeCameraHook::ToggleFreeCamera(RE::PlayerCamera* a_this, bool a_freezeTime)
+	{
+		// Always allow the toggle to complete to avoid state corruption:
+		// Just blocking the original toggleFreeCamera call in case tfc is triggered via console
+		// while a timeline is active would have unintended side effect that
+		// camera zoom is locked (mouse wheel no longer works) after timeline playback ends.
+		// Reason most likely is that console tfc has some post-toggle logic that runs
+		// even if we block the original function.
+
+		using FuncType = void(*)(RE::PlayerCamera*, bool);
+		auto func = reinterpret_cast<FuncType>(_ToggleFreeCamera);
+		func(a_this, a_freezeTime); // call the vanilla ToggleFreeCameraMode function
+		
+		// If we have an active timeline and just exited free camera via above func() call, 
+		// schedule re-entry for next frame (see comment above).
+		auto& timelineManager = FCFW::TimelineManager::GetSingleton();
+		size_t activeID = timelineManager.GetActiveTimelineID();
+		if (activeID > 0 && !a_this->IsInFreeCameraMode()) {
+			m_reEnterFreeCamera = true;
+		}
+	}
+
+	void ToggleFreeCameraHook::HandleDeferredFreeCameraToggle() {
+		if (m_reEnterFreeCamera) {
+			m_reEnterFreeCamera = false;
+			auto* playerCamera = RE::PlayerCamera::GetSingleton();
+			auto activeID = FCFW::TimelineManager::GetSingleton().GetActiveTimelineID();
+			if (playerCamera && !playerCamera->IsInFreeCameraMode() && activeID > 0) {
+				FCFW::ToggleFreeCameraNotHooked(false);
+			}
+		}
+	}
+
 	bool GridCellArrayHook::SetCenter(RE::GridCellArray* a_this, std::int32_t a_x, std::int32_t a_y)
 	{
 		log::info("=== GridCellArray::SetCenter called: ({}, {}) ===", a_x, a_y);
-return _SetCenter(a_this, a_x, a_y);		
+return _SetCenter(a_this, a_x, a_y);
+/*
 		// Capture call stack
 		void* stack[64];
 		WORD frames = CaptureStackBackTrace(1, 64, stack, nullptr); // Skip current frame
@@ -149,6 +218,6 @@ return _SetCenter(a_this, a_x, a_y);
 //		return true;
 		
 		// Call original
-		return _SetCenter(a_this, a_x, a_y);
+		return _SetCenter(a_this, a_x, a_y); */
 	}
 } // namespace Hooks

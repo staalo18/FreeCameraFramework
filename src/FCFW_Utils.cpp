@@ -239,4 +239,30 @@ namespace FCFW {
 
         return true;
     }
+
+    // ===== Free Camera Direct Toggle (bypasses hooks) =====
+    static std::uintptr_t g_freeCameraTrampoline = 0;
+
+    void InitializeFreeCameraTrampoline(std::uintptr_t a_trampolineAddr) {
+        g_freeCameraTrampoline = a_trampolineAddr;
+        log::info("FCFW_Utils: Initialized free camera trampoline at 0x{:X}", a_trampolineAddr);
+    }
+
+    void ToggleFreeCameraNotHooked(bool a_freezeTime) {
+        if (g_freeCameraTrampoline == 0) {
+            log::error("FCFW_Utils: Free camera trampoline not initialized!");
+            return;
+        }
+
+        auto* playerCamera = RE::PlayerCamera::GetSingleton();
+        if (!playerCamera) {
+            log::error("FCFW_Utils: PlayerCamera singleton not available");
+            return;
+        }
+
+        // Call original function via trampoline, bypassing hook
+        using FuncType = void(*)(RE::PlayerCamera*, bool);
+        auto func = reinterpret_cast<FuncType>(g_freeCameraTrampoline);
+        func(playerCamera, a_freezeTime);
+    }
 } // namespace FCFW
