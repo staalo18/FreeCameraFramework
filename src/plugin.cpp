@@ -688,6 +688,10 @@ extern "C" DLLEXPORT bool SKSEAPI SKSEPlugin_Load(const SKSE::LoadInterface* sks
             case SKSE::MessagingInterface::kPostLoadGame:
             case SKSE::MessagingInterface::kNewGame:
                 APIs::RequestAPIs();
+                if (!GetModuleHandleA("po3_Tweaks.dll")) {
+                    log::warn("{}: po3_Tweaks.dll not found.", __FUNCTION__);
+                    RE::DebugMessageBox("powerofthree's Tweaks not installed? FCFW bodypart support will not function properly.");
+                }                
                 break;
             }
         });

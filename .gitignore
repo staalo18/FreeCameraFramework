@@ -4,3 +4,4 @@
 build
 cmake-build*
 vcpkg_installed*
+FCFW_PROJECT_CONTEXT.md
