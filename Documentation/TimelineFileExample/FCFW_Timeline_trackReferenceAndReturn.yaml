@@ -7,6 +7,8 @@ globalEaseIn: false
 globalEaseOut: false
 showMenusDuringPlayback: false
 allowUserRotation: false
+followGround: true
+minHeightAboveGround: 0
 useDegrees: true
 
 translationPoints:

@@ -33,6 +33,7 @@ namespace FCFW
 		bool IsPaused() const;
 
 		void ClearPoints();
+		void Reset();
 
 		void SetPlaybackMode(PlaybackMode a_mode);
 		void SetLoopTimeOffset(float a_offset);

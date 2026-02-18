@@ -7,6 +7,8 @@ globalEaseIn: false
 globalEaseOut: false
 showMenusDuringPlayback: false
 allowUserRotation: true
+followGround: true
+minHeightAboveGround: 0
 useDegrees: true
 
 translationPoints:
@@ -75,3 +77,4 @@ rotationPoints:
       plugin: Skyrim.esm
       formID: 0xD8C56
     interpolationMode: linear
+    isOffsetRelative: false

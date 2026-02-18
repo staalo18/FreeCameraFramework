@@ -121,6 +121,13 @@ namespace FCFW
 		m_rotationTrack.ClearPoints();
 	}
 
+	void Timeline::Reset()
+	{
+		ClearPoints();
+		SetPlaybackMode(PlaybackMode::kEnd);
+		SetLoopTimeOffset(0.0f);
+	}
+
 	PlaybackMode Timeline::GetPlaybackMode() const
 	{
 		return m_translationTrack.GetPlaybackMode();

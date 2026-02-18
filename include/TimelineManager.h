@@ -10,8 +10,8 @@ namespace FCFW {
     // Per-timeline state container
     struct TimelineState {
         // ===== IDENTITY & OWNERSHIP (immutable after creation) =====
-        size_t m_id;                           // Timeline unique identifier
-        SKSE::PluginHandle m_ownerHandle;      // Plugin that owns this timeline
+        size_t m_id{ 0 };                      // Timeline unique identifier
+        SKSE::PluginHandle m_ownerHandle{ 0 }; // Plugin that owns this timeline
         std::string m_ownerName;               // Plugin name (for logging)
         
         // ===== TIMELINE DATA & STATIC CONFIGURATION (persisted in YAML) =====
@@ -28,10 +28,6 @@ namespace FCFW {
         float m_recordingInterval{ 1.0f };     // Sample interval for this recording session (0.0 = every frame)
         
         // ===== PLAYBACK STATE (runtime, reset on StopPlayback) =====
-        // NOTE: When adding new playback state fields, update these locations:
-        // 1. StartPlayback() - Initialize from parameters
-        // 2. SwitchPlayback() - Copy from source timeline to preserve state
-        // 3. StopPlayback() - Reset to default values
         bool m_isPlaybackRunning{ false };     // Active playback
         float m_playbackSpeed{ 1.0f };         // Computed time multiplier (runtime only, NOT persisted)
         float m_playbackDuration{ 0.0f };      // Computed total duration (runtime only, NOT persisted)
@@ -39,6 +35,36 @@ namespace FCFW {
         bool m_followGround{ true };           // Keep camera above ground level during playback (runtime only)
         float m_minHeightAboveGround{ 0.0f }; // Minimum height above ground when following ground (runtime only)
         RE::BSTPoint2<float> m_rotationOffset{ 0.0f, 0.0f }; // Accumulated user rotation (runtime only)
+        
+        void Initialize(size_t a_id, SKSE::PluginHandle a_ownerHandle) {
+            m_id = a_id;
+            m_ownerHandle = a_ownerHandle;
+            m_ownerName = std::format("Plugin_{}", a_ownerHandle);
+            
+            Reset();
+        }
+        
+		void Reset() {
+			m_timeline.Reset();
+			
+            m_globalEaseIn = false;
+            m_globalEaseOut = false;
+            m_showMenusDuringPlayback = false;
+            m_allowUserRotation = false;
+
+            m_isRecording = false;
+            m_currentRecordingTime = 0.0f;
+            m_lastRecordedPointTime = 0.0f;
+            m_recordingInterval = 1.0f;
+
+            m_isPlaybackRunning = false;
+            m_playbackSpeed = 1.0f;
+            m_playbackDuration = 0.0f;
+            m_isCompletedAndWaiting = false;
+            m_followGround = true;
+            m_minHeightAboveGround = 0.0f;
+            m_rotationOffset = { 0.0f, 0.0f };
+        }
     };
 
     class TimelineManager {
@@ -50,11 +76,17 @@ namespace FCFW {
             TimelineManager(const TimelineManager&) = delete;
             TimelineManager& operator=(const TimelineManager&) = delete;
 
-            void Update();
 
-            bool StartRecording(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, float a_recordingInterval = 1.0f, bool a_append = false, float a_timeOffset = 0.0f);
-            bool StopRecording(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID);
-
+        /* API functions
+        ********************/
+            bool RegisterPlugin(SKSE::PluginHandle a_pluginHandle);
+            
+            // timeline management
+            size_t RegisterTimeline(SKSE::PluginHandle a_pluginHandle);
+            bool UnregisterTimeline(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID);
+            bool ClearTimeline(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID);            
+            
+            // timeline points
             int AddTranslationPointAtCamera(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, float a_time, bool a_easeIn, bool a_easeOut, InterpolationMode a_interpolationMode);
             int AddTranslationPoint(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, float a_time, const RE::NiPoint3& a_position, bool a_easeIn, bool a_easeOut, InterpolationMode a_interpolationMode);
             int AddTranslationPointAtRef(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, float a_time, RE::TESObjectREFR* a_reference, BodyPart a_bodyPart, const RE::NiPoint3& a_offset, bool a_isOffsetRelative, bool a_easeIn, bool a_easeOut, InterpolationMode a_interpolationMode);
@@ -65,15 +97,16 @@ namespace FCFW {
             bool RemoveTranslationPoint(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, size_t a_index);
             bool RemoveRotationPoint(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, size_t a_index);
 
-            bool ClearTimeline(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID);
-            
             int GetTranslationPointCount(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID) const;
             int GetRotationPointCount(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID) const;
             
             RE::NiPoint3 GetTranslationPoint(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, size_t a_index) const;
             RE::BSTPoint2<float> GetRotationPoint(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, size_t a_index) const;
             
-            bool StartPlayback(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, float a_speed = 1.0f, bool a_globalEaseIn = false, bool a_globalEaseOut = false, bool a_useDuration = false, float a_duration = 0.0f, bool a_followGround = true, float a_minHeightAboveGround = 0.0f, bool a_showMenusDuringPlayback = false, float a_startTime = 0.0f);
+            // playback / recording
+            bool StartRecording(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, float a_recordingInterval = 1.0f, bool a_append = false, float a_timeOffset = 0.0f);
+            bool StopRecording(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID);
+            bool StartPlayback(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, float a_speed = 1.0f, bool a_globalEaseIn = false, bool a_globalEaseOut = false, bool a_useDuration = false, float a_duration = 0.0f, float a_startTime = 0.0f);
             bool StopPlayback(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID);
             bool SwitchPlayback(SKSE::PluginHandle a_pluginHandle, size_t a_fromTimelineID, size_t a_toTimelineID);
             bool IsPlaybackRunning(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID) const;
@@ -82,27 +115,36 @@ namespace FCFW {
             bool ResumePlayback(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID);
             bool IsPlaybackPaused(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID) const;
             float GetPlaybackTime(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID) const;
-            void SetUserTurning(bool a_turning);
+            
+            // timeline properties
             bool AllowUserRotation(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, bool a_allow);
             bool IsUserRotationAllowed(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID) const;
+            bool SetFollowGround(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, bool a_follow, float a_minHeight = 0.0f);
+            bool IsGroundFollowingEnabled(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID) const;
+            float GetMinHeightAboveGround(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID) const;
+            bool SetMenuVisibility(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, bool a_show);
+            bool AreMenusVisible(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID) const;
             bool SetPlaybackMode(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, PlaybackMode a_playbackMode, float a_loopTimeOffset = 0.0f);
+            
+            // import / export
+            bool AddTimelineFromFile(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, const char* a_filePath, float a_timeOffset = 0.0f); // Requires ownership
+            bool ExportTimeline(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, const char* a_filePath) const;
+
+            // Papyrus event registration
+            void RegisterForTimelineEvents(RE::TESForm* a_form);
+            void UnregisterForTimelineEvents(RE::TESForm* a_form);
+
+        /* Non-API functions for internal use and hooks
+        **************************************************/
+            void Update();
+
+            void SetUserTurning(bool a_turning);
             
             // Overloads for internal use (no ownership validation - for hooks)
             bool IsPlaybackRunning(size_t a_timelineID) const;
             bool IsUserRotationAllowed(size_t a_timelineID) const;
             size_t GetActiveTimelineID() const { return m_activeTimelineID; }    
-                                    
-            bool AddTimelineFromFile(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, const char* a_filePath, float a_timeOffset = 0.0f); // Requires ownership
-            bool ExportTimeline(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, const char* a_filePath) const;
-
-            bool RegisterPlugin(SKSE::PluginHandle a_pluginHandle);
-            size_t RegisterTimeline(SKSE::PluginHandle a_pluginHandle);
-            bool UnregisterTimeline(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID);
-            
-            // Papyrus event registration
-            void RegisterForTimelineEvents(RE::TESForm* a_form);
-            void UnregisterForTimelineEvents(RE::TESForm* a_form);
-            
+                
             // Save/load handlers
             void OnPreSaveGame();
             void OnPostSaveGame();
@@ -120,9 +162,7 @@ namespace FCFW {
             void RecordTimeline(TimelineState* a_state);
             void PlayTimeline(TimelineState* a_state);
             
-            // Copy runtime playback state from source to target timeline
-            // Used by SwitchPlayback to preserve playback settings across timeline transitions
-            void CopyPlaybackState(TimelineState* a_fromState, TimelineState* a_toState);
+           void CopyPlaybackState(TimelineState* a_fromState, TimelineState* a_toState);
 
             TimelineState* GetTimeline(size_t a_timelineID, SKSE::PluginHandle a_pluginHandle);
             const TimelineState* GetTimeline(size_t a_timelineID, SKSE::PluginHandle a_pluginHandle) const;
@@ -131,22 +171,22 @@ namespace FCFW {
 
             void RecenterGridAroundCameraIfNeeded();
 
-            std::unordered_set<SKSE::PluginHandle> m_registeredPlugins; // Track registered plugins
+            std::unordered_set<SKSE::PluginHandle> m_registeredPlugins;
             std::unordered_map<size_t, TimelineState> m_timelines;
             mutable std::recursive_mutex m_timelineMutex;  // Protect map operations (recursive for reentrant safety)
             std::atomic<size_t> m_nextTimelineID = 1;     // ID generator
-            size_t m_activeTimelineID = 0;            // Which timeline is active (0 = none)
+            size_t m_activeTimelineID = 0;
                         
             // Playback
             bool m_isShowingMenus = true;         // Whether menus were showing before playback started
             bool m_userTurning = false;           // Whether user is manually controlling camera during playback
-            RE::NiPoint2 m_lastFreeRotation;           // camera free rotation before playback started (third-person only)
+            RE::NiPoint2 m_lastFreeRotation;      // camera free rotation before playback started (third-person only)
             
             // Papyrus event registration
             std::vector<RE::TESForm*> m_eventReceivers;  // Forms registered for timeline events
             
             // Savegame handling
-            bool m_isSaveInProgress = false; // Flag to indicate save is in progress
+            bool m_isSaveInProgress = false;    // Flag to indicate save is in progress
 
             // Debug/testing
             void UpdateBodyPartRotationMatrixDisplay();

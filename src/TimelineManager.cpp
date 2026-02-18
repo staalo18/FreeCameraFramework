@@ -646,20 +646,12 @@ log::info("{}: Recentering grid to cell ({}, {})", __FUNCTION__, coords->cellX-1
             StopPlayback(a_pluginHandle, a_timelineID);
         }
         
-        state->m_timeline.ClearPoints();
-        
-        // Reset timeline metadata to defaults
-        state->m_timeline.SetLoopTimeOffset(0.0f);
-        state->m_timeline.SetPlaybackMode(PlaybackMode::kEnd);
-        state->m_globalEaseIn = false;
-        state->m_globalEaseOut = false;
-        state->m_showMenusDuringPlayback = false;
-        state->m_allowUserRotation = false;
+        state->Reset();
         
         return true;
     }
 
-    bool TimelineManager::StartPlayback(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, float a_speed, bool a_globalEaseIn, bool a_globalEaseOut, bool a_useDuration, float a_duration, bool a_followGround, float a_minHeightAboveGround, bool a_showMenusDuringPlayback, float a_startTime) {
+    bool TimelineManager::StartPlayback(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, float a_speed, bool a_globalEaseIn, bool a_globalEaseOut, bool a_useDuration, float a_duration, float a_startTime) {
         std::lock_guard<std::recursive_mutex> lock(m_timelineMutex);
         
         // Check if any timeline is already active
@@ -725,9 +717,6 @@ log::info("{}: Recentering grid to cell ({}, {})", __FUNCTION__, coords->cellX-1
         // Set playback parameters
         state->m_globalEaseIn = a_globalEaseIn;
         state->m_globalEaseOut = a_globalEaseOut;
-        state->m_followGround = a_followGround;
-        state->m_minHeightAboveGround = a_minHeightAboveGround;
-        state->m_showMenusDuringPlayback = a_showMenusDuringPlayback;
         
         // Set as active timeline
         m_activeTimelineID = a_timelineID;
@@ -1096,6 +1085,73 @@ log::info("{}: Recentering grid to cell ({}, {})", __FUNCTION__, coords->cellX-1
         return state->m_allowUserRotation;
     }
 
+    bool TimelineManager::SetFollowGround(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, bool a_follow, float a_minHeight) {
+        std::lock_guard<std::recursive_mutex> lock(m_timelineMutex);
+        
+        TimelineState* state = GetTimeline(a_timelineID, a_pluginHandle);
+        if (!state) {
+            return false;
+        }
+        
+        state->m_followGround = a_follow;
+        state->m_minHeightAboveGround = a_minHeight;
+        return true;
+    }
+
+    bool TimelineManager::IsGroundFollowingEnabled(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID) const {
+        std::lock_guard<std::recursive_mutex> lock(m_timelineMutex);
+        
+        const TimelineState* state = GetTimeline(a_timelineID, a_pluginHandle);
+        if (!state) {
+            return false;
+        }
+        
+        return state->m_followGround;
+    }
+
+    float TimelineManager::GetMinHeightAboveGround(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID) const {
+        std::lock_guard<std::recursive_mutex> lock(m_timelineMutex);
+        
+        const TimelineState* state = GetTimeline(a_timelineID, a_pluginHandle);
+        if (!state) {
+            return -1.0f;
+        }
+        
+        return state->m_minHeightAboveGround;
+    }
+
+    bool TimelineManager::SetMenuVisibility(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, bool a_show) {
+        std::lock_guard<std::recursive_mutex> lock(m_timelineMutex);
+        
+        TimelineState* state = GetTimeline(a_timelineID, a_pluginHandle);
+        if (!state) {
+            return false;
+        }
+        
+        state->m_showMenusDuringPlayback = a_show;
+        
+        // Apply immediately if playback is active
+        if (state->m_isPlaybackRunning && m_activeTimelineID == a_timelineID) {
+            auto* ui = RE::UI::GetSingleton();
+            if (ui) {
+                ui->ShowMenus(a_show);
+            }
+        }
+        
+        return true;
+    }
+
+    bool TimelineManager::AreMenusVisible(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID) const {
+        std::lock_guard<std::recursive_mutex> lock(m_timelineMutex);
+        
+        const TimelineState* state = GetTimeline(a_timelineID, a_pluginHandle);
+        if (!state) {
+            return false;
+        }
+        
+        return state->m_showMenusDuringPlayback;
+    }
+
     bool TimelineManager::SetPlaybackMode(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, PlaybackMode a_playbackMode, float a_loopTimeOffset) {
         std::lock_guard<std::recursive_mutex> lock(m_timelineMutex);
         
@@ -1165,6 +1221,16 @@ log::info("{}: Loading timeline from YAML file: {}", __FUNCTION__, a_filePath);
             state->m_allowUserRotation = allowRotation;
         }
         
+        if (root["followGround"]) {
+            bool followGround = root["followGround"].as<bool>();
+            state->m_followGround = followGround;
+        }
+        
+        if (root["minHeightAboveGround"]) {
+            float minHeight = root["minHeightAboveGround"].as<float>();
+            state->m_minHeightAboveGround = minHeight;
+        }
+        
         float rotationConversionFactor = 1.0f;  // Default: radians (no conversion)
         
         if (root["useDegrees"]) {
@@ -1224,6 +1290,8 @@ state->m_timeline.GetRotationPointCount() - rotationPointCount, a_filePath, a_ti
     	file << "globalEaseOut: " << (state->m_globalEaseOut ? "true" : "false") << "\n";
 		file << "showMenusDuringPlayback: " << (state->m_showMenusDuringPlayback ? "true" : "false") << "\n";
 		file << "allowUserRotation: " << (state->m_allowUserRotation ? "true" : "false") << "\n";
+		file << "followGround: " << (state->m_followGround ? "true" : "false") << "\n";
+		file << "minHeightAboveGround: " << state->m_minHeightAboveGround << "\n";
 		file << "useDegrees: true\n\n";
 		
 		// Export both translation and rotation paths to same file
@@ -1317,14 +1385,10 @@ state->m_timeline.GetRotationPointCount(), a_timelineID, a_filePath);
         size_t newID = m_nextTimelineID.fetch_add(1);
         
         TimelineState state;
-        state.m_id = newID;
-        state.m_timeline = Timeline();
-        state.m_ownerHandle = a_pluginHandle;
+        state.Initialize(newID, a_pluginHandle);
         
-        state.m_ownerName = std::format("Plugin_{}", a_pluginHandle);
-        
-//  Log before move to avoid use-after-move undefined behavior
-log::info("{}: Timeline {} registered by plugin '{}' (handle {})", __FUNCTION__, newID, state.m_ownerName, a_pluginHandle);
+        // Log before move to avoid use-after-move undefined behavior
+        log::info("{}: Timeline {} registered by plugin '{}' (handle {})", __FUNCTION__, newID, state.m_ownerName, a_pluginHandle);
         
         m_timelines[newID] = std::move(state);
         

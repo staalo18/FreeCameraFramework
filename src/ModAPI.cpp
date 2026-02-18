@@ -94,8 +94,8 @@ RE::BSTPoint2<float> Messaging::FCFWInterface::GetRotationPoint(SKSE::PluginHand
 	return FCFW::TimelineManager::GetSingleton().GetRotationPoint(a_pluginHandle, a_timelineID, a_index);
 }
 
-bool Messaging::FCFWInterface::StartPlayback(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, float a_speed, bool a_globalEaseIn, bool a_globalEaseOut, bool a_useDuration, float a_duration, bool a_followGround, float a_minHeightAboveGround, bool a_showMenusDuringPlayback, float a_startTime) const noexcept {
-	return FCFW::TimelineManager::GetSingleton().StartPlayback(a_pluginHandle, a_timelineID, a_speed, a_globalEaseIn, a_globalEaseOut, a_useDuration, a_duration, a_followGround, a_minHeightAboveGround, a_showMenusDuringPlayback, a_startTime);
+bool Messaging::FCFWInterface::StartPlayback(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, float a_speed, bool a_globalEaseIn, bool a_globalEaseOut, bool a_useDuration, float a_duration, float a_startTime) const noexcept {
+	return FCFW::TimelineManager::GetSingleton().StartPlayback(a_pluginHandle, a_timelineID, a_speed, a_globalEaseIn, a_globalEaseOut, a_useDuration, a_duration, a_startTime);
 }
 
 bool Messaging::FCFWInterface::StopPlayback(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID) const noexcept {
@@ -140,6 +140,26 @@ void Messaging::FCFWInterface::AllowUserRotation(SKSE::PluginHandle a_pluginHand
 
 bool Messaging::FCFWInterface::IsUserRotationAllowed(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID) const noexcept {
 	return FCFW::TimelineManager::GetSingleton().IsUserRotationAllowed(a_pluginHandle, a_timelineID);
+}
+
+bool Messaging::FCFWInterface::SetFollowGround(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, bool a_follow, float a_minHeight) const noexcept {
+    return FCFW::TimelineManager::GetSingleton().SetFollowGround(a_pluginHandle, a_timelineID, a_follow, a_minHeight);
+}
+
+bool Messaging::FCFWInterface::IsGroundFollowingEnabled(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID) const noexcept {
+    return FCFW::TimelineManager::GetSingleton().IsGroundFollowingEnabled(a_pluginHandle, a_timelineID);
+}
+
+float Messaging::FCFWInterface::GetMinHeightAboveGround(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID) const noexcept {
+    return FCFW::TimelineManager::GetSingleton().GetMinHeightAboveGround(a_pluginHandle, a_timelineID);
+}
+
+bool Messaging::FCFWInterface::SetMenuVisibility(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, bool a_show) const noexcept {
+    return FCFW::TimelineManager::GetSingleton().SetMenuVisibility(a_pluginHandle, a_timelineID, a_show);
+}
+
+bool Messaging::FCFWInterface::AreMenusVisible(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID) const noexcept {
+    return FCFW::TimelineManager::GetSingleton().AreMenusVisible(a_pluginHandle, a_timelineID);
 }
 
 bool Messaging::FCFWInterface::SetPlaybackMode(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, FCFW_API::PlaybackMode a_playbackMode, float a_loopTimeOffset) const noexcept {

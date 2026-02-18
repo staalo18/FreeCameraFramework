@@ -1,86 +1,135 @@
 # FreeCameraFramework Timeline (YAML format)
 formatVersion: 1
 
-playbackMode: wait
-loopTimeOffset: 0.0
+playbackMode: end
+loopTimeOffset: 0
 globalEaseIn: false
 globalEaseOut: false
 showMenusDuringPlayback: false
-allowUserRotation: true
+allowUserRotation: false
+followGround: true
+minHeightAboveGround: 0
 useDegrees: true
 
 translationPoints:
   - time: 0
     type: world
-    position: [5103.1, -15151.4, -5098.13]
+    position: [5408.34668, -15127.415, -4877.28613]
     interpolationMode: cubicHermite
-  - time: 1
+    easeIn: true
+    easeOut: false
+  - time: 0.0278333295
     type: world
-    position: [5104.75, -15171.3, -5098.24]
+    position: [5408.34668, -15127.415, -4877.28613]
     interpolationMode: cubicHermite
-  - time: 2
+    easeIn: false
+    easeOut: false
+  - time: 1.0418334
     type: world
-    position: [5060.46, -16146.7, -4988.79]
+    position: [4913.82227, -15019.9443, -5051.08887]
     interpolationMode: cubicHermite
-  - time: 3
+    easeIn: false
+    easeOut: false
+  - time: 2.05333424
     type: world
-    position: [4440.37, -16498.3, -4865.96]
+    position: [4446.24951, -15359.8643, -5089.03662]
     interpolationMode: cubicHermite
-  - time: 4
+    easeIn: false
+    easeOut: false
+  - time: 3.05716825
     type: world
-    position: [3876.84, -16041.7, -4908.09]
+    position: [4707.44824, -15841.6562, -4923.51611]
     interpolationMode: cubicHermite
-  - time: 5
+    easeIn: false
+    easeOut: false
+  - time: 4.07133532
     type: world
-    position: [4250.91, -15494.1, -5078.12]
+    position: [5286.43604, -15659.4785, -4853.13086]
     interpolationMode: cubicHermite
-  - time: 6
+    easeIn: false
+    easeOut: false
+  - time: 5.08416557
     type: world
-    position: [5021.69, -15739.6, -5127.54]
+    position: [5513.76074, -14945.209, -4846.46045]
     interpolationMode: cubicHermite
-  - time: 7
+    easeIn: false
+    easeOut: false
+  - time: 6.10866785
     type: world
-    position: [5604.94, -16201.2, -4872.48]
+    position: [4905.10742, -14773.9531, -4977.41748]
     interpolationMode: cubicHermite
-  - time: 8
+    easeIn: false
+    easeOut: false
+  - time: 7.1086688
     type: world
-    position: [5730.04, -17060.6, -4662.35]
+    position: [4663.43457, -14883.5254, -5064.97119]
     interpolationMode: cubicHermite
-
+    easeIn: false
+    easeOut: false
+  - time: 7.16150188
+    type: world
+    position: [4663.43457, -14883.5254, -5064.97119]
+    interpolationMode: cubicHermite
+    easeIn: false
+    easeOut: true
 rotationPoints:
   - time: 0
     type: world
-    rotation: [0.00615747, 3.06069]
+    rotation: [24.5928669, -73.9171066]
     interpolationMode: cubicHermite
-  - time: 1
+    easeIn: true
+    easeOut: false
+  - time: 0.0278333295
     type: world
-    rotation: [0.00553213, 3.05937]
+    rotation: [24.5928669, -73.9171066]
     interpolationMode: cubicHermite
-  - time: 2
+    easeIn: false
+    easeOut: false
+  - time: 1.0418334
     type: world
-    rotation: [6.06268, 3.68628]
+    rotation: [8.07487202, 271.964539]
     interpolationMode: cubicHermite
-  - time: 3
+    easeIn: false
+    easeOut: false
+  - time: 2.05333424
     type: world
-    rotation: [6.19836, 4.80869]
+    rotation: [354.901733, 190.588623]
     interpolationMode: cubicHermite
-  - time: 4
+    easeIn: false
+    easeOut: false
+  - time: 3.05716825
     type: world
-    rotation: [0.246377, 6.02453]
+    rotation: [341.242188, 116.836433]
     interpolationMode: cubicHermite
-  - time: 5
+    easeIn: false
+    easeOut: false
+  - time: 4.07133532
     type: world
-    rotation: [0.160888, 1.41267]
+    rotation: [354.766876, 50.9390984]
     interpolationMode: cubicHermite
-  - time: 6
+    easeIn: false
+    easeOut: false
+  - time: 5.08416557
     type: world
-    rotation: [6.16173, 2.08814]
+    rotation: [8.61877155, 321.709503]
     interpolationMode: cubicHermite
-  - time: 7
+    easeIn: false
+    easeOut: false
+  - time: 6.10866785
     type: world
-    rotation: [5.88728, 2.52834]
+    rotation: [15.8375378, 253.263214]
     interpolationMode: cubicHermite
-  - time: 8
+    easeIn: false
+    easeOut: false
+  - time: 7.1086688
     type: world
-    rotation: [6.19881, 3.61824]
+    rotation: [19.2174149, 242.771927]
     interpolationMode: cubicHermite
+    easeIn: false
+    easeOut: false
+  - time: 7.16150188
+    type: world
+    rotation: [19.2174149, 242.771927]
+    interpolationMode: cubicHermite
+    easeIn: false
+    easeOut: true

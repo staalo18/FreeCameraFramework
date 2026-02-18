@@ -319,7 +319,7 @@ log::error("{}: Invalid mod name '{}' or timeline ID {}", __FUNCTION__, a_modNam
             return point.y;
         }
 
-        bool StartPlayback(RE::StaticFunctionTag*, RE::BSFixedString a_modName, int a_timelineID, float a_speed, bool a_globalEaseIn, bool a_globalEaseOut, bool a_useDuration, float a_duration, bool a_followGround, float a_minHeightAboveGround, bool a_showMenusDuringPlayback, float a_startTime) {
+        bool StartPlayback(RE::StaticFunctionTag*, RE::BSFixedString a_modName, int a_timelineID, float a_speed, bool a_globalEaseIn, bool a_globalEaseOut, bool a_useDuration, float a_duration, float a_startTime) {
             if (a_modName.empty() || a_timelineID <= 0) {
                 return false;
             }
@@ -330,7 +330,7 @@ log::error("{}: Invalid mod name '{}' or timeline ID {}", __FUNCTION__, a_modNam
                 return false;
             }
 
-            return FCFW::TimelineManager::GetSingleton().StartPlayback(handle, static_cast<size_t>(a_timelineID), a_speed, a_globalEaseIn, a_globalEaseOut, a_useDuration, a_duration, a_followGround, a_minHeightAboveGround, a_showMenusDuringPlayback, a_startTime);
+            return FCFW::TimelineManager::GetSingleton().StartPlayback(handle, static_cast<size_t>(a_timelineID), a_speed, a_globalEaseIn, a_globalEaseOut, a_useDuration, a_duration, a_startTime);
         }
         
         bool StopPlayback(RE::StaticFunctionTag*, RE::BSFixedString a_modName, int a_timelineID) {
@@ -477,6 +477,76 @@ log::error("{}: Invalid mod name '{}' or timeline ID {}", __FUNCTION__, a_modNam
             return FCFW::TimelineManager::GetSingleton().IsUserRotationAllowed(handle, static_cast<size_t>(a_timelineID));
         }
 
+        bool SetFollowGround(RE::StaticFunctionTag*, RE::BSFixedString a_modName, std::int32_t a_timelineID, bool a_follow, float a_minHeight) {
+            if (a_modName.empty() || a_timelineID <= 0) {
+                return false;
+            }
+
+            SKSE::PluginHandle handle = FCFW::ModNameToHandle(a_modName.c_str());
+            if (handle == 0) {
+                log::error("{}: Invalid mod name '{}' - mod not loaded or doesn't exist", __FUNCTION__, a_modName.c_str());
+                return false;
+            }
+        
+            return FCFW::TimelineManager::GetSingleton().SetFollowGround(handle, static_cast<size_t>(a_timelineID), a_follow, a_minHeight);
+        }
+
+        bool IsGroundFollowingEnabled(RE::StaticFunctionTag*, RE::BSFixedString a_modName, std::int32_t a_timelineID) {
+            if (a_modName.empty() || a_timelineID <= 0) {
+                return false;
+            }
+
+            SKSE::PluginHandle handle = FCFW::ModNameToHandle(a_modName.c_str());
+            if (handle == 0) {
+                log::error("{}: Invalid mod name '{}' - mod not loaded or doesn't exist", __FUNCTION__, a_modName.c_str());
+                return false;
+            }
+        
+            return FCFW::TimelineManager::GetSingleton().IsGroundFollowingEnabled(handle, static_cast<size_t>(a_timelineID));
+        }
+
+        float GetMinHeightAboveGround(RE::StaticFunctionTag*, RE::BSFixedString a_modName, std::int32_t a_timelineID) {
+            if (a_modName.empty() || a_timelineID <= 0) {
+                return -1.0f;
+            }
+
+            SKSE::PluginHandle handle = FCFW::ModNameToHandle(a_modName.c_str());
+            if (handle == 0) {
+                log::error("{}: Invalid mod name '{}' - mod not loaded or doesn't exist", __FUNCTION__, a_modName.c_str());
+                return -1.0f;
+            }
+        
+            return FCFW::TimelineManager::GetSingleton().GetMinHeightAboveGround(handle, static_cast<size_t>(a_timelineID));
+        }
+
+        bool SetMenuVisibility(RE::StaticFunctionTag*, RE::BSFixedString a_modName, std::int32_t a_timelineID, bool a_show) {
+            if (a_modName.empty() || a_timelineID <= 0) {
+                return false;
+            }
+
+            SKSE::PluginHandle handle = FCFW::ModNameToHandle(a_modName.c_str());
+            if (handle == 0) {
+                log::error("{}: Invalid mod name '{}' - mod not loaded or doesn't exist", __FUNCTION__, a_modName.c_str());
+                return false;
+            }
+        
+            return FCFW::TimelineManager::GetSingleton().SetMenuVisibility(handle, static_cast<size_t>(a_timelineID), a_show);
+        }
+
+        bool AreMenusVisible(RE::StaticFunctionTag*, RE::BSFixedString a_modName, std::int32_t a_timelineID) {
+            if (a_modName.empty() || a_timelineID <= 0) {
+                return false;
+            }
+
+            SKSE::PluginHandle handle = FCFW::ModNameToHandle(a_modName.c_str());
+            if (handle == 0) {
+                log::error("{}: Invalid mod name '{}' - mod not loaded or doesn't exist", __FUNCTION__, a_modName.c_str());
+                return false;
+            }
+        
+            return FCFW::TimelineManager::GetSingleton().AreMenusVisible(handle, static_cast<size_t>(a_timelineID));
+        }
+
         bool SetPlaybackMode(RE::StaticFunctionTag*, RE::BSFixedString a_modName, std::int32_t a_timelineID, std::int32_t a_playbackMode, float a_loopTimeOffset) {
             if (a_modName.empty() || a_timelineID <= 0) {
                 return false;
@@ -610,6 +680,11 @@ log::error("{}: Invalid mod name '{}' or timeline ID {}", __FUNCTION__, a_modNam
             a_vm->RegisterFunction("GetPlaybackTime", "FCFW_SKSEFunctions", GetPlaybackTime);
             a_vm->RegisterFunction("AllowUserRotation", "FCFW_SKSEFunctions", AllowUserRotation);
             a_vm->RegisterFunction("IsUserRotationAllowed", "FCFW_SKSEFunctions", IsUserRotationAllowed);
+            a_vm->RegisterFunction("SetFollowGround", "FCFW_SKSEFunctions", SetFollowGround);
+            a_vm->RegisterFunction("IsGroundFollowingEnabled", "FCFW_SKSEFunctions", IsGroundFollowingEnabled);
+            a_vm->RegisterFunction("GetMinHeightAboveGround", "FCFW_SKSEFunctions", GetMinHeightAboveGround);
+            a_vm->RegisterFunction("SetMenuVisibility", "FCFW_SKSEFunctions", SetMenuVisibility);
+            a_vm->RegisterFunction("AreMenusVisible", "FCFW_SKSEFunctions", AreMenusVisible);
             a_vm->RegisterFunction("SetPlaybackMode", "FCFW_SKSEFunctions", SetPlaybackMode);
             a_vm->RegisterFunction("AddTimelineFromFile", "FCFW_SKSEFunctions", AddTimelineFromFile);
             a_vm->RegisterFunction("ExportTimeline", "FCFW_SKSEFunctions", ExportTimeline);

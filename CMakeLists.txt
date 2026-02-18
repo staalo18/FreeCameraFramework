@@ -4,7 +4,7 @@ cmake_minimum_required(VERSION 3.21)
 
 # Set your project name. This will be the name of your SKSE .dll file.
 set(NAME "FreeCameraFramework" CACHE STRING "")
-set(VERSION 0.9.5 CACHE STRING "")
+set(VERSION 1.0.0 CACHE STRING "")
 
 project(
 	${NAME}

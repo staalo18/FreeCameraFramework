@@ -18,6 +18,8 @@ globalEaseIn: false
 globalEaseOut: false
 showMenusDuringPlayback: false
 allowUserRotation: false
+followGround: true
+minHeightAboveGround: 0
 useDegrees: true
 
 translationPoints:
@@ -83,6 +85,17 @@ All global parameters are optional except `formatVersion`.
 - **Type:** boolean
 - **Default:** `false`
 - **Description:** Allow user to manually control camera rotation during playback
+
+### `followGround`
+- **Type:** boolean
+- **Default:** `true`
+- **Description:** Automatically adjust camera height to stay above ground level during playback. Prevents camera from going underground.
+
+### `minHeightAboveGround`
+- **Type:** float
+- **Default:** `0.0`
+- **Units:** Game units (Skyrim units)
+- **Description:** Minimum height above ground level when `followGround` is enabled. Camera will be raised if below this threshold.
 
 ### `useDegrees`
 - **Type:** boolean
@@ -179,6 +192,10 @@ Position relative to a reference object (NPC, marker, etc.).
 - `isOffsetRelative: boolean` (default: `false`)
   - `false` - Offset in world-space (Y axis = north)
   - `true` - Offset in reference's local space (rotates with reference heading)
+- `bodyPart: string` (default: `none`)
+  - Valid values: `none`, `head`, `torso`
+  - When set to a body part, offset is relative to that body part's position and rotation (for actors/characters)
+  - Only affects references that are actors; ignored for other reference types
 
 **Reference Resolution Priority:**
 1. If `editorID` present, look up by EditorID (load-order independent)
@@ -205,6 +222,7 @@ Position relative to a reference object (NPC, marker, etc.).
     formID: 0x14      # PlayerRef
   offset: [100.0, 0.0, 50.0]
   isOffsetRelative: true
+  bodyPart: head    # Track player's head position
   interpolationMode: linear
 ```
 

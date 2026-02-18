@@ -200,26 +200,36 @@ FCFW_SKSEFunctions.AddTranslationPoint(..., easeIn=false, easeOut=false, ...)
 
 **Ground-following** prevents the camera from going underground during playback:
 
+Ground-following is controlled via the `SetFollowGround()` function. Call this before or during playback:
+
 **Parameters:**
-- `followGround` (bool, default: true): Enable/disable ground-following
-- `minHeightAboveGround` (float, default: 0.0): Minimum clearance above terrain in units
+- `follow` (bool, default: true): Enable/disable ground-following
+- `minHeight` (float, default: 0.0): Minimum clearance above terrain in units
 
 **Behavior:**
-- When `followGround = true`, the camera's Z position is adjusted each frame to ensure it stays above ground/water level
-- If the interpolated camera height is below `minHeightAboveGround`, the camera is raised to maintain the minimum clearance
+- When ground-following is enabled, the camera's Z position is adjusted each frame to ensure it stays above ground/water level
+- If the interpolated camera height is below `minHeight`, the camera is raised to maintain the minimum clearance
 - Ground height includes water surfaces (uses `GetLandHeightWithWater`)
 - Only affects vertical (Z) position; horizontal (X, Y) movement is unchanged
+- Can be changed during playback - takes effect immediately
 
 **Example Usage:**
 ```papyrus
-; Enable ground-following with default minimum height (0.0) - this is the default
-FCFW_SKSEFunctions.StartPlayback(ModName, timelineID, 1.0, false, false, false, 0.0, true, 0.0)
+; Enable ground-following with default minimum height (0.0)
+FCFW_SKSEFunctions.SetFollowGround(ModName, timelineID, follow = true, minHeight = 0.0)
 
 ; Keep camera at least 100 units above ground
-FCFW_SKSEFunctions.StartPlayback(ModName, timelineID, 1.0, false, false, false, 0.0, true, 100.0)
+FCFW_SKSEFunctions.SetFollowGround(ModName, timelineID, follow = true, minHeight = 100.0)
 
 ; Disable ground-following (allow underground camera)
-FCFW_SKSEFunctions.StartPlayback(ModName, timelineID, 1.0, false, false, false, 0.0, false, 0.0)
+FCFW_SKSEFunctions.SetFollowGround(ModName, timelineID, follow = false, minHeight = 0.0)
+
+; Start playback (ground-following already configured)
+FCFW_SKSEFunctions.StartPlayback(ModName, timelineID)
+
+; Query current settings
+bool isFollowing = FCFW_SKSEFunctions.IsGroundFollowingEnabled(ModName, timelineID)
+float minHeight = FCFW_SKSEFunctions.GetMinHeightAboveGround(ModName, timelineID)
 ```
 
 **Use Cases:**
@@ -227,6 +237,66 @@ FCFW_SKSEFunctions.StartPlayback(ModName, timelineID, 1.0, false, false, false, 
 - Prevent camera from clipping through ground when terrain has changed
 - Maintain minimum clearance for better visibility
 - Underwater sequences (disable ground-following)
+
+### Runtime Controls vs Playback Configuration
+
+FCFW organizes parameters into three categories:
+
+**1. Timeline Properties** - Set during timeline definition (affect how timeline behaves):
+- `SetPlaybackMode()` - Controls end-of-timeline behavior (end/loop/wait)
+
+**2. Playback Configuration** - Set at StartPlayback (locked for duration of playback):
+- `speed` - Playback speed multiplier
+- `globalEaseIn/globalEaseOut` - Apply easing to entire timeline
+- `useDuration/duration` - Play timeline over specific duration
+- `startTime` - Resume from specific time
+
+**3. Runtime Controls** - Can be changed before or during playback:
+- `AllowUserRotation()` - Enable/disable user camera rotation
+- `SetFollowGround()` - Control ground-following behavior
+- `SetMenuVisibility()` - Show/hide menus during playback
+
+This separation allows runtime adjustments without restarting playback.
+
+### Default Values
+
+When a timeline is first registered, runtime controls are initialized with these defaults:
+
+| Runtime Control | Default Value | Matches Old API Behavior |
+|----------------|---------------|-------------------------|
+| `followGround` | `true` | ✓ Yes |
+| `minHeightAboveGround` | `0.0` | ✓ Yes |
+| `showMenusDuringPlayback` | `false` | ✓ Yes |
+| `allowUserRotation` | `false` | ✓ Yes |
+
+**Important:** These defaults ensure that calling `StartPlayback()` without explicitly setting runtime controls produces the same behavior as the old API where these parameters were included in `StartPlayback()` with default values.
+
+**Default Reset Operations:**
+
+The following operations reset runtime controls to their defaults:
+
+1. **`RegisterTimeline()`** - New timelines start with defaults
+2. **`ClearTimeline()`** - Clears points AND resets all runtime controls to defaults
+3. **`AddTimelineFromFile()`** - Sets defaults first, then loads YAML values (missing YAML fields keep defaults)
+
+**Example:**
+```papyrus
+; Register and start playback without setting runtime controls
+int timelineID = FCFW_SKSEFunctions.RegisterTimeline(ModName)
+; ... add points ...
+FCFW_SKSEFunctions.StartPlayback(ModName, timelineID)
+; Uses defaults: followGround=true, minHeight=0.0, showMenus=false, allowRotation=false
+
+; Clear timeline resets everything
+FCFW_SKSEFunctions.ClearTimeline(ModName, timelineID)
+; Runtime controls are back to defaults
+
+; Explicit configuration
+FCFW_SKSEFunctions.SetFollowGround(ModName, timelineID, follow = false)
+FCFW_SKSEFunctions.SetMenuVisibility(ModName, timelineID, show = true)
+FCFW_SKSEFunctions.StartPlayback(ModName, timelineID)
+; Uses configured values: followGround=false, showMenus=true
+```
 
 ### Ownership
 
@@ -690,14 +760,34 @@ endif
 - All translation and rotation points
 - Interpolation and easing settings
 - Playback mode configuration
+- Runtime control settings (followGround, minHeightAboveGround, showMenusDuringPlayback, allowUserRotation)
+- Global easing settings (globalEaseIn, globalEaseOut)
 - Reference formIDs (load-order independent)
 - TimelineIDs are NOT saved in YAML, as these are allocated dynamically during runtime.
+
+**Runtime Controls in Export:**
+When exporting, the current values of all runtime controls are saved to the YAML file. This allows you to:
+- Share timeline configurations with consistent behavior
+- Preserve carefully tuned settings across sessions
+- Create template timelines with pre-configured runtime controls
 
 ### Importing Timelines
 
 **Load timelines from YAML files:**
 
 NOTE: TimelineIDs are NOT saved in YAML as these are allocated dynamically during runtime. Import requires valid timelineID.
+
+**Default Handling:** When importing, FCFW first sets all runtime controls and global easing settings to their defaults, then loads values from the YAML file. This ensures:
+- Missing YAML fields use appropriate defaults
+- Backwards compatibility with older YAML files that don't include all fields
+- Consistent behavior when importing partial timeline definitions
+
+**Import Process:**
+1. Set all runtime controls to defaults (followGround=true, minHeight=0.0, showMenus=false, allowRotation=false)
+2. Set global easing to defaults (globalEaseIn=false, globalEaseOut=false)
+3. Load YAML file
+4. Override defaults with any values present in YAML
+5. Import translation and rotation points
 
 ```papyrus
 string filename = "MyTimeline.yaml"

@@ -326,8 +326,10 @@ Event OnKeyDown(int keyCode)
             BuildTimeline2() 
             BuildReturnTimeline(timeline3ID)
 
+            FCFW_SKSEFunctions.SetFollowGround(ModName, timeline1ID, follow = true, minHeight = 100.0)
+
             ; Start playback
-            if !FCFW_SKSEFunctions.StartPlayback(ModName, timeline1ID, minHeightAboveGround = 100.0)
+            if !FCFW_SKSEFunctions.StartPlayback(ModName, timeline1ID)
                 Debug.Trace("FCFW_EXAMPLE: ERROR - Failed to start playback")
                 Debug.Notification("FCFW Example: Failed to start playback")
             endif
@@ -623,9 +625,11 @@ Function RestorePlaybackState()
         return
     endif
            
+    ; Restore ground following settings
+    FCFW_SKSEFunctions.SetFollowGround(ModName, timelineToRestore, follow = true, minHeight = savedMinHeightAboveGround)
+
     ; Resume playback at the saved time
     bool success = FCFW_SKSEFunctions.StartPlayback(modName = ModName, timelineID = timelineToRestore, \
-        minHeightAboveGround = savedMinHeightAboveGround, \
         startTime = savedPlaybackTime)  ; <-- Resume at saved time!
     
     if success

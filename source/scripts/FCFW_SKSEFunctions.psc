@@ -219,12 +219,11 @@ float Function GetRotationPointYaw(string modName, int timelineID, int index) gl
 ; useDuration: if true, plays timeline over duration seconds
 ;              if false (default), plays timeline with speed as speed multiplier
 ; duration: total duration in seconds for entire timeline, only used if useDuration=true (default: 0.0)
-; followGround: if true, keeps camera above ground/water level during playback (default: true)
-; minHeightAboveGround: minimum height above ground when following ground (default: 0.0)
-; showMenusDuringPlayback: if true, keeps menus visible during playback; if false, hides menus (default: false)
 ; startTime: start playback at this time in seconds (default: 0.0 = start from beginning). Useful for resuming playback after save/load.
 ; Returns: true on success, false on failure
-bool Function StartPlayback(string modName, int timelineID, float speed = 1.0, bool globalEaseIn = false, bool globalEaseOut = false, bool useDuration = false, float duration = 0.0, bool followGround = true, float minHeightAboveGround = 0.0, bool showMenusDuringPlayback = false, float startTime = 0.0) global native
+; NOTE: To control ground following, menu visibility, and user rotation, use the separate SetFollowGround(),
+;       SetMenuVisibility(), and AllowUserRotation() functions before or during playback.
+bool Function StartPlayback(string modName, int timelineID, float speed = 1.0, bool globalEaseIn = false, bool globalEaseOut = false, bool useDuration = false, float duration = 0.0, float startTime = 0.0) global native
 
 ; Stop playback of the camera timeline
 ; Stop playback of a camera path timeline
@@ -296,6 +295,43 @@ bool Function AllowUserRotation(string modName, int timelineID, bool allow) glob
 ; timelineID: timeline ID to check
 ; Returns: true if user can control rotation, false otherwise
 bool Function IsUserRotationAllowed(string modName, int timelineID) global native
+
+; Enable or disable ground following for a timeline
+; Ground following keeps the camera above the ground/water during playback
+; Can be called before or during playback - takes effect immediately
+; modName: name of your mod's ESP/ESL file (e.g., "MyMod.esp")
+; timelineID: timeline ID to configure
+; follow: true to enable ground following, false to disable (default: true)
+; minHeight: minimum height above ground/water when following (default: 0.0)
+; Returns: true on success, false on failure
+bool Function SetFollowGround(string modName, int timelineID, bool follow, float minHeight = 0.0) global native
+
+; Check if ground following is enabled for a timeline
+; modName: name of your mod's ESP/ESL file (e.g., "MyMod.esp")
+; timelineID: timeline ID to check
+; Returns: true if ground following enabled, false otherwise
+bool Function IsGroundFollowingEnabled(string modName, int timelineID) global native
+
+; Get the minimum height above ground for a timeline
+; modName: name of your mod's ESP/ESL file (e.g., "MyMod.esp")
+; timelineID: timeline ID to query
+; Returns: minimum height in game units, or -1.0 on error
+float Function GetMinHeightAboveGround(string modName, int timelineID) global native
+
+; Set menu visibility during timeline playback
+; Controls whether menus are shown or hidden during playback
+; Can be called before or during playback - takes effect immediately
+; modName: name of your mod's ESP/ESL file (e.g., "MyMod.esp")
+; timelineID: timeline ID to configure
+; show: true to show menus during playback, false to hide (default: false)
+; Returns: true on success, false on failure
+bool Function SetMenuVisibility(string modName, int timelineID, bool show) global native
+
+; Check if menus are visible during timeline playback
+; modName: name of your mod's ESP/ESL file (e.g., "MyMod.esp")
+; timelineID: timeline ID to check
+; Returns: true if menus visible, false otherwise
+bool Function AreMenusVisible(string modName, int timelineID) global native
 
 ; Set the playback mode and loop time offset for a timeline
 ; This determines what happens when the timeline reaches its end
