@@ -573,6 +573,8 @@ log::info("{}: Recentering grid to cell ({}, {})", __FUNCTION__, coords->cellX-1
         a_state->m_timeline.UpdatePlayback(deltaTime);
 
 //        RecenterGridAroundCameraIfNeeded();
+        // re-center audio to current camera position
+        CorrectAudioListener();
 
         // Apply global easing
         float sampleTime = a_state->m_timeline.GetPlaybackTime();

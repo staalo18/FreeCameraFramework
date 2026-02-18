@@ -240,6 +240,48 @@ namespace FCFW {
         return true;
     }
 
+    
+    void CorrectAudioListener() {
+        // re-centers the audio listener onto the camera position/orientation (required for free camera state)
+        // This function is authored by asdt123123, all credits go to them!
+        
+        auto* niCamera = RE::Main::WorldRootCamera();
+        if (!niCamera) return;
+
+        auto* bsAudio = RE::BSAudioManager::QPlatformInstance();
+
+        if (!bsAudio || !bsAudio->audioListener) return;
+
+        auto base = reinterpret_cast<std::uintptr_t>(bsAudio->audioListener);
+        auto* x3d = reinterpret_cast<RE::X3DAUDIO_LISTENER*>(base + 0x40);
+
+        const auto& pos = niCamera->world.translate;
+        const auto& rot = niCamera->world.rotate;
+
+        x3d->Position = {pos.x, pos.z, pos.y};
+
+        // Front is col0 (Right) and the Y-Z swapped
+        x3d->OrientFront = {rot.entry[0][0], rot.entry[2][0], rot.entry[1][0]};
+
+        // Top is col1 (Forward)and Y-Z swapped
+        x3d->OrientTop = {rot.entry[0][1], rot.entry[2][1], rot.entry[1][1]};
+
+        x3d->Velocity = {0.f, 0.f, 0.f};
+
+        // Update whatever this is for too
+        auto* f = reinterpret_cast<float*>(base + 0x08);
+        f[0] = pos.x;
+        f[1] = pos.y;
+        f[2] = pos.z;
+        f[3] = rot.entry[0][0];
+        f[4] = rot.entry[1][0];
+        f[5] = rot.entry[2][0];
+        f[6] = rot.entry[0][1];
+        f[7] = rot.entry[1][1];
+        f[8] = rot.entry[2][1];
+        f[9] = f[10] = f[11] = 0.f;
+    }
+
     // ===== Free Camera Direct Toggle (bypasses hooks) =====
     static std::uintptr_t g_freeCameraTrampoline = 0;
 
