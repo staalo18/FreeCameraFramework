@@ -58,6 +58,10 @@ int Messaging::FCFWInterface::AddRotationPointAtCamera(SKSE::PluginHandle a_plug
     return FCFW::TimelineManager::GetSingleton().AddRotationPointAtCamera(a_pluginHandle, a_timelineID, a_time, a_easeIn, a_easeOut, static_cast<FCFW::InterpolationMode>(a_interpolationMode));
 }
 
+int Messaging::FCFWInterface::AddFOVPoint(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, float a_time, float a_fov, bool a_easeIn, bool a_easeOut, FCFW_API::InterpolationMode a_interpolationMode) const noexcept {
+    return FCFW::TimelineManager::GetSingleton().AddFOVPoint(a_pluginHandle, a_timelineID, a_time, a_fov, a_easeIn, a_easeOut, static_cast<FCFW::InterpolationMode>(a_interpolationMode));
+}
+
 bool Messaging::FCFWInterface::StartRecording(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, float a_recordingInterval, bool a_append, float a_timeOffset) const noexcept {
     return FCFW::TimelineManager::GetSingleton().StartRecording(a_pluginHandle, a_timelineID, a_recordingInterval, a_append, a_timeOffset);
 }
@@ -74,6 +78,10 @@ bool Messaging::FCFWInterface::RemoveRotationPoint(SKSE::PluginHandle a_pluginHa
 	return FCFW::TimelineManager::GetSingleton().RemoveRotationPoint(a_pluginHandle, a_timelineID, a_index);
 }
 
+bool Messaging::FCFWInterface::RemoveFOVPoint(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, size_t a_index) const noexcept {
+	return FCFW::TimelineManager::GetSingleton().RemoveFOVPoint(a_pluginHandle, a_timelineID, a_index);
+}
+
 bool Messaging::FCFWInterface::ClearTimeline(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID) const noexcept {
 	return FCFW::TimelineManager::GetSingleton().ClearTimeline(a_pluginHandle, a_timelineID);
 }
@@ -86,12 +94,20 @@ int Messaging::FCFWInterface::GetRotationPointCount(SKSE::PluginHandle a_pluginH
 	return FCFW::TimelineManager::GetSingleton().GetRotationPointCount(a_pluginHandle, a_timelineID);
 }
 
+int Messaging::FCFWInterface::GetFOVPointCount(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID) const noexcept {
+	return FCFW::TimelineManager::GetSingleton().GetFOVPointCount(a_pluginHandle, a_timelineID);
+}
+
 RE::NiPoint3 Messaging::FCFWInterface::GetTranslationPoint(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, size_t a_index) const noexcept {
 	return FCFW::TimelineManager::GetSingleton().GetTranslationPoint(a_pluginHandle, a_timelineID, a_index);
 }
 
 RE::BSTPoint2<float> Messaging::FCFWInterface::GetRotationPoint(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, size_t a_index) const noexcept {
 	return FCFW::TimelineManager::GetSingleton().GetRotationPoint(a_pluginHandle, a_timelineID, a_index);
+}
+
+float Messaging::FCFWInterface::GetFOVPoint(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, size_t a_index) const noexcept {
+	return FCFW::TimelineManager::GetSingleton().GetFOVPoint(a_pluginHandle, a_timelineID, a_index);
 }
 
 bool Messaging::FCFWInterface::StartPlayback(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, float a_speed, bool a_globalEaseIn, bool a_globalEaseOut, bool a_useDuration, float a_duration, float a_startTime) const noexcept {

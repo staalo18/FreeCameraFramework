@@ -127,7 +127,8 @@ log::error("{}: Invalid mod name '{}' or timeline ID {}", __FUNCTION__, a_modNam
                 return -1;
             }
 
-            RE::BSTPoint2<float> rotation{a_pitch, a_yaw};
+            // Convert from degrees (Papyrus convention) to radians (C++ API)
+            RE::BSTPoint2<float> rotation{PI / 180.f * a_pitch, PI / 180.f * a_yaw};
             return FCFW::TimelineManager::GetSingleton().AddRotationPoint(handle, static_cast<size_t>(a_timelineID), a_time, rotation, a_easeIn, a_easeOut, ToInterpolationMode(a_interpolationMode));
         }
 
@@ -142,8 +143,23 @@ log::error("{}: Invalid mod name '{}' or timeline ID {}", __FUNCTION__, a_modNam
                 return -1;
             }
 
-            RE::BSTPoint2<float> offset{a_offsetPitch, a_offsetYaw};
+            // Convert from degrees (Papyrus convention) to radians (C++ API)
+            RE::BSTPoint2<float> offset{PI / 180.f * a_offsetPitch, PI / 180.f * a_offsetYaw};
             return FCFW::TimelineManager::GetSingleton().AddRotationPointAtRef(handle, static_cast<size_t>(a_timelineID), a_time, a_reference, ToBodyPart(a_bodyPart), offset, a_isOffsetRelative, a_easeIn, a_easeOut, ToInterpolationMode(a_interpolationMode));
+        }
+
+        int AddFOVPoint(RE::StaticFunctionTag*, RE::BSFixedString a_modName, int a_timelineID, float a_time, float a_fov, bool a_easeIn, bool a_easeOut, int a_interpolationMode) {
+            if (a_modName.empty() || a_timelineID <= 0) {
+                return -1;
+            }
+
+            SKSE::PluginHandle handle = FCFW::ModNameToHandle(a_modName.c_str());
+            if (handle == 0) {
+                log::error("{}: Invalid mod name '{}' - mod not loaded or doesn't exist", __FUNCTION__, a_modName.c_str());
+                return -1;
+            }
+
+            return FCFW::TimelineManager::GetSingleton().AddFOVPoint(handle, static_cast<size_t>(a_timelineID), a_time, a_fov, a_easeIn, a_easeOut, ToInterpolationMode(a_interpolationMode));
         }
 
         bool StartRecording(RE::StaticFunctionTag*, RE::BSFixedString a_modName, int a_timelineID, float a_recordingInterval, bool a_append, float a_timeOffset) {
@@ -202,6 +218,20 @@ log::error("{}: Invalid mod name '{}' or timeline ID {}", __FUNCTION__, a_modNam
             return FCFW::TimelineManager::GetSingleton().RemoveRotationPoint(handle, static_cast<size_t>(a_timelineID), static_cast<size_t>(a_index));
         }
 
+        bool RemoveFOVPoint(RE::StaticFunctionTag*, RE::BSFixedString a_modName, int a_timelineID, int a_index) {
+            if (a_modName.empty() || a_timelineID <= 0) {
+                return false;
+            }
+
+            SKSE::PluginHandle handle = FCFW::ModNameToHandle(a_modName.c_str());
+            if (handle == 0) {
+                log::error("{}: Invalid mod name '{}' - mod not loaded or doesn't exist", __FUNCTION__, a_modName.c_str());
+                return false;
+            }
+
+            return FCFW::TimelineManager::GetSingleton().RemoveFOVPoint(handle, static_cast<size_t>(a_timelineID), static_cast<size_t>(a_index));
+        }
+
         bool ClearTimeline(RE::StaticFunctionTag*, RE::BSFixedString a_modName, int a_timelineID) {
             if (a_modName.empty() || a_timelineID <= 0) {
                 return false;
@@ -242,6 +272,20 @@ log::error("{}: Invalid mod name '{}' or timeline ID {}", __FUNCTION__, a_modNam
             }
             
             return FCFW::TimelineManager::GetSingleton().GetRotationPointCount(handle, static_cast<size_t>(a_timelineID));
+        }
+
+        int GetFOVPointCount(RE::StaticFunctionTag*, RE::BSFixedString a_modName, int a_timelineID) {
+            if (a_modName.empty() || a_timelineID <= 0) {
+                return 0;
+            }
+
+            SKSE::PluginHandle handle = FCFW::ModNameToHandle(a_modName.c_str());
+            if (handle == 0) {
+                log::error("{}: Invalid mod name '{}' - mod not loaded or doesn't exist", __FUNCTION__, a_modName.c_str());
+                return 0;
+            }
+            
+            return FCFW::TimelineManager::GetSingleton().GetFOVPointCount(handle, static_cast<size_t>(a_timelineID));
         }
 
         float GetTranslationPointX(RE::StaticFunctionTag*, RE::BSFixedString a_modName, int a_timelineID, int a_index) {
@@ -317,6 +361,20 @@ log::error("{}: Invalid mod name '{}' or timeline ID {}", __FUNCTION__, a_modNam
 
             RE::BSTPoint2<float> point = FCFW::TimelineManager::GetSingleton().GetRotationPoint(handle, static_cast<size_t>(a_timelineID), static_cast<size_t>(a_index));
             return point.y;
+        }
+
+        float GetFOVPoint(RE::StaticFunctionTag*, RE::BSFixedString a_modName, int a_timelineID, int a_index) {
+            if (a_modName.empty() || a_timelineID <= 0 || a_index < 0) {
+                return 80.0f;
+            }
+
+            SKSE::PluginHandle handle = FCFW::ModNameToHandle(a_modName.c_str());
+            if (handle == 0) {
+                log::error("{}: Invalid mod name '{}' - mod not loaded or doesn't exist", __FUNCTION__, a_modName.c_str());
+                return 80.0f;
+            }
+
+            return FCFW::TimelineManager::GetSingleton().GetFOVPoint(handle, static_cast<size_t>(a_timelineID), static_cast<size_t>(a_index));
         }
 
         bool StartPlayback(RE::StaticFunctionTag*, RE::BSFixedString a_modName, int a_timelineID, float a_speed, bool a_globalEaseIn, bool a_globalEaseOut, bool a_useDuration, float a_duration, float a_startTime) {
@@ -656,18 +714,22 @@ log::error("{}: Invalid mod name '{}' or timeline ID {}", __FUNCTION__, a_modNam
             a_vm->RegisterFunction("AddRotationPointAtCamera", "FCFW_SKSEFunctions", AddRotationPointAtCamera);
             a_vm->RegisterFunction("AddRotationPoint", "FCFW_SKSEFunctions", AddRotationPoint);
             a_vm->RegisterFunction("AddRotationPointAtRef", "FCFW_SKSEFunctions", AddRotationPointAtRef);
+            a_vm->RegisterFunction("AddFOVPoint", "FCFW_SKSEFunctions", AddFOVPoint);
             a_vm->RegisterFunction("StartRecording", "FCFW_SKSEFunctions", StartRecording);
             a_vm->RegisterFunction("StopRecording", "FCFW_SKSEFunctions", StopRecording);
             a_vm->RegisterFunction("RemoveTranslationPoint", "FCFW_SKSEFunctions", RemoveTranslationPoint);
             a_vm->RegisterFunction("RemoveRotationPoint", "FCFW_SKSEFunctions", RemoveRotationPoint);
+            a_vm->RegisterFunction("RemoveFOVPoint", "FCFW_SKSEFunctions", RemoveFOVPoint);
             a_vm->RegisterFunction("ClearTimeline", "FCFW_SKSEFunctions", ClearTimeline);
             a_vm->RegisterFunction("GetTranslationPointCount", "FCFW_SKSEFunctions", GetTranslationPointCount);
             a_vm->RegisterFunction("GetRotationPointCount", "FCFW_SKSEFunctions", GetRotationPointCount);
+            a_vm->RegisterFunction("GetFOVPointCount", "FCFW_SKSEFunctions", GetFOVPointCount);
             a_vm->RegisterFunction("GetTranslationPointX", "FCFW_SKSEFunctions", GetTranslationPointX);
             a_vm->RegisterFunction("GetTranslationPointY", "FCFW_SKSEFunctions", GetTranslationPointY);
             a_vm->RegisterFunction("GetTranslationPointZ", "FCFW_SKSEFunctions", GetTranslationPointZ);
             a_vm->RegisterFunction("GetRotationPointPitch", "FCFW_SKSEFunctions", GetRotationPointPitch);
             a_vm->RegisterFunction("GetRotationPointYaw", "FCFW_SKSEFunctions", GetRotationPointYaw);
+            a_vm->RegisterFunction("GetFOVPoint", "FCFW_SKSEFunctions", GetFOVPoint);
             a_vm->RegisterFunction("StartPlayback", "FCFW_SKSEFunctions", StartPlayback);
             a_vm->RegisterFunction("StopPlayback", "FCFW_SKSEFunctions", StopPlayback);
             a_vm->RegisterFunction("SwitchPlayback", "FCFW_SKSEFunctions", SwitchPlayback);

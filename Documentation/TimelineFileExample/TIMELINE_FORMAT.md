@@ -37,6 +37,13 @@ rotationPoints:
     interpolationMode: cubicHermite
     easeIn: false
     easeOut: false
+
+fovPoints:
+  - time: 0.0
+    fov: 80.0
+    interpolationMode: cubicHermite
+    easeIn: false
+    easeOut: false
 ```
 
 ---
@@ -335,6 +342,55 @@ Rotation relative to camera aim at playback start.
 
 ---
 
+## FOV Points
+
+FOV (Field of View) points define camera zoom level over time. Array: `fovPoints`
+
+**FOV Values:**
+- Valid range: 1-160 degrees
+- Default: 80 degrees
+- Lower values = zoomed in (telephoto effect)
+- Higher values = zoomed out (wide angle effect)
+- Values outside 1-160 range are clamped to 80 with warning logged
+
+**Required Fields:**
+- `time` - Time in seconds
+- `fov` - Field of view angle in degrees
+
+**Optional Fields:**
+- `interpolationMode` - Interpolation between this and next point (default: `cubicHermite`)
+  - `none` - Jump to FOV value instantly
+  - `linear` - Linear interpolation
+  - `cubicHermite` - Smooth curved transition
+- `easeIn` - Smooth acceleration from previous point (default: `false`)
+- `easeOut` - Smooth deceleration to this point (default: `false`)
+
+**Note:** FOV is always in world space. Unlike translation/rotation, there is no reference tracking or camera-relative mode.
+
+**Example (Zoom sequence):**
+```yaml
+fovPoints:
+  - time: 0.0
+    fov: 80.0                    # Start at default FOV
+    interpolationMode: cubicHermite
+    easeIn: false
+    easeOut: false
+    
+  - time: 3.0
+    fov: 30.0                    # Zoom in (telephoto)
+    interpolationMode: cubicHermite
+    easeIn: true
+    easeOut: true
+    
+  - time: 6.0
+    fov: 120.0                   # Zoom out (wide angle)
+    interpolationMode: linear
+    easeIn: false
+    easeOut: false
+```
+
+---
+
 ## Complete Example
 
 ```yaml
@@ -380,6 +436,19 @@ rotationPoints:
     interpolationMode: linear
     easeIn: false
     easeOut: false
+
+fovPoints:
+  - time: 0.0
+    fov: 80.0
+    interpolationMode: cubicHermite
+    easeIn: false
+    easeOut: false
+    
+  - time: 2.0
+    fov: 60.0
+    interpolationMode: cubicHermite
+    easeIn: true
+    easeOut: true
 ```
 
 ---

@@ -402,6 +402,67 @@ namespace FCFW {
         BodyPart m_bodyPart;                   // Body part to extract rotation from (kReference only, requires m_isOffsetRelative=true)
     };
 
+    class FOVPoint {
+    public:
+        FOVPoint(
+            const Transition& a_transition = Transition(0.0f, InterpolationMode::kCubicHermite, false, false),
+            float a_fov = 80.0f)
+            : m_transition(a_transition)
+            , m_point(a_fov)
+            , m_pointType(PointType::kWorld)
+            , m_reference(nullptr) {
+            // Clamp FOV to valid range (1-160 degrees)
+            if (m_point < 1.0f || m_point > 160.0f) {
+                log::warn("{}: FOV value {} out of range [1, 160], clamping to 80.0", __FUNCTION__, m_point);
+                m_point = 80.0f;
+            }
+        }
+
+        float GetPointAtCamera() const {
+            return RE::PlayerCamera::GetSingleton()->worldFOV;
+        }
+
+        float GetPoint() const {
+            return m_point;
+        }
+
+        bool IsNearlyEqual(const FOVPoint& other) const {
+            return std::abs(m_point - other.m_point) < EPSILON_COMPARISON;
+        }
+
+        FOVPoint LinearInterpolate(const FOVPoint& p1, const FOVPoint& p2, float t) const {
+            FOVPoint result;
+            result.m_transition = m_transition;
+            result.m_point = p1.m_point + t * (p2.m_point - p1.m_point);
+            return result;
+        }
+
+        FOVPoint CubicHermite(const FOVPoint& p0, const FOVPoint& p1,
+                              const FOVPoint& p2, const FOVPoint& p3, float t) const {
+            FOVPoint result;
+            result.m_transition = m_transition;
+            result.m_point = CubicHermiteInterpolate(p0.m_point, p1.m_point, p2.m_point, p3.m_point, t);
+            return result;
+        }
+
+        FOVPoint operator+(const FOVPoint& other) const {
+            return FOVPoint(m_transition, m_point + other.m_point);
+        }
+
+        FOVPoint operator-(const FOVPoint& other) const {
+            return FOVPoint(m_transition, m_point - other.m_point);
+        }
+
+        FOVPoint operator*(float scalar) const {
+            return FOVPoint(m_transition, m_point * scalar);
+        }
+
+        Transition m_transition;
+        mutable float m_point;  // FOV value in degrees (1-160)
+        PointType m_pointType;  // Always kWorld (dummy for template compatibility)
+        RE::TESObjectREFR* m_reference;  // Always nullptr (dummy for template compatibility)
+    };
+
     template<typename TransitionPoint>
     class CameraPath {
     public:
@@ -457,7 +518,7 @@ namespace FCFW {
         size_t GetPointCount() const { return m_points.size(); }
 
         // Update all camera points - store current camera value into m_point
-        void UpdateCameraPoints() {
+        virtual void UpdateCameraPoints() {
             for (auto& point : m_points) {
                 if (point.m_pointType == PointType::kCamera) {
                     point.m_point = point.GetPointAtCamera();
@@ -488,6 +549,17 @@ namespace FCFW {
         using ValueType = RE::BSTPoint2<float>;  // Type returned by GetPoint()
         
         RotationPoint GetPointAtCamera(float a_time, bool a_easeIn, bool a_easeOut) const override;
+        
+        bool AddPathFromFile(const std::string& a_filePath, float a_timeOffset = 0.0f, float a_conversionFactor = 1.0f);
+        bool ExportPath(std::ofstream& a_file, float a_conversionFactor = 1.0f) const;
+    };
+
+    class FOVPath : public CameraPath<FOVPoint> {
+    public:
+        using TransitionPoint = FOVPoint;
+        using ValueType = float;  // Type returned by GetPoint()
+        
+        FOVPoint GetPointAtCamera(float a_time, bool a_easeIn, bool a_easeOut) const override;
         
         bool AddPathFromFile(const std::string& a_filePath, float a_timeOffset = 0.0f, float a_conversionFactor = 1.0f);
         bool ExportPath(std::ofstream& a_file, float a_conversionFactor = 1.0f) const;

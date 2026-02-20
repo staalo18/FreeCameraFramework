@@ -145,11 +145,11 @@ if(DEFINED OUTPUT_FOLDER)
         VERBATIM
     )
 
-    # Copy FCFW_PAPYRUS_REFERENCE.md to Documentation folder
+    # Copy FCFW_DEVELOPER_REFERENCE.md to Documentation folder
     add_custom_command(
         TARGET "${PROJECT_NAME}"
         POST_BUILD
-        COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${CMAKE_CURRENT_SOURCE_DIR}/Documentation/FCFW_PAPYRUS_REFERENCE.md" "${DOCUMENTATION_FOLDER}/FCFW_PAPYRUS_REFERENCE.md"
+        COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${CMAKE_CURRENT_SOURCE_DIR}/Documentation/FCFW_DEVELOPER_REFERENCE.md" "${DOCUMENTATION_FOLDER}/FCFW_DEVELOPER_REFERENCE.md"
         VERBATIM
     )
 

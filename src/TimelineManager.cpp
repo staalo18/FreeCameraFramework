@@ -231,6 +231,7 @@ log::info("{}: Sent Papyrus event '{}' for timeline {} to {} receivers", __FUNCT
         // Add initial point
         RE::NiPoint3 cameraPos = _ts_SKSEFunctions::GetCameraPos();
         RE::NiPoint3 cameraRot = _ts_SKSEFunctions::GetCameraRotation();
+        float fov = playerCamera ? playerCamera->worldFOV : 80.0f;
         
         Transition transTranslation(startTime, InterpolationMode::kCubicHermite, useEaseIn, false);
         TranslationPoint translationPoint(transTranslation, PointType::kWorld, cameraPos);
@@ -239,6 +240,10 @@ log::info("{}: Sent Papyrus event '{}' for timeline {} to {} receivers", __FUNCT
         Transition transRotation(startTime, InterpolationMode::kCubicHermite, useEaseIn, false);
         RotationPoint rotationPoint(transRotation, PointType::kWorld, RE::BSTPoint2<float>({cameraRot.x, cameraRot.z}));
         state->m_timeline.AddRotationPoint(rotationPoint);
+        
+        Transition transFOV(startTime, InterpolationMode::kCubicHermite, useEaseIn, false);
+        FOVPoint fovPoint(transFOV, fov);
+        state->m_timeline.AddFOVPoint(fovPoint);
         
         return true;
     }
@@ -272,6 +277,7 @@ log::info("{}: Sent Papyrus event '{}' for timeline {} to {} receivers", __FUNCT
 
         RE::NiPoint3 cameraPos = _ts_SKSEFunctions::GetCameraPos();
         RE::NiPoint3 cameraRot = _ts_SKSEFunctions::GetCameraRotation();
+        float fov = playerCamera ? playerCamera->worldFOV : 80.0f;
         
         Transition transTranslation(state->m_currentRecordingTime, InterpolationMode::kCubicHermite, false, true);
         TranslationPoint translationPoint(transTranslation, PointType::kWorld, cameraPos);
@@ -280,6 +286,10 @@ log::info("{}: Sent Papyrus event '{}' for timeline {} to {} receivers", __FUNCT
         Transition transRotation(state->m_currentRecordingTime, InterpolationMode::kCubicHermite, false, true);
         RotationPoint rotationPoint(transRotation, PointType::kWorld, RE::BSTPoint2<float>({cameraRot.x, cameraRot.z}));
         state->m_timeline.AddRotationPoint(rotationPoint);
+        
+        Transition transFOV(state->m_currentRecordingTime, InterpolationMode::kCubicHermite, false, true);
+        FOVPoint fovPoint(transFOV, fov);
+        state->m_timeline.AddFOVPoint(fovPoint);
         
         ToggleFreeCameraNotHooked();
         
@@ -417,6 +427,25 @@ log::info("{}: Sent Papyrus event '{}' for timeline {} to {} receivers", __FUNCT
         return static_cast<int>(state->m_timeline.AddRotationPoint(point));
     }
 
+    int TimelineManager::AddFOVPoint(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, float a_time, float a_fov, bool a_easeIn, bool a_easeOut, InterpolationMode a_interpolationMode) {
+        std::lock_guard<std::recursive_mutex> lock(m_timelineMutex);
+        
+        TimelineState* state = GetTimeline(a_timelineID, a_pluginHandle);
+        if (!state) {
+            return -1;
+        }
+        
+        if (state->m_isPlaybackRunning) {
+            log::info("{}: Timeline modified during playback, stopping playback", __FUNCTION__);
+            StopPlayback(a_pluginHandle, a_timelineID);
+        }
+        
+        Transition transition(a_time, a_interpolationMode, a_easeIn, a_easeOut);
+        FOVPoint point(transition, a_fov);
+        
+        return static_cast<int>(state->m_timeline.AddFOVPoint(point));
+    }
+
     bool TimelineManager::RemoveTranslationPoint(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, size_t a_index) {
         std::lock_guard<std::recursive_mutex> lock(m_timelineMutex);
         
@@ -451,8 +480,30 @@ log::info("{}: Sent Papyrus event '{}' for timeline {} to {} receivers", __FUNCT
         return true;
     }
 
-    std::int32_t cellX = 0;
-    std::int32_t cellY = 0;
+    bool TimelineManager::RemoveFOVPoint(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, size_t a_index) {
+        std::lock_guard<std::recursive_mutex> lock(m_timelineMutex);
+        
+        TimelineState* state = GetTimeline(a_timelineID, a_pluginHandle);
+        if (!state) {
+            return false;
+        }
+        
+        if (state->m_isPlaybackRunning) {
+            log::info("{}: Timeline modified during playback, stopping playback", __FUNCTION__);
+            StopPlayback(a_pluginHandle, a_timelineID);
+        }
+        
+        state->m_timeline.RemoveFOVPoint(a_index);
+        return true;
+    }
+/* Experimentation for handling camera movements across multiple cells
+
+    std::int32_t m_currentCellX = 0;
+    std::int32_t m_currentCellY = 0;
+    std::int32_t m_initialCellX = 0;
+    std::int32_t m_initialCellY = 0;
+    RE::NiPoint3 m_initialPlayerPosition;
+    bool m_isPlayerAtInitialPosition = true;
 
     void TimelineManager::RecenterGridAroundCameraIfNeeded()
     {
@@ -462,68 +513,45 @@ log::info("{}: Sent Papyrus event '{}' for timeline {} to {} receivers", __FUNCT
             return;
         }
 
+        auto player = RE::PlayerCharacter::GetSingleton();
+        if (!player) {
+            log::error("{}: PlayerCharacter not available", __FUNCTION__);
+            return;
+        }
+
         auto cameraPos = _ts_SKSEFunctions::GetCameraPos();
         // Calculate cell coordinates manually (Skyrim cells are 4096 units)
         constexpr float CELL_SIZE = 4096.0f;
         std::int32_t cameraCellX = static_cast<std::int32_t>(std::floor(cameraPos.x / CELL_SIZE));
         std::int32_t cameraCellY = static_cast<std::int32_t>(std::floor(cameraPos.y / CELL_SIZE));
 
-        if (cameraCellX == cellX && cameraCellY == cellY) {
-            return;
+        float distanceToInitial = cameraPos.GetDistance(m_initialPlayerPosition);
+        float distanceToPlayer = cameraPos.GetDistance(player->GetPosition());
+
+        if ((cameraCellX  == m_initialCellX && cameraCellY == m_initialCellY) || distanceToInitial < CELL_SIZE) {
+            if (!m_isPlayerAtInitialPosition) {
+log::info("{}: Resetting player position to initial position", __FUNCTION__);
+                player->SetPosition(m_initialPlayerPosition, true);
+                
+//                player->Enable(true);
+                m_isPlayerAtInitialPosition = true;
+            }
+            m_currentCellX = cameraCellX;
+            m_currentCellY = cameraCellY;
+        } else if ((cameraCellX != m_currentCellX || cameraCellY != m_currentCellY) && distanceToPlayer > CELL_SIZE) {
+log::info("{}: Recentering grid to cell ({}, {})", __FUNCTION__, cameraCellX, cameraCellY);
+//            float landHeight = _ts_SKSEFunctions::GetLandHeightWithWater(cameraPos);
+//            cameraPos.z = landHeight + 10.0f;
+            
+            player->SetPosition(cameraPos, true);
+                        
+//            player->Disable();    
+            m_isPlayerAtInitialPosition = false;
+            m_currentCellX = cameraCellX;
+            m_currentCellY = cameraCellY;
         }
-        auto playPos = RE::PlayerCharacter::GetSingleton()->GetPosition();
-        std::int32_t playerCellX = static_cast<std::int32_t>(std::floor(playPos.x / CELL_SIZE));
-        std::int32_t playerCellY = static_cast<std::int32_t>(std::floor(playPos.y / CELL_SIZE));
-log::info("{}: Camera is in cell ({}, {}), old cell is ({}, {}), player cell is ({}, {})", __FUNCTION__, cameraCellX, cameraCellY, cellX, cellY, playerCellX, playerCellY);           
-//        RE::PlayerCharacter::GetSingleton()->SetPosition(cameraPos, true);
-
-
-    // The function is likely a MEMBER function of GridCellArray or TES
-    // Signature is probably: void GridCellArray::Unk_Function(int32 cellX, int32 cellY)
-    // or: void TES::Unk_Function(int32 cellX, int32 cellY)
- /*   
-    auto base = REL::Module::get().base();
-    uintptr_t funcAddr = base + 0x5ECA6A;
-    
-    // Try as a member function of GridCellArray (this pointer is passed in RCX on x64)
-    using GridUpdateFunc = void(*)(RE::GridCellArray*, std::int32_t, std::int32_t);
-    auto updateFunc = reinterpret_cast<GridUpdateFunc>(funcAddr);
-    
-    log::info("{}: Calling master grid update function at 0x{:X} with cells ({}, {})", 
-              __FUNCTION__, funcAddr, cameraCellX, cameraCellY);
-    
-    // Call with gridCells as the 'this' pointer
-    updateFunc(tes->gridCells, cameraCellX, cameraCellY);
-   
-*/
-
-/*
-        cellX = cameraCellX;
-        cellY = cameraCellY;
-        return;
-
-        auto* targetCell = tes->GetCell(cameraPos);
-        if (!targetCell) {
-            log::error("{}: Target cell not found for camera position", __FUNCTION__);
-            return;
-        }
-
-        auto coords = targetCell->GetCoordinates();
-        if (!coords) {
-            log::error("{}: Cell coordinates not available", __FUNCTION__);
-            return;
-        }
-
-log::info("{}: Camera is in cell ({}, {}), current cell is ({}, {})", __FUNCTION__, coords->cellX-1, coords->cellY, tes->currentGridX, tes->currentGridY);
-
-        // Only re-center if we've moved significantly from current center
-        if (coords->cellX-1 != tes->currentGridX || coords->cellY != tes->currentGridY) {
-log::info("{}: Recentering grid to cell ({}, {})", __FUNCTION__, coords->cellX-1, coords->cellY);
-            tes->gridCells->SetCenter(coords->cellX-1, coords->cellY);
-        }
-*/
     }
-
+*/
     void TimelineManager::PlayTimeline(TimelineState* a_state) {
         if (!a_state || !a_state->m_isPlaybackRunning) {
             return;
@@ -590,6 +618,15 @@ log::info("{}: Recentering grid to cell ({}, {})", __FUNCTION__, coords->cellX-1
         
         // Get interpolated points
         RE::NiPoint3 cameraPos = a_state->m_timeline.GetTranslation(sampleTime);
+        
+        // Apply FOV if timeline has FOV points
+        if (a_state->m_timeline.GetFOVPointCount() > 0) {
+            playerCamera->worldFOV = a_state->m_timeline.GetFOV(sampleTime);
+log::info("{}:time: {}  - Setting FOV to {}", __FUNCTION__, sampleTime, playerCamera->worldFOV);
+        }
+        else {
+log::info("{}:time: {}  - No FOV points, using FOV {}", __FUNCTION__, sampleTime, playerCamera->worldFOV);
+        }
         // Apply ground-following if enabled
         if (a_state->m_followGround) {
             float landHeight = _ts_SKSEFunctions::GetLandHeightWithWater(cameraPos);
@@ -736,6 +773,9 @@ log::info("{}: Recentering grid to cell ({}, {})", __FUNCTION__, coords->cellX-1
             }
         }
         
+        // Save current FOV to restore after playback
+        state->m_savedFOV = playerCamera->worldFOV;
+        
         // Initialize timeline playback
         state->m_timeline.ResetPlayback();
         state->m_timeline.StartPlayback();
@@ -756,7 +796,23 @@ log::info("{}: Recentering grid to cell ({}, {})", __FUNCTION__, coords->cellX-1
             m_isShowingMenus = ui->IsShowingMenus();
             ui->ShowMenus(state->m_showMenusDuringPlayback);
         }
-        
+/* Experimentation for handling camera movements across multiple cells
+        // store initial player position
+        auto player = RE::PlayerCharacter::GetSingleton();
+        if (!player) {
+            log::error("{}: PlayerCharacter not available", __FUNCTION__);
+            return false;
+        }
+
+        m_initialPlayerPosition = player->GetPosition();
+        auto cameraPos = _ts_SKSEFunctions::GetCameraPos();
+        // Calculate cell coordinates manually (Skyrim cells are 4096 units)
+        constexpr float CELL_SIZE = 4096.0f;
+        m_initialCellX = static_cast<std::int32_t>(std::floor(cameraPos.x / CELL_SIZE));
+        m_initialCellY = static_cast<std::int32_t>(std::floor(cameraPos.y / CELL_SIZE));
+        m_currentCellX = m_initialCellX;
+        m_currentCellY = m_initialCellY;
+*/        
         // Enter free camera mode
         ToggleFreeCameraNotHooked();
         
@@ -789,6 +845,17 @@ log::info("{}: Recentering grid to cell ({}, {})", __FUNCTION__, coords->cellX-1
         }
         
         return static_cast<int>(state->m_timeline.GetRotationPointCount());
+    }
+
+    int TimelineManager::GetFOVPointCount(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID) const {
+        std::lock_guard<std::recursive_mutex> lock(m_timelineMutex);
+        
+        const TimelineState* state = GetTimeline(a_timelineID, a_pluginHandle);
+        if (!state) {
+            return -1;
+        }
+        
+        return static_cast<int>(state->m_timeline.GetFOVPointCount());
     }
 
     
@@ -830,6 +897,9 @@ log::info("{}: Recentering grid to cell ({}, {})", __FUNCTION__, coords->cellX-1
                     cameraState->freeRotation = m_lastFreeRotation;
                 }
             }
+            
+            // Restore FOV to pre-playback value
+            playerCamera->worldFOV = state->m_savedFOV;
         }
         
         // Clear active state
@@ -1062,6 +1132,23 @@ log::info("{}: Recentering grid to cell ({}, {})", __FUNCTION__, coords->cellX-1
         return state->m_timeline.GetRotationPoint(a_index);
     }
 
+    float TimelineManager::GetFOVPoint(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, size_t a_index) const {
+        std::lock_guard<std::recursive_mutex> lock(m_timelineMutex);
+        
+        const TimelineState* state = GetTimeline(a_timelineID, a_pluginHandle);
+        if (!state) {
+            log::error("{}: Timeline {} not found or not owned by plugin handle {}", __FUNCTION__, a_timelineID, a_pluginHandle);
+            return 80.0f;
+        }
+        
+        if (a_index >= state->m_timeline.GetFOVPointCount()) {
+            log::error("{}: Index {} out of range (timeline {} has {} FOV points)", __FUNCTION__, a_index, a_timelineID, state->m_timeline.GetFOVPointCount());
+            return 80.0f;
+        }
+        
+        return state->m_timeline.GetFOVPoint(a_index);
+    }
+
     bool TimelineManager::AllowUserRotation(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, bool a_allow) {
         std::lock_guard<std::recursive_mutex> lock(m_timelineMutex);
         
@@ -1242,9 +1329,11 @@ log::info("{}: Loading timeline from YAML file: {}", __FUNCTION__, a_filePath);
         
         size_t translationPointCount = state->m_timeline.GetTranslationPointCount();
         size_t rotationPointCount = state->m_timeline.GetRotationPointCount();
+        size_t fovPointCount = state->m_timeline.GetFOVPointCount();
         
         bool importTranslationSuccess = state->m_timeline.AddTranslationPathFromFile(fullPath.string(), a_timeOffset);
         bool importRotationSuccess = state->m_timeline.AddRotationPathFromFile(fullPath.string(), a_timeOffset, rotationConversionFactor);
+        bool importFOVSuccess = state->m_timeline.AddFOVPathFromFile(fullPath.string(), a_timeOffset);
         
         if (!importTranslationSuccess) {
             log::error("{}: Failed to import translation points from YAML file: {}", __FUNCTION__, a_filePath);
@@ -1256,9 +1345,17 @@ log::info("{}: Loading timeline from YAML file: {}", __FUNCTION__, a_filePath);
             return false;
         }
         
-log::info("{}: Loaded {} translation and {} rotation points from {} to timeline {}", 
-__FUNCTION__, state->m_timeline.GetTranslationPointCount() - translationPointCount, 
-state->m_timeline.GetRotationPointCount() - rotationPointCount, a_filePath, a_timelineID);
+        if (!importFOVSuccess) {
+            log::error("{}: Failed to import FOV points from YAML file: {}", __FUNCTION__, a_filePath);
+            return false;
+        }
+        
+        log::info("{}: Loaded {} translation, {} rotation, and {} FOV points from {} to timeline {}", 
+            __FUNCTION__, 
+            state->m_timeline.GetTranslationPointCount() - translationPointCount, 
+            state->m_timeline.GetRotationPointCount() - rotationPointCount,
+            state->m_timeline.GetFOVPointCount() - fovPointCount,
+            a_filePath, a_timelineID);
 
         return true;
     }
@@ -1294,21 +1391,26 @@ state->m_timeline.GetRotationPointCount() - rotationPointCount, a_filePath, a_ti
 		file << "minHeightAboveGround: " << state->m_minHeightAboveGround << "\n";
 		file << "useDegrees: true\n\n";
 		
-		// Export both translation and rotation paths to same file
+		// Export translation, rotation, and FOV paths to same file
 		bool exportTranslationSuccess = state->m_timeline.ExportTranslationPath(file);
-		file << "\n";  // Separate the two sections
+		file << "\n";  // Separate the sections
 		bool exportRotationSuccess = state->m_timeline.ExportRotationPath(file, 180.0f / PI);
+		file << "\n";  // Separate the sections
+		bool exportFOVSuccess = state->m_timeline.ExportFOVPath(file);
 		
 		file.close();
 		
-		if (!exportTranslationSuccess || !exportRotationSuccess) {
+		if (!exportTranslationSuccess || !exportRotationSuccess || !exportFOVSuccess) {
 			log::error("{}: Failed to export timeline to YAML file: {}", __FUNCTION__, a_filePath);
 			return false;
 		}
 		
-log::info("{}: Exported {} translation and {} rotation points from timeline {} to {}", 
-__FUNCTION__, state->m_timeline.GetTranslationPointCount(), 
-state->m_timeline.GetRotationPointCount(), a_timelineID, a_filePath);
+		log::info("{}: Exported {} translation, {} rotation, and {} FOV points from timeline {} to {}", 
+			__FUNCTION__, 
+			state->m_timeline.GetTranslationPointCount(), 
+			state->m_timeline.GetRotationPointCount(),
+			state->m_timeline.GetFOVPointCount(),
+			a_timelineID, a_filePath);
         return true;
     }
 
@@ -1487,9 +1589,10 @@ state->m_timeline.GetRotationPointCount(), a_timelineID, a_filePath);
         
         if (a_state->m_recordingInterval == 0.0f || 
             (a_state->m_currentRecordingTime - a_state->m_lastRecordedPointTime >= a_state->m_recordingInterval)) {
-            // Capture camera position/rotation as kWorld points
+            // Capture camera position/rotation/FOV as kWorld points
             RE::NiPoint3 cameraPos = _ts_SKSEFunctions::GetCameraPos();
             RE::NiPoint3 cameraRot = _ts_SKSEFunctions::GetCameraRotation();
+            float fov = playerCamera ? playerCamera->worldFOV : 80.0f;
             
             Transition transTranslation(a_state->m_currentRecordingTime, InterpolationMode::kCubicHermite, false, false);
             TranslationPoint translationPoint(transTranslation, PointType::kWorld, cameraPos);
@@ -1498,6 +1601,10 @@ state->m_timeline.GetRotationPointCount(), a_timelineID, a_filePath);
             Transition transRotation(a_state->m_currentRecordingTime, InterpolationMode::kCubicHermite, false, false);
             RotationPoint rotationPoint(transRotation, PointType::kWorld, RE::BSTPoint2<float>({cameraRot.x, cameraRot.z}));
             a_state->m_timeline.AddRotationPoint(rotationPoint);
+            
+            Transition transFOV(a_state->m_currentRecordingTime, InterpolationMode::kCubicHermite, false, false);
+            FOVPoint fovPoint(transFOV, fov);
+            a_state->m_timeline.AddFOVPoint(fovPoint);
             
             a_state->m_lastRecordedPointTime = a_state->m_currentRecordingTime;
         }

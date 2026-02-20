@@ -63,6 +63,7 @@ namespace FCFW
 
 	using TranslationTrack = TimelineTrack<TranslationPath>;
 	using RotationTrack = TimelineTrack<RotationPath>;
+	using FOVTrack = TimelineTrack<FOVPath>;
 
 	template <typename PathType>
 	void TimelineTrack<PathType>::AddPoint(const TransitionPoint& a_point)

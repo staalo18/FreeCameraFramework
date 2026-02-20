@@ -209,6 +209,22 @@ namespace FCFW_API {
 		[[nodiscard]] virtual int AddRotationPointAtCamera(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, float a_time, bool a_easeIn = false, bool a_easeOut = false, InterpolationMode a_interpolationMode = InterpolationMode::kCubicHermite) const noexcept = 0;
 
 		/// <summary>
+		/// Add a FOV (Field of View) point to the timeline.
+		/// FOV controls camera zoom level in degrees (1-160, default 80).
+		/// </summary>
+		/// <param name="a_pluginHandle">Plugin handle of the calling plugin (use SKSE::GetPluginHandle())</param>
+		/// <param name="a_timelineID">Timeline ID to add the point to</param>
+		/// <param name="a_time">Time in seconds when this point occurs</param>
+		/// <param name="a_fov">Field of view in degrees (1-160)</param>
+		/// <param name="a_easeIn">Apply ease-in at the start of interpolation (default: false)</param>
+		/// <param name="a_easeOut">Apply ease-out at the end of interpolation (default: false)</param>
+		/// <param name="a_interpolationMode">Interpolation mode (default: kCubicHermite)</param>
+		/// <returns>Index of the added point, or -1 on failure</returns>
+		/// <remarks>NOTE: Both easeIn and easeOut control the INCOMING segment (previous→current point), not the outgoing segment.
+		/// For smooth transition through a point, set easeOut=false for the current point AND easeIn=false for the next point.</remarks>
+		[[nodiscard]] virtual int AddFOVPoint(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, float a_time, float a_fov, bool a_easeIn = false, bool a_easeOut = false, InterpolationMode a_interpolationMode = InterpolationMode::kCubicHermite) const noexcept = 0;
+
+		/// <summary>
 		/// Remove a translation point from a timeline
 		/// </summary>
 		/// <param name="a_pluginHandle">Plugin handle of the calling plugin (use SKSE::GetPluginHandle())</param>
@@ -225,6 +241,15 @@ namespace FCFW_API {
 		/// <param name="a_index">Index of the point to remove</param>
 		/// <returns>true if the point was removed, false on failure</returns>
 		[[nodiscard]] virtual bool RemoveRotationPoint(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, size_t a_index) const noexcept = 0;
+
+		/// <summary>
+		/// Remove a FOV point from a timeline
+		/// </summary>
+		/// <param name="a_pluginHandle">Plugin handle of the calling plugin (use SKSE::GetPluginHandle())</param>
+		/// <param name="a_timelineID">Timeline ID to remove the point from</param>
+		/// <param name="a_index">Index of the point to remove</param>
+		/// <returns>true if the point was removed, false on failure</returns>
+		[[nodiscard]] virtual bool RemoveFOVPoint(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, size_t a_index) const noexcept = 0;
 
         /// <summary>
         /// Start recording camera movement to a timeline.
@@ -294,6 +319,23 @@ namespace FCFW_API {
 		/// <param name="a_index">Index of the rotation point (0-based)</param>
 		/// <returns>RE::BSTPoint2&lt;float&gt; with rotation (x=pitch, y=yaw in radians), or (0,0) if timeline not found/owned or index out of range</returns>
 		[[nodiscard]] virtual RE::BSTPoint2<float> GetRotationPoint(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, size_t a_index) const noexcept = 0;
+
+		/// <summary>
+		/// Get the number of FOV points in the timeline.
+		/// </summary>
+		/// <param name="a_pluginHandle">Plugin handle for ownership validation</param>
+		/// <param name="a_timelineID">Timeline ID to query</param>
+		/// <returns>Number of FOV points, or -1 if timeline not found or not owned</returns>
+		[[nodiscard]] virtual int GetFOVPointCount(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID) const noexcept = 0;
+
+		/// <summary>
+		/// Get the FOV value of a FOV point by index.
+		/// </summary>
+		/// <param name="a_pluginHandle">Plugin handle for ownership validation</param>
+		/// <param name="a_timelineID">Timeline ID to query</param>
+		/// <param name="a_index">Index of the FOV point (0-based)</param>
+		/// <returns>FOV value in degrees, or 80.0 if timeline not found/owned or index out of range</returns>
+		[[nodiscard]] virtual float GetFOVPoint(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, size_t a_index) const noexcept = 0;
 
 		/// <summary>
 		/// Start playing the camera timeline.

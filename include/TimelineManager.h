@@ -35,6 +35,7 @@ namespace FCFW {
         bool m_followGround{ true };           // Keep camera above ground level during playback (runtime only)
         float m_minHeightAboveGround{ 0.0f }; // Minimum height above ground when following ground (runtime only)
         RE::BSTPoint2<float> m_rotationOffset{ 0.0f, 0.0f }; // Accumulated user rotation (runtime only)
+        float m_savedFOV{ 80.0f };             // FOV before playback starts
         
         void Initialize(size_t a_id, SKSE::PluginHandle a_ownerHandle) {
             m_id = a_id;
@@ -64,6 +65,7 @@ namespace FCFW {
             m_followGround = true;
             m_minHeightAboveGround = 0.0f;
             m_rotationOffset = { 0.0f, 0.0f };
+            m_savedFOV = 80.0f;
         }
     };
 
@@ -93,15 +95,19 @@ namespace FCFW {
             int AddRotationPointAtCamera(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, float a_time, bool a_easeIn, bool a_easeOut, InterpolationMode a_interpolationMode);
             int AddRotationPoint(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, float a_time, const RE::BSTPoint2<float>& a_rotation, bool a_easeIn, bool a_easeOut, InterpolationMode a_interpolationMode);
             int AddRotationPointAtRef(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, float a_time, RE::TESObjectREFR* a_reference, BodyPart a_bodyPart, const RE::BSTPoint2<float>& a_offset, bool a_isOffsetRelative, bool a_easeIn, bool a_easeOut, InterpolationMode a_interpolationMode);
+            int AddFOVPoint(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, float a_time, float a_fov, bool a_easeIn, bool a_easeOut, InterpolationMode a_interpolationMode);
             
             bool RemoveTranslationPoint(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, size_t a_index);
             bool RemoveRotationPoint(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, size_t a_index);
+            bool RemoveFOVPoint(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, size_t a_index);
 
             int GetTranslationPointCount(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID) const;
             int GetRotationPointCount(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID) const;
+            int GetFOVPointCount(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID) const;
             
             RE::NiPoint3 GetTranslationPoint(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, size_t a_index) const;
             RE::BSTPoint2<float> GetRotationPoint(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, size_t a_index) const;
+            float GetFOVPoint(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, size_t a_index) const;
             
             // playback / recording
             bool StartRecording(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, float a_recordingInterval = 1.0f, bool a_append = false, float a_timeOffset = 0.0f);

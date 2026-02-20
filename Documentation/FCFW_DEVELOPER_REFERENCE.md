@@ -1,4 +1,4 @@
-# FreeCameraFramework (FCFW) - Papyrus Developer Reference
+# FreeCamera Framework (FCFW) - Developer Reference
 
 ---
 
@@ -17,13 +17,13 @@
 
 ## What is FCFW?
 
-FreeCameraFramework is an SKSE plugin that enables cinematic camera control in Skyrim.
+FreeCameraFramework is an SKSE plugin that provides C++ and Papyrus APIs for embedding your own custom camera logic into your mod, enabling  fully free camera control.
 
 ---
 
 ## Introduction
 
-This document provides a reference for Papyrus developers who want to create cinematic camera sequences in Skyrim using the FreeCameraFramework (FCFW) plugin. Whether you're building machinima, creating scripted cutscenes, or adding dynamic camera movements to your mod, FCFW provides a powerful and flexible API for camera control.
+This document describes the fundamental concepts and features of the FreeCamera Framework that apply regardless of whether you're using the Papyrus API or C++ plugin API. Examples are for Papyrus, but the same concepts and functions also apply to C++ plugins.
 
 ### Quick Start and References
 
@@ -64,13 +64,14 @@ FCFW Source: https://github.com/staalo18/FreeCameraFramework
 **Flexible Camera Paths**
 - **Translation points** control camera position (where it moves)
 - **Rotation points** control camera orientation (where it looks)
-- Three point types:
+- **FOV points** control camera field of view (zoom level)
+- Three point types for translation and rotation:
   - **World points**: Static coordinates in world space
   - **Reference points**: Follow or look at objects/actors
   - **Camera points**: Capture current camera state (for smooth transitions)
 
 **Interpolation Modes**
-- **None**: Jump instantly to point (no interpolation)
+- **None**: Jump instantly to point (no interpolation). Useful for hard-cutting camera positions.
 - **Linear**: Linear interpolation between points (straight line for translation points, linear change of angles for rotation points)
 - **Cubic Hermite**: Smooth curved paths with automatic tangent calculation
 - Per-point easing for acceleration/deceleration between points
@@ -109,16 +110,17 @@ A **timeline** is a container for camera movement data. Each timeline has:
 - A unique **timeline ID** (integer > 0)
 - **Translation points** defining camera positions over time
 - **Rotation points** defining camera orientations over time
+- **FOV points** defining camera zoom levels over time
 - **Playback settings** (mode, loop offset, user rotation, etc.)
 
-**Important**: Translation and rotation tracks are independent. You can have:
+**Important**: Translation, rotation, and FOV tracks are independent. You can have:
 - Different numbers of points in each track
-- Different time values for translation vs rotation points
+- Different time values for translation vs rotation vs FOV points
 - Different interpolation modes per track
 
-### Points
+### Control Points
 
-**Points** are keyframes that define camera state at specific times:
+**Control Points** are keyframes that define camera state at specific times:
 
 **Translation Points** specify where the camera is located:
 ```papyrus
@@ -134,15 +136,36 @@ FCFW_SKSEFunctions.AddTranslationPointAtCamera(modName, timelineID, 10.0)
 
 **Rotation Points** specify where the camera is looking:
 ```papyrus
-; Look at specific pitch/yaw at time 0.0 (world coords)
+; Look at specific pitch/yaw at time 0.0 (world coords, in degrees)
 FCFW_SKSEFunctions.AddRotationPoint(modName, timelineID, 0.0, pitch, yaw)
 
-; Look directly at actor at time 5.0 (bodyPart defaults to 0=kNone, offsets default to 0.0)
+; Look directly at actor at time 5.0 (bodyPart defaults to 0=kNone, offsets in degrees default to 0.0)
 FCFW_SKSEFunctions.AddRotationPointAtRef(modName, timelineID, 5.0, actorRef, bodyPart=0, offsetPitch=0.0, offsetYaw=0.0)
 
 ; Camera point capturing camera rotation at the start of playback. Camera rotates to this angle at time 10.0
 FCFW_SKSEFunctions.AddRotationPointAtCamera(modName, timelineID, 10.0)
 ```
+
+**FOV Points** specify the camera's field of view (zoom level):
+```papyrus
+; Set FOV to 80 degrees at time 0.0 (default FOV)
+FCFW_SKSEFunctions.AddFOVPoint(modName, timelineID, 0.0, 80.0)
+
+; Zoom in to 30 degrees at time 5.0 with smooth transition
+FCFW_SKSEFunctions.AddFOVPoint(modName, timelineID, 5.0, 30.0, easeIn=true, easeOut=true, interpolationMode=2)
+
+; Zoom out to wide angle 120 degrees at time 10.0
+FCFW_SKSEFunctions.AddFOVPoint(modName, timelineID, 10.0, 120.0)
+```
+
+**FOV Values:**
+- Valid range: 1-160 degrees
+- Default: 80 degrees
+
+**Rotation Values (Papyrus API):**
+- **Pitch and Yaw**: Specified in **degrees**
+- **Offsets**: Also in **degrees**
+- Note: C++ API uses radians; Papyrus API automatically converts degrees to radians
 
 ### Time Values
 
@@ -209,7 +232,7 @@ Ground-following is controlled via the `SetFollowGround()` function. Call this b
 **Behavior:**
 - When ground-following is enabled, the camera's Z position is adjusted each frame to ensure it stays above ground/water level
 - If the interpolated camera height is below `minHeight`, the camera is raised to maintain the minimum clearance
-- Ground height includes water surfaces (uses `GetLandHeightWithWater`)
+- Ground height includes water surfaces
 - Only affects vertical (Z) position; horizontal (X, Y) movement is unchanged
 - Can be changed during playback - takes effect immediately
 
@@ -232,56 +255,27 @@ bool isFollowing = FCFW_SKSEFunctions.IsGroundFollowingEnabled(ModName, timeline
 float minHeight = FCFW_SKSEFunctions.GetMinHeightAboveGround(ModName, timelineID)
 ```
 
-**Use Cases:**
-- Terrain-following flight cameras
-- Prevent camera from clipping through ground when terrain has changed
-- Maintain minimum clearance for better visibility
-- Underwater sequences (disable ground-following)
+### Playback Configuration
 
-### Runtime Controls vs Playback Configuration
-
-FCFW organizes parameters into three categories:
-
-**1. Timeline Properties** - Set during timeline definition (affect how timeline behaves):
 - `SetPlaybackMode()` - Controls end-of-timeline behavior (end/loop/wait)
-
-**2. Playback Configuration** - Set at StartPlayback (locked for duration of playback):
 - `speed` - Playback speed multiplier
 - `globalEaseIn/globalEaseOut` - Apply easing to entire timeline
 - `useDuration/duration` - Play timeline over specific duration
 - `startTime` - Resume from specific time
-
-**3. Runtime Controls** - Can be changed before or during playback:
 - `AllowUserRotation()` - Enable/disable user camera rotation
 - `SetFollowGround()` - Control ground-following behavior
 - `SetMenuVisibility()` - Show/hide menus during playback
 
-This separation allows runtime adjustments without restarting playback.
-
-### Default Values
-
-When a timeline is first registered, runtime controls are initialized with these defaults:
-
-| Runtime Control | Default Value | Matches Old API Behavior |
-|----------------|---------------|-------------------------|
-| `followGround` | `true` | ✓ Yes |
-| `minHeightAboveGround` | `0.0` | ✓ Yes |
-| `showMenusDuringPlayback` | `false` | ✓ Yes |
-| `allowUserRotation` | `false` | ✓ Yes |
-
-**Important:** These defaults ensure that calling `StartPlayback()` without explicitly setting runtime controls produces the same behavior as the old API where these parameters were included in `StartPlayback()` with default values.
-
 **Default Reset Operations:**
 
-The following operations reset runtime controls to their defaults:
+The following operations reset the playback configuration to its defaults:
 
 1. **`RegisterTimeline()`** - New timelines start with defaults
-2. **`ClearTimeline()`** - Clears points AND resets all runtime controls to defaults
-3. **`AddTimelineFromFile()`** - Sets defaults first, then loads YAML values (missing YAML fields keep defaults)
+2. **`ClearTimeline()`** - Clears points AND resets all playback configurations to defaults
 
 **Example:**
 ```papyrus
-; Register and start playback without setting runtime controls
+; Register and start playback without setting playback configuration
 int timelineID = FCFW_SKSEFunctions.RegisterTimeline(ModName)
 ; ... add points ...
 FCFW_SKSEFunctions.StartPlayback(ModName, timelineID)
@@ -289,7 +283,7 @@ FCFW_SKSEFunctions.StartPlayback(ModName, timelineID)
 
 ; Clear timeline resets everything
 FCFW_SKSEFunctions.ClearTimeline(ModName, timelineID)
-; Runtime controls are back to defaults
+; playback configurations are back to defaults
 
 ; Explicit configuration
 FCFW_SKSEFunctions.SetFollowGround(ModName, timelineID, follow = false)
@@ -327,7 +321,7 @@ endif
 
 **What RegisterPlugin() does:**
 - Registers your plugin with FCFW for the first time
-- If already registered, unregisters all timelines previously registered by that plugin, then re-registers the plugin.
+- NOTE: If already registered, this function UNREGISTERS all timelines previously registered by that plugin, then re-registers the plugin.
 - Must register plugin before any `RegisterTimeline()` calls
 
 ### Registering Timelines
@@ -467,13 +461,15 @@ FCFW_SKSEFunctions.AddRotationPoint(
     ModName,
     timelineID,
     time = 0.0,
-    pitch = 0.1,         ; Pitch in radians
-    yaw = 1.57,          ; Yaw in radians (≈90 degrees)
+    pitch = 5,         ; Pitch in degrees
+    yaw = 90.0,          ; Yaw in degrees
     easeIn = false,
     easeOut = false,
     interpolationMode = 2
 )
 ```
+**Note:** Papyrus API uses **degrees** for rotation angles (pitch, yaw, offsets). C++ API uses **radians**.
+
 
 **Use world points when:**
 - Camera should move to specific locations
@@ -510,14 +506,15 @@ FCFW_SKSEFunctions.AddRotationPointAtRef(
     time = 5.0,
     reference = targetActor,
     bodyPart = 0,        ; kNone = use root rotation (0=kNone, 1=kHead, 2=kTorso)
-    offsetPitch = 0.0,   ; No pitch offset (optional, defaults to 0.0)
-    offsetYaw = 0.0,     ; No yaw offset - look straight at target (optional, defaults to 0.0)
+    offsetPitch = 0.0,   ; No pitch offset in degrees (optional, defaults to 0.0)
+    offsetYaw = 0.0,     ; No yaw offset in degrees - look straight at target (optional, defaults to 0.0)
     isOffsetRelative = false,  ; Offset from camera-to-ref direction
     easeIn = false,
     easeOut = false,
     interpolationMode = 2
 )
 ```
+**Note:** Papyrus API uses **degrees** for rotation angles (pitch, yaw, offsets). C++ API uses **radians**.
 
 **Offset Modes:**
 
@@ -531,14 +528,16 @@ FCFW_SKSEFunctions.AddRotationPointAtRef(
 - Useful for fixed offsets like "200 units north"
 
 **Rotation with `isOffsetRelative = true`:**
-- Camera looks in the direction reference is facing + offset
+- Camera looks in the direction reference is facing + offset (in degrees)
 - `offsetYaw = 0` means "look where actor looks"
-- `offsetYaw = 3.14` means "look opposite direction"
+- `offsetYaw = 180` means "look opposite direction of where the actor looks"
 
 **Rotation with `isOffsetRelative = false`:**
-- Camera looks at reference from current position + offset
-- `offsetYaw = 0` means "look directly at target"
-- `offsetPitch = 0.5` means "look slightly above target"
+- Camera looks at reference + offset (in degrees)
+- `offsetYaw = 0` means "look directly at reference"
+- `offsetPitch = 20` means "look slightly above reference"
+
+**Note:** Papyrus API uses **degrees** for rotation angles (pitch, yaw, offsets). C++ API uses **radians**.
 
 ### Camera Points
 
@@ -569,6 +568,50 @@ FCFW_SKSEFunctions.AddRotationPointAtCamera(
 **Key Behavior:**
 - Position/rotation is sampled when `FCFW_SKSEFunctions.StartPlayback()` is called
 - Useful to define smooth camera behavior at the start end the end of a timeline playback
+
+### FOV Points
+
+**FOV points** control the camera's field of view (zoom level):
+
+```papyrus
+; Start at default FOV
+FCFW_SKSEFunctions.AddFOVPoint(
+    ModName,
+    timelineID,
+    time = 0.0,
+    fov = 80.0,          ; Default field of view in degrees
+    easeIn = false,
+    easeOut = false,
+    interpolationMode = 2 ; Cubic Hermite for smooth zoom
+)
+
+; Zoom in for telephoto effect
+FCFW_SKSEFunctions.AddFOVPoint(
+    ModName,
+    timelineID,
+    time = 3.0,
+    fov = 30.0,          ; Zoomed in
+    easeIn = true,       ; Smooth acceleration
+    easeOut = true,      ; Smooth deceleration
+    interpolationMode = 2
+)
+
+; Zoom out for wide angle
+FCFW_SKSEFunctions.AddFOVPoint(
+    ModName,
+    timelineID,
+    time = 6.0,
+    fov = 120.0,         ; Wide angle
+    easeIn = false,
+    easeOut = false,
+    interpolationMode = 1 ; Linear interpolation
+)
+```
+
+**FOV Characteristics:**
+- Valid range: 1-160 degrees (values outside this range are clamped to 80 with a warning)
+- Default: 80 degrees
+- Automatically captured during recording
 
 
 ### Procedural Path Generation
@@ -668,13 +711,13 @@ Please look into  FCFW_EXAMPLE_QUESTSCRIPT.psc for an example on how to do this.
 - Whether playback was paused (`IsPlaybackPaused()`)
 
 **What Not to Save:**
-- User rotation offset (not exposed in API - known limitation)
+- User rotation offset (not exposed in API)
 - Timeline IDs (these change on reload)
 
 **Timeline Content Persistence:**
 - **Procedurally-generated timelines:** Rebuild on load (e.g., orbit paths, dynamic paths)
 - **Recorded/imported timelines:** Content is lost on load unless explicitly persisted
-  - **Solution:** Auto-export after recording/import, re-import on load
+  - **Solution:** Auto-export after recording/import, re-import on load.
   - **Example workflow:**
     1. After `StopRecording()`: `ExportTimeline(ModName, timelineID, "Timeline_AutoSave.yaml")`
     2. After `AddTimelineFromFile()`: `ExportTimeline(ModName, timelineID, "Timeline_AutoSave.yaml")`
@@ -708,8 +751,6 @@ EndEvent
 ```
 
 **Important**: 
-- Only Forms can receive events (Quest, ObjectReference, etc.)
-- ReferenceAlias cannot receive events directly
 - Events must be re-registered after loading a save
 
 ### Event Callbacks
@@ -760,16 +801,16 @@ endif
 - All translation and rotation points
 - Interpolation and easing settings
 - Playback mode configuration
-- Runtime control settings (followGround, minHeightAboveGround, showMenusDuringPlayback, allowUserRotation)
+- Playback configuration settings (followGround, minHeightAboveGround, showMenusDuringPlayback, allowUserRotation)
 - Global easing settings (globalEaseIn, globalEaseOut)
 - Reference formIDs (load-order independent)
 - TimelineIDs are NOT saved in YAML, as these are allocated dynamically during runtime.
 
-**Runtime Controls in Export:**
-When exporting, the current values of all runtime controls are saved to the YAML file. This allows you to:
+**Playback configurations in Export:**
+When exporting, the current values of all playback configurations are saved to the YAML file. This allows you to:
 - Share timeline configurations with consistent behavior
 - Preserve carefully tuned settings across sessions
-- Create template timelines with pre-configured runtime controls
+- Create template timelines with pre-configured playback configurations
 
 ### Importing Timelines
 
@@ -777,13 +818,13 @@ When exporting, the current values of all runtime controls are saved to the YAML
 
 NOTE: TimelineIDs are NOT saved in YAML as these are allocated dynamically during runtime. Import requires valid timelineID.
 
-**Default Handling:** When importing, FCFW first sets all runtime controls and global easing settings to their defaults, then loads values from the YAML file. This ensures:
+**Default Handling:** When importing, FCFW first sets all playback configurations and global easing settings to their defaults, then loads values from the YAML file. This ensures:
 - Missing YAML fields use appropriate defaults
 - Backwards compatibility with older YAML files that don't include all fields
 - Consistent behavior when importing partial timeline definitions
 
 **Import Process:**
-1. Set all runtime controls to defaults (followGround=true, minHeight=0.0, showMenus=false, allowRotation=false)
+1. Set all playback configurations to defaults (followGround=true, minHeight=0.0, showMenus=false, allowRotation=false)
 2. Set global easing to defaults (globalEaseIn=false, globalEaseOut=false)
 3. Load YAML file
 4. Override defaults with any values present in YAML

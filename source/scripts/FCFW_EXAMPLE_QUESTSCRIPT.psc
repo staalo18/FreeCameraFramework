@@ -56,7 +56,7 @@ Scriptname FCFW_EXAMPLE_QUESTSCRIPT extends Quest
 ; For a complete FreeCameraFramework API description, see Source/Scripts/FCFW_SKSEFunctions.psc.
 ;     You need to include this file (and the compiled script Scripts/FCFW_SKSEFunctions.pex) in your mod if you want to use FCFW's functions. 
 ;
-; For a detailed reference on FreeCameraFramework and its usage, see Documentation/FCFW_PAPYRUS_REFERENCE.md.
+; For a detailed reference on FreeCameraFramework and its usage, see Documentation/FCFW_DEVELOPER_REFERENCE.md.
 ;
 ; ============================================================================
 

@@ -55,6 +55,23 @@ namespace FCFW {
                     << YAML::EndSeq;
             }
         };
+
+        template<> struct PointTraits<FOVPoint> {
+            using ValueType = float;
+            static constexpr const char* SectionName = "fovPoints";
+            static constexpr const char* ValueKey = "fov";
+            static constexpr size_t ValueSize = 1;
+            
+            static ValueType ReadValue(const YAML::Node& node, float /*conversionFactor*/) {
+                // FOV is in degrees, no conversion factor needed
+                return node.as<float>();
+            }
+            
+            static void WriteValue(YAML::Emitter& out, const ValueType& value, float /*conversionFactor*/) {
+                // FOV is in degrees, no conversion factor needed
+                out << value;
+            }
+        };
     }
     
     // Template helper for importing points from YAML
@@ -198,7 +215,7 @@ namespace FCFW {
             return false;
         }
     }
-    
+
     // Template helper for exporting points to YAML
     template<typename PointType, typename PathType>
     bool ExportPathToYAML(const PathType* path, std::ofstream& a_file, float a_conversionFactor) {
@@ -297,6 +314,13 @@ namespace FCFW {
         return RotationPoint(transition, PointType::kCamera);
     }
 
+    // ===== FOVPath implementations =====
+
+    FOVPoint FOVPath::GetPointAtCamera(float a_time, bool a_easeIn, bool a_easeOut) const {
+        Transition transition(a_time, InterpolationMode::kCubicHermite, a_easeIn, a_easeOut);
+        return FOVPoint(transition, 80.0f);
+    }
+
     // ===== TranslationPath YAML implementations =====
     
     bool TranslationPath::AddPathFromFile(const std::string& a_filePath, float a_timeOffset, float a_conversionFactor) {
@@ -315,6 +339,110 @@ namespace FCFW {
 
     bool RotationPath::ExportPath(std::ofstream& a_file, float a_conversionFactor) const {
         return ExportPathToYAML<RotationPoint>(this, a_file, a_conversionFactor);
+    }
+
+    // ===== FOVPath YAML implementations =====
+    
+    bool FOVPath::AddPathFromFile(const std::string& a_filePath, float a_timeOffset, float a_conversionFactor) {
+        try {
+            YAML::Node root = YAML::LoadFile(a_filePath);
+            
+            // Check format version
+            int formatVersion = 1;
+            if (root["formatVersion"]) {
+                formatVersion = root["formatVersion"].as<int>();
+                if (formatVersion != 1) {
+                    log::warn("{}: Unknown formatVersion {} in file, attempting to parse as version 1", 
+                             __FUNCTION__, formatVersion);
+                }
+            } else {
+                log::info("{}: No formatVersion specified, assuming version 1", __FUNCTION__);
+            }
+            
+            if (!root["fovPoints"]) {
+                log::info("{}: No 'fovPoints' section in YAML file", __FUNCTION__);
+                return true;
+            }
+            
+            for (const auto& pointNode : root["fovPoints"]) {
+                if (!pointNode["time"]) {
+                    log::warn("{}: Skipping point without 'time' field", __FUNCTION__);
+                    continue;
+                }
+                
+                float time = pointNode["time"].as<float>() + a_timeOffset;
+                bool easeIn = pointNode["easeIn"] ? pointNode["easeIn"].as<bool>() : false;
+                bool easeOut = pointNode["easeOut"] ? pointNode["easeOut"].as<bool>() : false;
+                
+                InterpolationMode mode = InterpolationMode::kCubicHermite;
+                if (pointNode["interpolationMode"]) {
+                    mode = StringToInterpolationMode(pointNode["interpolationMode"].as<std::string>());
+                }
+                
+                Transition transition(time, mode, easeIn, easeOut);
+                
+                // Read FOV value
+                if (pointNode["fov"]) {
+                    float fov = pointNode["fov"].as<float>();
+                    FOVPoint point(transition, fov);
+                    AddPoint(point);
+                } else {
+                    log::warn("{}: FOV point at time {} missing 'fov' field", __FUNCTION__, time);
+                    continue;
+                }
+            }
+            
+            return true;
+            
+        } catch (const YAML::Exception& e) {
+            log::error("{}: YAML parsing error: {}", __FUNCTION__, e.what());
+            return false;
+        } catch (const std::exception& e) {
+            log::error("{}: Error loading YAML file: {}", __FUNCTION__, e.what());
+            return false;
+        }
+    }
+
+    bool FOVPath::ExportPath(std::ofstream& a_file, float a_conversionFactor) const {
+        if (!a_file.is_open()) {
+            log::error("{}: File is not open", __FUNCTION__);
+            return false;
+        }
+
+        try {
+            YAML::Emitter out;
+            out << YAML::BeginMap;
+            out << YAML::Key << "fovPoints";
+            out << YAML::Value << YAML::BeginSeq;
+            
+            for (const auto& point : m_points) {
+                out << YAML::BeginMap;
+                out << YAML::Key << "time" << YAML::Value << point.m_transition.m_time;
+                out << YAML::Key << "fov" << YAML::Value << point.m_point;
+                out << YAML::Key << "interpolationMode" << YAML::Value << InterpolationModeToString(point.m_transition.m_mode);
+                out << YAML::Key << "easeIn" << YAML::Value << (point.m_transition.m_easeIn ? true : false);
+                out << YAML::Key << "easeOut" << YAML::Value << (point.m_transition.m_easeOut ? true : false);
+                out << YAML::EndMap;
+            }
+            
+            out << YAML::EndSeq;
+            out << YAML::EndMap;
+            
+            // Extract section and write to stream
+            std::string yamlStr = out.c_str();
+            size_t startPos = yamlStr.find("fovPoints");
+            if (startPos != std::string::npos) {
+                a_file << yamlStr.substr(startPos);
+            } else {
+                a_file << yamlStr;
+            }
+            
+            return true;
+            
+        } catch (const std::exception& e) {
+            log::error("{}: Error exporting YAML: {}", __FUNCTION__, e.what());
+            return false;
+        }
     }
 
 } // namespace FCFW

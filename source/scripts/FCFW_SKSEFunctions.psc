@@ -85,8 +85,8 @@ int Function AddTranslationPointAtCamera(string modName, int timelineID, float t
 ; modName: name of your mod's ESP/ESL file (e.g., "MyMod.esp")
 ; timelineID: timeline ID to add the point to
 ; time: time in seconds when this point occurs
-; pitch: relative to world coords
-; yaw: relative to world coords
+; pitch: pitch in degrees relative to world coords
+; yaw: yaw in degrees relative to world coords
 ; easeIn: ease in at the start of interpolation
 ; easeOut: ease out at the end of interpolation
 ; interpolationMode: 0=None, 1=Linear, 2=CubicHermite (default)
@@ -99,9 +99,9 @@ int Function AddRotationPoint(string modName, int timelineID, float time, float 
 ; time: time in seconds when this point occurs
 ; reference: the object reference to track
 ; bodyPart: which body part to track rotation from (0=root, 1=eye, 2=head, 3=torso, default: 0=root)
-; offsetPitch: pitch offset from camera-to-reference direction (isOffsetRelative == false) / the ref's heading (isOffsetRelative == true)
-; offsetYaw: isOffsetRelative == false - yaw offset from camera-to-reference direction. A value of 0 means looking directly at the reference.
-;            isOffsetRelative == true - yaw offset from reference's heading. A value of 0 means looking into the direction the ref is heading.
+; offsetPitch: pitch offset in degrees from camera-to-reference direction (isOffsetRelative == false) / the ref's heading (isOffsetRelative == true)
+; offsetYaw: yaw offset in degrees. isOffsetRelative == false - offset from camera-to-reference direction. A value of 0 means looking directly at the reference.
+;            isOffsetRelative == true - offset from reference's heading. A value of 0 means looking into the direction the ref is heading.
 ; isOffsetRelative: if true, offset is relative to reference's heading instead of camera-to-reference direction.
 ; easeIn: ease in at the start of interpolation
 ; easeOut: ease out at the end of interpolation
@@ -123,6 +123,20 @@ int Function AddRotationPointAtRef(string modName, int timelineID, float time, O
 ; NOTE: Both easeIn and easeOut control the INCOMING segment (previous->current point), not the outgoing segment.
 ; For smooth transition through a point, set easeOut=false for the current point AND easeIn=false for the next point.
 int Function AddRotationPointAtCamera(string modName, int timelineID, float time, bool easeIn = false, bool easeOut = false, int interpolationMode = 2) global native
+
+; Add a FOV (Field of View) point to the timeline
+; FOV controls camera zoom level in degrees (1-160, default 80)
+; modName: name of your mod's ESP/ESL file (e.g., "MyMod.esp")
+; timelineID: timeline ID to add the point to
+; time: time in seconds when this point occurs
+; fov: field of view in degrees (1-160)
+; easeIn: ease in at the start of interpolation
+; easeOut: ease out at the end of interpolation
+; interpolationMode: 0=None, 1=Linear, 2=CubicHermite (default)
+; Returns: index of the added point, or -1 on failure
+; NOTE: Both easeIn and easeOut control the INCOMING segment (previous->current point), not the outgoing segment.
+; For smooth transition through a point, set easeOut=false for the current point AND easeIn=false for the next point.
+int Function AddFOVPoint(string modName, int timelineID, float time, float fov, bool easeIn = false, bool easeOut = false, int interpolationMode = 2) global native
 
 ; Start recording camera movements to the timeline
 ; modName: name of your mod's ESP/ESL file (e.g., "MyMod.esp")
@@ -157,6 +171,13 @@ bool Function RemoveTranslationPoint(string modName, int timelineID, int index) 
 ; Returns: true if removed, false on failure
 bool Function RemoveRotationPoint(string modName, int timelineID, int index) global native
 
+; Remove a FOV point from the timeline
+; modName: name of your mod's ESP/ESL file
+; timelineID: timeline ID to remove the point from
+; index: index of the point to remove
+; Returns: true if removed, false on failure
+bool Function RemoveFOVPoint(string modName, int timelineID, int index) global native
+
 ; Clear the entire camera timeline
 ; modName: name of your mod's ESP/ESL file
 ; timelineID: timeline ID to clear
@@ -174,6 +195,12 @@ int Function GetTranslationPointCount(string modName, int timelineID) global nat
 ; timelineID: timeline ID to query
 ; Returns: number of rotation points, or -1 if timeline not found
 int Function GetRotationPointCount(string modName, int timelineID) global native
+
+; Get the number of FOV points in the timeline
+; modName: name of your mod's ESP/ESL file (e.g., "MyMod.esp")
+; timelineID: timeline ID to query
+; Returns: number of FOV points, or -1 if timeline not found
+int Function GetFOVPointCount(string modName, int timelineID) global native
 
 ; Get the X coordinate of a translation point by index
 ; modName: name of your mod's ESP/ESL file (e.g., "MyMod.esp")
@@ -209,6 +236,13 @@ float Function GetRotationPointPitch(string modName, int timelineID, int index) 
 ; index: 0-based index of the point
 ; Returns: yaw in radians, or 0.0 if timeline not found or index out of range
 float Function GetRotationPointYaw(string modName, int timelineID, int index) global native
+
+; Get the FOV value of a FOV point by index
+; modName: name of your mod's ESP/ESL file (e.g., "MyMod.esp")
+; timelineID: timeline ID to query
+; index: 0-based index of the point
+; Returns: FOV in degrees, or 80.0 if timeline not found or index out of range
+float Function GetFOVPoint(string modName, int timelineID, int index) global native
 
 ; Start playback of a camera path timeline
 ; modName: name of your mod's ESP/ESL file (e.g., "MyMod.esp")
