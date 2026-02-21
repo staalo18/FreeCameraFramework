@@ -2,6 +2,7 @@
 #include "FCFW_Utils.h"
 #include <yaml-cpp/yaml.h>
 #include "APIManager.h"
+#include "Hooks.h"
 namespace FCFW {
 
     void TimelineManager::ToggleBodyPartRotationMatrixDisplay(RE::Actor* a_actor, BodyPart a_bodyPart) {
@@ -88,12 +89,8 @@ namespace FCFW {
                     
                     vm->SendEvent(handle, RE::BSFixedString(eventName), args);
                 });
-            }
-            
-log::info("{}: Queued Papyrus event '{}' to form 0x{:X}", __FUNCTION__, a_eventName, receiver->GetFormID());
+            }            
         }
-        
-log::info("{}: Sent Papyrus event '{}' for timeline {} to {} receivers", __FUNCTION__, a_eventName, a_timelineID, m_eventReceivers.size());
     }
 
     void TimelineManager::RegisterForTimelineEvents(RE::TESForm* a_form) {
@@ -199,7 +196,23 @@ log::info("{}: Sent Papyrus event '{}' for timeline {} to {} receivers", __FUNCT
             state->m_recordingInterval = a_recordingInterval;
         }
 
+        // Capture camera rotation before entering free camera mode
+        RE::NiPoint3 preSwitchRotation = _ts_SKSEFunctions::GetCameraRotation();
+
         ToggleFreeCameraNotHooked();
+
+        // Ensure free camera rotation is initialized correctly
+        if (playerCamera->currentState && playerCamera->currentState->id == RE::CameraState::kFree) {
+            RE::FreeCameraState* freeCamState = static_cast<RE::FreeCameraState*>(playerCamera->currentState.get());
+            if (freeCamState) {
+                // Set free camera rotation to match pre-switch camera state
+                // FreeCameraState::rotation is NiPoint2 where .x=pitch, .y=yaw
+                freeCamState->rotation.x = preSwitchRotation.x;  // pitch
+                freeCamState->rotation.y = preSwitchRotation.z;  // yaw (from NiPoint3.z)
+                log::info("{}: Initialized free camera rotation for recording to pitch={}, yaw={}", 
+                         __FUNCTION__, preSwitchRotation.x, preSwitchRotation.z);
+            }
+        }
 
         // Calculate start time and easing based on append mode
         float startTime = 0.0f;
@@ -238,7 +251,8 @@ log::info("{}: Sent Papyrus event '{}' for timeline {} to {} receivers", __FUNCT
         state->m_timeline.AddTranslationPoint(translationPoint);
         
         Transition transRotation(startTime, InterpolationMode::kCubicHermite, useEaseIn, false);
-        RotationPoint rotationPoint(transRotation, PointType::kWorld, RE::BSTPoint2<float>({cameraRot.x, cameraRot.z}));
+        float cameraRoll = Hooks::FreeCameraRollHook::GetFreeCameraRoll();
+        RotationPoint rotationPoint(transRotation, PointType::kWorld, RE::NiPoint3{cameraRot.x, cameraRoll, cameraRot.z});
         state->m_timeline.AddRotationPoint(rotationPoint);
         
         Transition transFOV(startTime, InterpolationMode::kCubicHermite, useEaseIn, false);
@@ -284,7 +298,8 @@ log::info("{}: Sent Papyrus event '{}' for timeline {} to {} receivers", __FUNCT
         state->m_timeline.AddTranslationPoint(translationPoint);
         
         Transition transRotation(state->m_currentRecordingTime, InterpolationMode::kCubicHermite, false, true);
-        RotationPoint rotationPoint(transRotation, PointType::kWorld, RE::BSTPoint2<float>({cameraRot.x, cameraRot.z}));
+        float cameraRoll = Hooks::FreeCameraRollHook::GetFreeCameraRoll();
+        RotationPoint rotationPoint(transRotation, PointType::kWorld, RE::NiPoint3{cameraRot.x, cameraRoll, cameraRot.z});
         state->m_timeline.AddRotationPoint(rotationPoint);
         
         Transition transFOV(state->m_currentRecordingTime, InterpolationMode::kCubicHermite, false, true);
@@ -384,7 +399,7 @@ log::info("{}: Sent Papyrus event '{}' for timeline {} to {} receivers", __FUNCT
         return static_cast<int>(state->m_timeline.AddRotationPoint(point));
     }
 
-    int TimelineManager::AddRotationPoint(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, float a_time, const RE::BSTPoint2<float>& a_rotation, bool a_easeIn, bool a_easeOut, InterpolationMode a_interpolationMode) {
+    int TimelineManager::AddRotationPoint(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, float a_time, const RE::NiPoint3& a_rotation, bool a_easeIn, bool a_easeOut, InterpolationMode a_interpolationMode) {
         std::lock_guard<std::recursive_mutex> lock(m_timelineMutex);
         
         TimelineState* state = GetTimeline(a_timelineID, a_pluginHandle);
@@ -403,7 +418,7 @@ log::info("{}: Sent Papyrus event '{}' for timeline {} to {} receivers", __FUNCT
         return static_cast<int>(state->m_timeline.AddRotationPoint(point));
     }
 
-    int TimelineManager::AddRotationPointAtRef(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, float a_time, RE::TESObjectREFR* a_reference, BodyPart a_bodyPart, const RE::BSTPoint2<float>& a_offset, bool a_isOffsetRelative, bool a_easeIn, bool a_easeOut, InterpolationMode a_interpolationMode) {
+    int TimelineManager::AddRotationPointAtRef(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, float a_time, RE::TESObjectREFR* a_reference, BodyPart a_bodyPart, const RE::NiPoint3& a_offset, bool a_isOffsetRelative, bool a_easeIn, bool a_easeOut, InterpolationMode a_interpolationMode) {
         std::lock_guard<std::recursive_mutex> lock(m_timelineMutex);
         
         TimelineState* state = GetTimeline(a_timelineID, a_pluginHandle);
@@ -422,7 +437,7 @@ log::info("{}: Sent Papyrus event '{}' for timeline {} to {} receivers", __FUNCT
         }
         
         Transition transition(a_time, a_interpolationMode, a_easeIn, a_easeOut);
-        RotationPoint point(transition, PointType::kReference, RE::BSTPoint2<float>{}, a_offset, a_reference, a_isOffsetRelative, a_bodyPart);
+        RotationPoint point(transition, PointType::kReference, RE::NiPoint3{}, a_offset, a_reference, a_isOffsetRelative, a_bodyPart);
         
         return static_cast<int>(state->m_timeline.AddRotationPoint(point));
     }
@@ -622,11 +637,8 @@ log::info("{}: Recentering grid to cell ({}, {})", __FUNCTION__, cameraCellX, ca
         // Apply FOV if timeline has FOV points
         if (a_state->m_timeline.GetFOVPointCount() > 0) {
             playerCamera->worldFOV = a_state->m_timeline.GetFOV(sampleTime);
-log::info("{}:time: {}  - Setting FOV to {}", __FUNCTION__, sampleTime, playerCamera->worldFOV);
         }
-        else {
-log::info("{}:time: {}  - No FOV points, using FOV {}", __FUNCTION__, sampleTime, playerCamera->worldFOV);
-        }
+
         // Apply ground-following if enabled
         if (a_state->m_followGround) {
             float landHeight = _ts_SKSEFunctions::GetLandHeightWithWater(cameraPos);
@@ -638,17 +650,21 @@ log::info("{}:time: {}  - No FOV points, using FOV {}", __FUNCTION__, sampleTime
         
         cameraState->translation = cameraPos;
         
-        RE::BSTPoint2<float> rotation = a_state->m_timeline.GetRotation(sampleTime);
+        RE::NiPoint3 rotation = a_state->m_timeline.GetRotation(sampleTime);
         
         // Handle user rotation
         if (m_userTurning && a_state->m_allowUserRotation) {
             a_state->m_rotationOffset.x = _ts_SKSEFunctions::NormalRelativeAngle(cameraState->rotation.x - rotation.x);
-            a_state->m_rotationOffset.y = _ts_SKSEFunctions::NormalRelativeAngle(cameraState->rotation.y - rotation.y);
+            a_state->m_rotationOffset.z = _ts_SKSEFunctions::NormalRelativeAngle(cameraState->rotation.y - rotation.z);
             m_userTurning = false;
         } else {
             cameraState->rotation.x = _ts_SKSEFunctions::NormalRelativeAngle(rotation.x + a_state->m_rotationOffset.x);
-            cameraState->rotation.y = _ts_SKSEFunctions::NormalRelativeAngle(rotation.y + a_state->m_rotationOffset.y);
+            cameraState->rotation.y = _ts_SKSEFunctions::NormalRelativeAngle(rotation.z + a_state->m_rotationOffset.z);
         }
+
+        // Inject roll from timeline via hook
+        float roll = rotation.y;
+        Hooks::FreeCameraRollHook::SetFreeCameraRoll(roll);
         
         if (a_state->m_timeline.GetPlaybackMode() == PlaybackMode::kWait) {
             float playbackTime = a_state->m_timeline.GetPlaybackTime();
@@ -758,7 +774,7 @@ log::info("{}:time: {}  - No FOV points, using FOV {}", __FUNCTION__, sampleTime
         // Set as active timeline
         m_activeTimelineID = a_timelineID;
         state->m_isPlaybackRunning = true;
-        state->m_rotationOffset = { 0.0f, 0.0f };  // Reset per-timeline rotation offset
+        state->m_rotationOffset = RE::NiPoint3{ 0.0f, 0.0f, 0.0f };  // Reset per-timeline rotation offset
         state->m_isCompletedAndWaiting = false;   // Reset completion event flag for kWait mode
         
         // Save pre-playback state
@@ -813,8 +829,25 @@ log::info("{}:time: {}  - No FOV points, using FOV {}", __FUNCTION__, sampleTime
         m_currentCellX = m_initialCellX;
         m_currentCellY = m_initialCellY;
 */        
+        // Capture camera rotation before entering free camera mode
+        // This ensures free camera inherits the correct rotation even if the game doesn't do it automatically
+        RE::NiPoint3 preSwitchRotation = _ts_SKSEFunctions::GetCameraRotation();
+        
         // Enter free camera mode
         ToggleFreeCameraNotHooked();
+        
+        // Ensure free camera rotation is initialized correctly
+        if (playerCamera->currentState && playerCamera->currentState->id == RE::CameraState::kFree) {
+            RE::FreeCameraState* freeCamState = static_cast<RE::FreeCameraState*>(playerCamera->currentState.get());
+            if (freeCamState) {
+                // Set free camera rotation to match pre-switch camera state
+                // FreeCameraState::rotation is NiPoint2 where .x=pitch, .y=yaw
+                freeCamState->rotation.x = preSwitchRotation.x;  // pitch
+                freeCamState->rotation.y = preSwitchRotation.z;  // yaw (from NiPoint3.z)
+                log::info("{}: Initialized free camera rotation to pitch={}, yaw={}", 
+                         __FUNCTION__, preSwitchRotation.x, preSwitchRotation.z);
+            }
+        }
         
         log::info("{}: Started playback on timeline {}", __FUNCTION__, a_timelineID);
         
@@ -900,6 +933,9 @@ log::info("{}:time: {}  - No FOV points, using FOV {}", __FUNCTION__, sampleTime
             
             // Restore FOV to pre-playback value
             playerCamera->worldFOV = state->m_savedFOV;
+
+            // Reset camera roll
+            Hooks::FreeCameraRollHook::SetFreeCameraRoll(0.0f);
         }
         
         // Clear active state
@@ -995,8 +1031,7 @@ log::info("{}:time: {}  - No FOV points, using FOV {}", __FUNCTION__, sampleTime
         // Dispatch start event for target timeline
         DispatchTimelineEvent(static_cast<uint32_t>(FCFW_API::FCFWMessage::kPlaybackStart), a_toTimelineID);
         DispatchTimelineEventPapyrus("OnPlaybackStart", a_toTimelineID);
-        
-        log::info("{}: Successfully switched to timeline {}", __FUNCTION__, a_toTimelineID);
+
         return true;
     }
 
@@ -1017,7 +1052,7 @@ log::info("{}:time: {}  - No FOV points, using FOV {}", __FUNCTION__, sampleTime
         if (a_toState->m_allowUserRotation) {
             a_toState->m_rotationOffset = a_fromState->m_rotationOffset;
         } else {
-            a_toState->m_rotationOffset = { 0.0f, 0.0f };
+            a_toState->m_rotationOffset = RE::NiPoint3{ 0.0f, 0.0f, 0.0f };
         }
     }
 
@@ -1115,18 +1150,18 @@ log::info("{}:time: {}  - No FOV points, using FOV {}", __FUNCTION__, sampleTime
         return state->m_timeline.GetTranslationPoint(a_index);
     }
 
-    RE::BSTPoint2<float> TimelineManager::GetRotationPoint(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, size_t a_index) const {
+    RE::NiPoint3 TimelineManager::GetRotationPoint(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, size_t a_index) const {
         std::lock_guard<std::recursive_mutex> lock(m_timelineMutex);
         
         const TimelineState* state = GetTimeline(a_timelineID, a_pluginHandle);
         if (!state) {
             log::error("{}: Timeline {} not found or not owned by plugin handle {}", __FUNCTION__, a_timelineID, a_pluginHandle);
-            return RE::BSTPoint2<float>{0.0f, 0.0f};
+            return RE::NiPoint3{0.0f, 0.0f, 0.0f};
         }
         
         if (a_index >= state->m_timeline.GetRotationPointCount()) {
             log::error("{}: Index {} out of range (timeline {} has {} rotation points)", __FUNCTION__, a_index, a_timelineID, state->m_timeline.GetRotationPointCount());
-            return RE::BSTPoint2<float>{0.0f, 0.0f};
+            return RE::NiPoint3{0.0f, 0.0f, 0.0f};
         }
         
         return state->m_timeline.GetRotationPoint(a_index);
@@ -1273,8 +1308,6 @@ log::info("{}:time: {}  - No FOV points, using FOV {}", __FUNCTION__, sampleTime
             return false;
         }
         
-log::info("{}: Loading timeline from YAML file: {}", __FUNCTION__, a_filePath);
-        
         YAML::Node root = YAML::LoadFile(fullPath.string());
         
         if (root["playbackMode"]) {
@@ -1327,10 +1360,6 @@ log::info("{}: Loading timeline from YAML file: {}", __FUNCTION__, a_filePath);
             }
         }
         
-        size_t translationPointCount = state->m_timeline.GetTranslationPointCount();
-        size_t rotationPointCount = state->m_timeline.GetRotationPointCount();
-        size_t fovPointCount = state->m_timeline.GetFOVPointCount();
-        
         bool importTranslationSuccess = state->m_timeline.AddTranslationPathFromFile(fullPath.string(), a_timeOffset);
         bool importRotationSuccess = state->m_timeline.AddRotationPathFromFile(fullPath.string(), a_timeOffset, rotationConversionFactor);
         bool importFOVSuccess = state->m_timeline.AddFOVPathFromFile(fullPath.string(), a_timeOffset);
@@ -1350,13 +1379,6 @@ log::info("{}: Loading timeline from YAML file: {}", __FUNCTION__, a_filePath);
             return false;
         }
         
-        log::info("{}: Loaded {} translation, {} rotation, and {} FOV points from {} to timeline {}", 
-            __FUNCTION__, 
-            state->m_timeline.GetTranslationPointCount() - translationPointCount, 
-            state->m_timeline.GetRotationPointCount() - rotationPointCount,
-            state->m_timeline.GetFOVPointCount() - fovPointCount,
-            a_filePath, a_timelineID);
-
         return true;
     }
     
@@ -1405,12 +1427,6 @@ log::info("{}: Loading timeline from YAML file: {}", __FUNCTION__, a_filePath);
 			return false;
 		}
 		
-		log::info("{}: Exported {} translation, {} rotation, and {} FOV points from timeline {} to {}", 
-			__FUNCTION__, 
-			state->m_timeline.GetTranslationPointCount(), 
-			state->m_timeline.GetRotationPointCount(),
-			state->m_timeline.GetFOVPointCount(),
-			a_timelineID, a_filePath);
         return true;
     }
 
@@ -1489,7 +1505,6 @@ log::info("{}: Loading timeline from YAML file: {}", __FUNCTION__, a_filePath);
         TimelineState state;
         state.Initialize(newID, a_pluginHandle);
         
-        // Log before move to avoid use-after-move undefined behavior
         log::info("{}: Timeline {} registered by plugin '{}' (handle {})", __FUNCTION__, newID, state.m_ownerName, a_pluginHandle);
         
         m_timelines[newID] = std::move(state);
@@ -1591,7 +1606,7 @@ log::info("{}: Loading timeline from YAML file: {}", __FUNCTION__, a_filePath);
             (a_state->m_currentRecordingTime - a_state->m_lastRecordedPointTime >= a_state->m_recordingInterval)) {
             // Capture camera position/rotation/FOV as kWorld points
             RE::NiPoint3 cameraPos = _ts_SKSEFunctions::GetCameraPos();
-            RE::NiPoint3 cameraRot = _ts_SKSEFunctions::GetCameraRotation();
+            RE::NiPoint3 cameraRot = _ts_SKSEFunctions::GetCameraRotation(); // currently does not provide roll
             float fov = playerCamera ? playerCamera->worldFOV : 80.0f;
             
             Transition transTranslation(a_state->m_currentRecordingTime, InterpolationMode::kCubicHermite, false, false);
@@ -1599,7 +1614,8 @@ log::info("{}: Loading timeline from YAML file: {}", __FUNCTION__, a_filePath);
             a_state->m_timeline.AddTranslationPoint(translationPoint);
             
             Transition transRotation(a_state->m_currentRecordingTime, InterpolationMode::kCubicHermite, false, false);
-            RotationPoint rotationPoint(transRotation, PointType::kWorld, RE::BSTPoint2<float>({cameraRot.x, cameraRot.z}));
+            float cameraRoll = Hooks::FreeCameraRollHook::GetFreeCameraRoll(); // obtain roll via hook since _ts_SKSEFunctions::GetCameraRotation() doesn't provide it
+            RotationPoint rotationPoint(transRotation, PointType::kWorld, RE::NiPoint3{cameraRot.x, cameraRoll, cameraRot.z});
             a_state->m_timeline.AddRotationPoint(rotationPoint);
             
             Transition transFOV(a_state->m_currentRecordingTime, InterpolationMode::kCubicHermite, false, false);

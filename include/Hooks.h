@@ -99,6 +99,27 @@ namespace Hooks
         static inline REL::Relocation<decltype(SetCenter)> _SetCenter;
     };
 
+    class FreeCameraRollHook
+    {
+    public:
+        static void Hook()
+        {
+            // Hook FromEulerAnglesZXY called during FreeCamera::GetRotation
+            REL::Relocation<std::uintptr_t> getRot{ RELOCATION_ID(49814, 50744), 0x1B };
+            auto& trampoline = SKSE::GetTrampoline();
+            _FromEulerAnglesZXY = trampoline.write_call<5>(getRot.address(), FromEulerAnglesZXY);
+        }
+
+        // Set custom roll value
+        static void SetFreeCameraRoll(float a_roll) { m_cameraRoll = a_roll; }
+        static float GetFreeCameraRoll() { return m_cameraRoll; }
+
+    private:
+        static void FromEulerAnglesZXY(RE::NiMatrix3* a_matrix, float a_z, float a_x, float a_y);
+        static inline REL::Relocation<decltype(FromEulerAnglesZXY)> _FromEulerAnglesZXY;
+        static inline float m_cameraRoll{ 0.0f };
+    };
+
 
 	void Install();
 } // namespace Hooks	

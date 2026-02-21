@@ -165,14 +165,14 @@ namespace FCFW_API {
         /// <param name="a_pluginHandle">Plugin handle of the calling plugin (use SKSE::GetPluginHandle())</param>
         /// <param name="a_timelineID">Timeline ID to add the point to</param>
         /// <param name="a_time">Time in seconds when this point occurs</param>
-        /// <param name="a_rotation">Rotation in radians as RE::BSTPoint2&lt;float&gt; (x=pitch, y=yaw relative to world coordinates)</param>
-        /// <param name="a_easeIn">Apply ease-in at the start of interpolation (default: false)</param>
+		/// <param name="a_rotation">Rotation in radians as RE::NiPoint3 (x=pitch, y=roll, z=yaw).
+		/// <param name="a_easeIn">Apply ease-in at the start of interpolation (default: false)</param>
         /// <param name="a_easeOut">Apply ease-out at the end of interpolation (default: false)</param>
         /// <param name="a_interpolationMode">Interpolation mode (default: kCubicHermite)</param>
         /// <returns>Index of the added point, or -1 on failure</returns>
         /// <remarks>NOTE: Both easeIn and easeOut control the INCOMING segment (previous→current point), not the outgoing segment.
         /// For smooth transition through a point, set easeOut=false for the current point AND easeIn=false for the next point.</remarks>
-        [[nodiscard]] virtual int AddRotationPoint(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, float a_time, const RE::BSTPoint2<float>& a_rotation, bool a_easeIn = false, bool a_easeOut = false, InterpolationMode a_interpolationMode = InterpolationMode::kCubicHermite) const noexcept = 0;
+        [[nodiscard]] virtual int AddRotationPoint(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, float a_time, const RE::NiPoint3& a_rotation, bool a_easeIn = false, bool a_easeOut = false, InterpolationMode a_interpolationMode = InterpolationMode::kCubicHermite) const noexcept = 0;
 		
 		/// <summary>
 		/// Add a rotation point that sets the rotation relative to camera-to-reference direction, or alternatively the ref's heading
@@ -181,9 +181,9 @@ namespace FCFW_API {
 		/// <param name="a_timelineID">Timeline ID to add the point to</param>
 		/// <param name="a_time">Time in seconds when this point occurs</param>
 		/// <param name="a_reference">The object reference to track</param>
-		/// <param name="a_offset">Rotation offset as RE::BSTPoint2&lt;float&gt; (x=pitch, y=yaw in radians). Meaning depends on a_isOffsetRelative:
-		///            a_isOffsetRelative == false - offset from camera-to-reference direction (0,0 means looking directly at reference)
-		///            a_isOffsetRelative == true - offset from reference's heading (0,0 means looking in direction ref is facing)</param>
+		/// <param name="a_offset">Rotation offset as RE::NiPoint3 (x=pitch, y=roll, z=yaw in radians). Meaning depends on a_isOffsetRelative:
+		///            a_isOffsetRelative == false - offset from camera-to-reference direction (0,0,0 means looking directly at reference)
+		///            a_isOffsetRelative == true - offset from reference's heading (0,0,0 means looking in direction ref is facing)</param>
 		/// <param name="a_bodyPart">Body part to track rotation from (default: kNone = root rotation)</param>
 		/// <param name="a_isOffsetRelative">If true, offset is relative to reference's heading instead of camera-to-reference direction (default: false)</param>
 		/// <param name="a_easeIn">Ease in at the start of interpolation (default: false)</param>
@@ -192,7 +192,7 @@ namespace FCFW_API {
 		/// <returns> Index of the added point on success, -1 on failure</returns>
 		/// <remarks>NOTE: Both easeIn and easeOut control the INCOMING segment (previous→current point), not the outgoing segment.
 		/// For smooth transition through a point, set easeOut=false for the current point AND easeIn=false for the next point.</remarks>
-		[[nodiscard]] virtual int AddRotationPointAtRef(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, float a_time, RE::TESObjectREFR* a_reference, BodyPart a_bodyPart = BodyPart::kNone, const RE::BSTPoint2<float>& a_offset = RE::BSTPoint2<float>(), bool a_isOffsetRelative = false, bool a_easeIn = false, bool a_easeOut = false, InterpolationMode a_interpolationMode = InterpolationMode::kCubicHermite) const noexcept = 0;        /// <summary>
+		[[nodiscard]] virtual int AddRotationPointAtRef(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, float a_time, RE::TESObjectREFR* a_reference, BodyPart a_bodyPart = BodyPart::kNone, const RE::NiPoint3& a_offset = RE::NiPoint3(), bool a_isOffsetRelative = false, bool a_easeIn = false, bool a_easeOut = false, InterpolationMode a_interpolationMode = InterpolationMode::kCubicHermite) const noexcept = 0;        /// <summary>
 
 		/// Add a rotation point that captures camera rotation at the start of playback.
         /// This point can be used to start playback smoothly from the last camera rotation, and return to it later.
@@ -312,13 +312,13 @@ namespace FCFW_API {
 
 		/// <summary>
 		/// Get the rotation of a rotation point by index.
-		/// Returns the rotation as pitch (x) and yaw (y) in radians.
+		/// Returns the rotation as pitch (x), roll (y), and yaw (z) in radians.
 		/// </summary>
 		/// <param name="a_pluginHandle">Plugin handle for ownership validation</param>
 		/// <param name="a_timelineID">Timeline ID to query</param>
 		/// <param name="a_index">Index of the rotation point (0-based)</param>
-		/// <returns>RE::BSTPoint2&lt;float&gt; with rotation (x=pitch, y=yaw in radians), or (0,0) if timeline not found/owned or index out of range</returns>
-		[[nodiscard]] virtual RE::BSTPoint2<float> GetRotationPoint(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, size_t a_index) const noexcept = 0;
+		/// <returns>RE::NiPoint3 with rotation (x=pitch, y=roll, z=yaw in radians), or (0,0,0) if timeline not found/owned or index out of range</returns>
+		[[nodiscard]] virtual RE::NiPoint3 GetRotationPoint(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, size_t a_index) const noexcept = 0;
 
 		/// <summary>
 		/// Get the number of FOV points in the timeline.

@@ -36,22 +36,24 @@ namespace FCFW {
         };
         
         template<> struct PointTraits<RotationPoint> {
-            using ValueType = RE::BSTPoint2<float>;
+            using ValueType = RE::NiPoint3;
             static constexpr const char* SectionName = "rotationPoints";
             static constexpr const char* ValueKey = "rotation";
-            static constexpr size_t ValueSize = 2;
+            static constexpr size_t ValueSize = 3;
             
             static ValueType ReadValue(const YAML::Node& node, float conversionFactor) {
                 return ValueType{
-                    node[0].as<float>() * conversionFactor,
-                    node[1].as<float>() * conversionFactor
+                    node[0].as<float>() * conversionFactor,  // pitch
+                    node[1].as<float>() * conversionFactor,  // roll
+                    node[2].as<float>() * conversionFactor   // yaw
                 };
             }
             
             static void WriteValue(YAML::Emitter& out, const ValueType& value, float conversionFactor) {
                 out << YAML::Flow << YAML::BeginSeq 
-                    << (value.x * conversionFactor) 
-                    << (value.y * conversionFactor) 
+                    << (value.x * conversionFactor)  // pitch
+                    << (value.y * conversionFactor)  // roll
+                    << (value.z * conversionFactor)  // yaw
                     << YAML::EndSeq;
             }
         };

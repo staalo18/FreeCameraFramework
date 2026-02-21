@@ -287,7 +287,6 @@ namespace FCFW {
 
     void InitializeFreeCameraTrampoline(std::uintptr_t a_trampolineAddr) {
         g_freeCameraTrampoline = a_trampolineAddr;
-        log::info("FCFW_Utils: Initialized free camera trampoline at 0x{:X}", a_trampolineAddr);
     }
 
     void ToggleFreeCameraNotHooked(bool a_freezeTime) {

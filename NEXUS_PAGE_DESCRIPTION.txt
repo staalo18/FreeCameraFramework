@@ -1,0 +1,97 @@
+[center][size=6][b]FreeCamera Framework[/b][/size]
+
+[line]
+
+[size=5][b]About This Mod[/b][/size]
+
+A powerful modder's resource that brings fully free camera control to your mod. 
+
+[b]This is a modder's resource, not a standalone gameplay mod.[/b]
+The FreeCamera Framework (FCFW) is an SKSE plugin that provides C++ and Papyrus APIs for embedding your own custom camera logic into your mod.
+
+This plugin is part of the Cutscene Framework for cinematic cutscene generation in Skyrim. Cutscene Framework Discord.
+
+[size=5][b]For Users[/b][/size]
+
+This SKSE plugin is a framework for other mods to use. By itself, it does nothing visible in-game.
+Install it if a mod you're using lists it as a requirement.
+Note that FCFW itself requires [url=https://www.nexusmods.com/skyrimspecialedition/mods/51073]powerofthree's Tweaks[/url] to properly support bodyparts!
+
+Watch the videos below to see some examples of what can be done with FCFW:
+
+[b]Cinematic Cutscene Generation[/b]
+[youtube]QR0wNmJ2Keo[/youtube]
+[i]A Skyrim cutscene implemented using FCFW - scene from the Caistorshold mod[/i]
+
+[b]Record and playback Camera Paths[/b]
+[youtube]eW11ovmrREI[/youtube]
+[i]Camera path recorded and played back in real-time using FCFW[/i]
+
+[b]Example Mod: Second Sight Spell - See Through Others' Eyes[/b]
+[youtube]vbNjzO7NR-Q[/youtube]
+[i]A spell that lets you experience the world through another character's perspective, powered by FCFW[/i]
+
+[b]Programatic Camera control[/b]
+[youtube]i7UA1nTT15A[/youtube]
+[i]Example of FCFW's programmable camera: smooth orbit around a moving actor, then return to player[/i]
+
+
+[size=5][b]Key Features[/b][/size]
+
+**Full API Support for Papyrus, and SKSE plugins. Comprehensive example mod and documentation included to get you started quickly.
+
+**Flexible Camera Path definition via control points for translation, rotation, FOV. 
+   Control points can be in world coordinates, or  relative to any object reference.
+   Various interpolation modes are available to tune camera behavior between the individual control points
+
+**Multi-Timeline system allows for management of multiple independent camera timelines within the same plugin, and across different plugins.
+
+**Real-Time recording of in-game camera movements. Recorded camera timelines can be played back any time
+
+**Option to enable camera rotation control for the user during playback
+
+**Camera timelines can be exported to YAML files for editing and distribution. Import pre-made or edited camera timelines, share timelines between mods or sessions.
+
+**Event callbacks enable you to dynamically react on playback events. For example, chain camera timeline sequences using event-driven logic
+
+
+[size=5][b]Quick Start For Mod Developers[/b][/size]
+
+Download the example mod (FCFW_EXAMPLE) from this page, or grab it directly from the FCFW installation (`Documentation/PapyrusExample`). Install it in your Data directory, and activate FCFW_EXAMPLE.esp in your mod list.
+
+Test the FCFW_EXAMPLE features by pressing the following keys:
+* Key '1' - Cinematic Orbit Sequence: Smooth approach from current camera position to orbit entry (center is a marker reference above the player), followed by continuous circular orbit around marker (looping). During this stage the user can rotate the camera freely while it is orbiting. Pressing '1' again triggers a smooth return to initial camera position.
+* Key '2' - Playback Sequence: Plays back camera timeline. Timeline can be defined via recording (via key '3'), or from imported YAML (via key '5').
+* Key '3' - Recording Mode: Records camera movement in real-time. Can be exported to a YAML file via key '4', and played back via Key '2'.
+* Key '4' - Export Recorded Timeline to YAML File: Exports recorded timeline to a YAML file for external editing and later import/use. Exported timeline file can be found in the Skyrim Data folder (`FCFW_EXAMPLE_TIMELINE.yaml`).
+* Key '5' - Import Recorded Timeline from YAML File: Imports timeline from `FCFW_EXAMPLE_TIMELINE.yaml`. Play back imported timeline via Key '2'.
+
+Review `Source/Scripts/FCFW_EXAMPLE_QUESTSCRIPT.psc` to get an understanding on how the various features are implemented using the FCFW API. Look at the proposed exercises in the comment section and start modifying the script / YAML files.
+
+Comprehensive reference for plugin developers: `Documentation/FCFW_DEVELOPER_REFERENCE.md`
+
+Complete API documentation (Papyrus): `Source/Scripts/FCFW_SKSEFunctions.psc`
+Complete API documentation (C++): Get `include/FCFW_API.h` from the FCFW [url=https://github.com/staalo18/FreeCameraFramework]GitHub[/url].
+
+To understand the timeline YAML file format, check out the timeline example files in `Documentation/TimelineFileExample/*.yaml`:
+- FCFW_Timeline_orbitReference.yaml - a looping orbit around a reference
+- FCFW_Timeline_trackReferenceAndReturn.yaml - move camera to reference, track it for a while, then return
+- FCFW_Timeline_worldPath.yaml - a pre-recorded world-space camera path with wait at end
+
+The complete timeline YAML format description is here: `Documentation/TimelineFileExample/TIMELINE_FORMAT.md`
+
+
+[size=5][b]Requirements[/b][/size]
+
+• [url=https://skse.silverlock.org]Skyrim Script Extender (SKSE)[/url]
+• [url=https://www.nexusmods.com/skyrimspecialedition/mods/32444]Address Library for SKSE Plugins[/url]
+• [url=https://www.nexusmods.com/skyrimspecialedition/mods/51073]powerofthree's Tweaks[/url]
+
+[size=5][b]Credits & Source Code[/b][/size]
+
+The CommonLib community for providing Commonlib.
+[url=https://www.nexusmods.com/profile/Ershin]Ersh[/url] for publishing the source code for [url=https://www.nexusmods.com/skyrimspecialedition/mods/51614]True Directional Movemennt[/url], which served as a reference for some of the camera related logic.
+[url=https://www.nexusmods.com/profile/Pickysaurus]Pickysaurus[/url] for the idea, and his support for this framework.
+[url=https://www.nexusmods.com/profile/Cassieandstuff]Cassie[/url], [url=https://www.nexusmods.com/profile/xYZeroYx]Viny[/url], COACHWICKWACK from the Cutscene Framework team for their support. Cutscene Framework Discord:
+
+FCFW sources: [url=https://github.com/staalo18/FreeCameraFramework]GitHub[/url]

@@ -33,7 +33,7 @@ translationPoints:
 rotationPoints:
   - time: 0.0
     type: world
-    rotation: [pitch, yaw]
+    rotation: [pitch, roll, yaw]
     interpolationMode: cubicHermite
     easeIn: false
     easeOut: false
@@ -262,23 +262,24 @@ Rotation points define camera aim direction over time. Array: `rotationPoints`
 
 **Angle Format:**
 - `pitch` - Vertical angle (positive = up, negative = down)
+- `roll` - Camera tilt/banking (positive = clockwise rotation, negative = counter-clockwise)
 - `yaw` - Horizontal angle (0° = north, 90° = east, 180° = south, 270° = west)
 - Units determined by `useDegrees` setting
 
 ### World Type
 
-Static pitch/yaw angles in world space.
+Static pitch/roll/yaw angles in world space.
 
 **Required Fields:**
 - `time`
 - `type: world`
-- `rotation: [pitch, yaw]` - Angles in degrees or radians
+- `rotation: [pitch, roll, yaw]` - Angles in degrees or radians
 
 **Example:**
 ```yaml
 - time: 0.0
   type: world
-  rotation: [15.0, 90.0]     # Looking east, tilted 15° up
+  rotation: [15.0, 0.0, 90.0]     # Looking east, tilted 15° up, no roll
   interpolationMode: cubicHermite
 ```
 
@@ -290,7 +291,7 @@ Rotation pointing at or relative to reference.
 - `time`
 - `type: reference`
 - `reference:` - Same format as translation reference (editorID or plugin+formID)
-- `offset: [pitch, yaw]` - Angle offset
+- `offset: [pitch, roll, yaw]` - Angle offset
 
 **Optional Fields:**
 - `isOffsetRelative: boolean` (default: `false`)
@@ -303,7 +304,7 @@ Rotation pointing at or relative to reference.
   type: reference
   reference:
     editorID: "PlayerRef"
-  offset: [10.0, 0.0]           # Look at player, 10° above center
+  offset: [10.0, 0.0, 0.0]      # Look at player, 10° above center, no roll or yaw offset
   isOffsetRelative: false
   interpolationMode: linear
 ```
@@ -314,7 +315,7 @@ Rotation pointing at or relative to reference.
   type: reference
   reference:
     editorID: "PlayerRef"
-  offset: [0.0, 45.0]           # Face same direction as player, rotated 45° right
+  offset: [0.0, 0.0, 45.0]      # Face same direction as player, rotated 45° right, no pitch or roll offset
   isOffsetRelative: true
   interpolationMode: cubicHermite
 ```
@@ -326,18 +327,18 @@ Rotation relative to camera aim at playback start.
 **Required Fields:**
 - `time`
 - `type: camera`
-- `offset: [pitch, yaw]` - Angle offset from camera rotation at `StartPlayback()` call
+- `offset: [pitch, roll, yaw]` - Angle offset from camera rotation at `StartPlayback()` call
 
-**Behavior:** Camera rotation is captured once when playback starts. Offset is added to create absolute pitch/yaw. After baking, behaves as static world rotation during playback.
+**Behavior:** Camera rotation is captured once when playback starts. Offset is added to create absolute pitch/roll/yaw. After baking, behaves as static world rotation during playback.
 
 **Example:**
 ```yaml
 - time: 0.0
   type: camera
-  offset: [0.0, 0.0]            # Start at current camera rotation
+  offset: [0.0, 0.0, 0.0]       # Start at current camera rotation
 - time: 3.0
   type: camera
-  offset: [0.0, 90.0]           # Rotate 90° right from start
+  offset: [0.0, 0.0, 90.0]      # Rotate 90° right from start, no pitch or roll change
 ```
 
 ---

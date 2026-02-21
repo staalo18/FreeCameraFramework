@@ -72,7 +72,7 @@ translationPoints:
 rotationPoints:
   - time: 0
     type: reference
-    offset: [0, 0]
+    offset: [0, 0, 0]
     reference:
       plugin: Skyrim.esm
       formID: 0xD8C56
