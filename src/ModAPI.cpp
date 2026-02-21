@@ -26,7 +26,6 @@ bool Messaging::FCFWInterface::RegisterPlugin(SKSE::PluginHandle a_pluginHandle)
 
 size_t Messaging::FCFWInterface::RegisterTimeline(SKSE::PluginHandle a_pluginHandle) const noexcept {
 	size_t result = FCFW::TimelineManager::GetSingleton().RegisterTimeline(a_pluginHandle);
-	log::info("{}: API wrapper returning timeline ID {}", __FUNCTION__, result);
 	return result;
 }
 
@@ -46,11 +45,11 @@ int Messaging::FCFWInterface::AddTranslationPointAtCamera(SKSE::PluginHandle a_p
 	return FCFW::TimelineManager::GetSingleton().AddTranslationPointAtCamera(a_pluginHandle, a_timelineID, a_time, a_easeIn, a_easeOut, static_cast<FCFW::InterpolationMode>(a_interpolationMode));
 }
 
-int Messaging::FCFWInterface::AddRotationPoint(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, float a_time, const RE::BSTPoint2<float>& a_rotation, bool a_easeIn, bool a_easeOut, FCFW_API::InterpolationMode a_interpolationMode) const noexcept {
+int Messaging::FCFWInterface::AddRotationPoint(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, float a_time, const RE::NiPoint3& a_rotation, bool a_easeIn, bool a_easeOut, FCFW_API::InterpolationMode a_interpolationMode) const noexcept {
 	return FCFW::TimelineManager::GetSingleton().AddRotationPoint(a_pluginHandle, a_timelineID, a_time, a_rotation, a_easeIn, a_easeOut, static_cast<FCFW::InterpolationMode>(a_interpolationMode));
 }
 
-int Messaging::FCFWInterface::AddRotationPointAtRef(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, float a_time, RE::TESObjectREFR* a_reference, FCFW_API::BodyPart a_bodyPart, const RE::BSTPoint2<float>& a_offset, bool a_isOffsetRelative, bool a_easeIn, bool a_easeOut, FCFW_API::InterpolationMode a_interpolationMode) const noexcept {
+int Messaging::FCFWInterface::AddRotationPointAtRef(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, float a_time, RE::TESObjectREFR* a_reference, FCFW_API::BodyPart a_bodyPart, const RE::NiPoint3& a_offset, bool a_isOffsetRelative, bool a_easeIn, bool a_easeOut, FCFW_API::InterpolationMode a_interpolationMode) const noexcept {
 	return FCFW::TimelineManager::GetSingleton().AddRotationPointAtRef(a_pluginHandle, a_timelineID, a_time, a_reference, static_cast<FCFW::BodyPart>(a_bodyPart), a_offset, a_isOffsetRelative, a_easeIn, a_easeOut, static_cast<FCFW::InterpolationMode>(a_interpolationMode));
 }
 
@@ -102,7 +101,7 @@ RE::NiPoint3 Messaging::FCFWInterface::GetTranslationPoint(SKSE::PluginHandle a_
 	return FCFW::TimelineManager::GetSingleton().GetTranslationPoint(a_pluginHandle, a_timelineID, a_index);
 }
 
-RE::BSTPoint2<float> Messaging::FCFWInterface::GetRotationPoint(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, size_t a_index) const noexcept {
+RE::NiPoint3 Messaging::FCFWInterface::GetRotationPoint(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, size_t a_index) const noexcept {
 	return FCFW::TimelineManager::GetSingleton().GetRotationPoint(a_pluginHandle, a_timelineID, a_index);
 }
 

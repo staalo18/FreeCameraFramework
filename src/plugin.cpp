@@ -116,7 +116,7 @@ log::error("{}: Invalid mod name '{}' or timeline ID {}", __FUNCTION__, a_modNam
             return FCFW::TimelineManager::GetSingleton().AddRotationPointAtCamera(handle, static_cast<size_t>(a_timelineID), a_time, a_easeIn, a_easeOut, ToInterpolationMode(a_interpolationMode));
         }
 
-        int AddRotationPoint(RE::StaticFunctionTag*, RE::BSFixedString a_modName, int a_timelineID, float a_time, float a_pitch, float a_yaw, bool a_easeIn, bool a_easeOut, int a_interpolationMode) {
+        int AddRotationPoint(RE::StaticFunctionTag*, RE::BSFixedString a_modName, int a_timelineID, float a_time, float a_pitch, float a_yaw, float a_roll, bool a_easeIn, bool a_easeOut, int a_interpolationMode) {
             if (a_modName.empty() || a_timelineID <= 0) {
                 return -1;
             }
@@ -128,11 +128,11 @@ log::error("{}: Invalid mod name '{}' or timeline ID {}", __FUNCTION__, a_modNam
             }
 
             // Convert from degrees (Papyrus convention) to radians (C++ API)
-            RE::BSTPoint2<float> rotation{PI / 180.f * a_pitch, PI / 180.f * a_yaw};
+            RE::NiPoint3 rotation{PI / 180.f * a_pitch, PI / 180.f * a_roll, PI / 180.f * a_yaw};
             return FCFW::TimelineManager::GetSingleton().AddRotationPoint(handle, static_cast<size_t>(a_timelineID), a_time, rotation, a_easeIn, a_easeOut, ToInterpolationMode(a_interpolationMode));
         }
 
-        int AddRotationPointAtRef(RE::StaticFunctionTag*, RE::BSFixedString a_modName, int a_timelineID, float a_time, RE::TESObjectREFR* a_reference, int a_bodyPart, float a_offsetPitch, float a_offsetYaw, bool a_isOffsetRelative, bool a_easeIn, bool a_easeOut, int a_interpolationMode) {
+        int AddRotationPointAtRef(RE::StaticFunctionTag*, RE::BSFixedString a_modName, int a_timelineID, float a_time, RE::TESObjectREFR* a_reference, int a_bodyPart, float a_offsetPitch, float a_offsetYaw, float a_offsetRoll, bool a_isOffsetRelative, bool a_easeIn, bool a_easeOut, int a_interpolationMode) {
             if (a_modName.empty() || a_timelineID <= 0) {
                 return -1;
             }
@@ -144,7 +144,7 @@ log::error("{}: Invalid mod name '{}' or timeline ID {}", __FUNCTION__, a_modNam
             }
 
             // Convert from degrees (Papyrus convention) to radians (C++ API)
-            RE::BSTPoint2<float> offset{PI / 180.f * a_offsetPitch, PI / 180.f * a_offsetYaw};
+            RE::NiPoint3 offset{PI / 180.f * a_offsetPitch, PI / 180.f * a_offsetRoll, PI / 180.f * a_offsetYaw};
             return FCFW::TimelineManager::GetSingleton().AddRotationPointAtRef(handle, static_cast<size_t>(a_timelineID), a_time, a_reference, ToBodyPart(a_bodyPart), offset, a_isOffsetRelative, a_easeIn, a_easeOut, ToInterpolationMode(a_interpolationMode));
         }
 
@@ -344,8 +344,9 @@ log::error("{}: Invalid mod name '{}' or timeline ID {}", __FUNCTION__, a_modNam
                 return 0.0f;
             }
 
-            RE::BSTPoint2<float> point = FCFW::TimelineManager::GetSingleton().GetRotationPoint(handle, static_cast<size_t>(a_timelineID), static_cast<size_t>(a_index));
-            return point.x;
+            RE::NiPoint3 point = FCFW::TimelineManager::GetSingleton().GetRotationPoint(handle, static_cast<size_t>(a_timelineID), static_cast<size_t>(a_index));
+            // Convert from radians (C++ API) to degrees (Papyrus convention)
+            return point.x * 180.f / PI;  // pitch
         }
 
         float GetRotationPointYaw(RE::StaticFunctionTag*, RE::BSFixedString a_modName, int a_timelineID, int a_index) {
@@ -359,8 +360,25 @@ log::error("{}: Invalid mod name '{}' or timeline ID {}", __FUNCTION__, a_modNam
                 return 0.0f;
             }
 
-            RE::BSTPoint2<float> point = FCFW::TimelineManager::GetSingleton().GetRotationPoint(handle, static_cast<size_t>(a_timelineID), static_cast<size_t>(a_index));
-            return point.y;
+            RE::NiPoint3 point = FCFW::TimelineManager::GetSingleton().GetRotationPoint(handle, static_cast<size_t>(a_timelineID), static_cast<size_t>(a_index));
+            // Convert from radians (C++ API) to degrees (Papyrus convention)
+            return point.z * 180.f / PI;  // yaw
+        }
+
+        float GetRotationPointRoll(RE::StaticFunctionTag*, RE::BSFixedString a_modName, int a_timelineID, int a_index) {
+            if (a_modName.empty() || a_timelineID <= 0 || a_index < 0) {
+                return 0.0f;
+            }
+
+            SKSE::PluginHandle handle = FCFW::ModNameToHandle(a_modName.c_str());
+            if (handle == 0) {
+                log::error("{}: Invalid mod name '{}' - mod not loaded or doesn't exist", __FUNCTION__, a_modName.c_str());
+                return 0.0f;
+            }
+
+            RE::NiPoint3 point = FCFW::TimelineManager::GetSingleton().GetRotationPoint(handle, static_cast<size_t>(a_timelineID), static_cast<size_t>(a_index));
+            // Convert from radians (C++ API) to degrees (Papyrus convention)
+            return point.y * 180.f / PI;  // roll
         }
 
         float GetFOVPoint(RE::StaticFunctionTag*, RE::BSFixedString a_modName, int a_timelineID, int a_index) {
@@ -672,12 +690,14 @@ log::error("{}: Invalid mod name '{}' or timeline ID {}", __FUNCTION__, a_modNam
         
         float GetCameraPitch(RE::StaticFunctionTag*) {
             RE::NiPoint3 rot = _ts_SKSEFunctions::GetCameraRotation();
-            return rot.x;  // Pitch
+            // Convert from radians (C++ API) to degrees (Papyrus convention)
+            return rot.x * 180.f / PI;  // Pitch
         }
         
         float GetCameraYaw(RE::StaticFunctionTag*) {
             RE::NiPoint3 rot = _ts_SKSEFunctions::GetCameraRotation();
-            return rot.z;  // Yaw
+            // Convert from radians (C++ API) to degrees (Papyrus convention)
+            return rot.z * 180.f / PI;  // Yaw
         }
         
         void RegisterForTimelineEvents(RE::StaticFunctionTag*, RE::TESForm* a_form) {
@@ -729,6 +749,7 @@ log::error("{}: Invalid mod name '{}' or timeline ID {}", __FUNCTION__, a_modNam
             a_vm->RegisterFunction("GetTranslationPointZ", "FCFW_SKSEFunctions", GetTranslationPointZ);
             a_vm->RegisterFunction("GetRotationPointPitch", "FCFW_SKSEFunctions", GetRotationPointPitch);
             a_vm->RegisterFunction("GetRotationPointYaw", "FCFW_SKSEFunctions", GetRotationPointYaw);
+            a_vm->RegisterFunction("GetRotationPointRoll", "FCFW_SKSEFunctions", GetRotationPointRoll);
             a_vm->RegisterFunction("GetFOVPoint", "FCFW_SKSEFunctions", GetFOVPoint);
             a_vm->RegisterFunction("StartPlayback", "FCFW_SKSEFunctions", StartPlayback);
             a_vm->RegisterFunction("StopPlayback", "FCFW_SKSEFunctions", StopPlayback);

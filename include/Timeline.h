@@ -22,7 +22,7 @@ namespace FCFW
 		void ResumePlayback();
 
 	RE::NiPoint3 GetTranslation(float a_time) const;
-	RE::BSTPoint2<float> GetRotation(float a_time) const;
+	RE::NiPoint3 GetRotation(float a_time) const;
 	float GetFOV(float a_time) const;
 
 	size_t GetTranslationPointCount() const;
@@ -53,7 +53,7 @@ namespace FCFW
 	bool ExportFOVPath(std::ofstream& a_file) const;
 
 	RE::NiPoint3 GetTranslationPoint(size_t a_index) const;
-	RE::BSTPoint2<float> GetRotationPoint(size_t a_index) const;
+	RE::NiPoint3 GetRotationPoint(size_t a_index) const;
 	float GetFOVPoint(size_t a_index) const;private:
 	TranslationTrack m_translationTrack;  // Position keyframes
 	RotationTrack m_rotationTrack;        // Rotation keyframes

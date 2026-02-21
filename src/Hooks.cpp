@@ -14,6 +14,7 @@ namespace Hooks
 		MovementHook::Hook();
 		FreeCameraStateHook::Hook();
 		ToggleFreeCameraHook::Hook();
+		FreeCameraRollHook::Hook();
 		
  //       GridCellArrayHook::Hook();
 
@@ -220,4 +221,11 @@ return _SetCenter(a_this, a_x, a_y);
 		// Call original
 		return _SetCenter(a_this, a_x, a_y); */
 	}
+
+	void FreeCameraRollHook::FromEulerAnglesZXY(RE::NiMatrix3* a_matrix, float a_z /*yaw*/, float a_x /*pitch*/, float /*roll*/)
+	{
+		// Replace roll parameter with custom value
+		return _FromEulerAnglesZXY(a_matrix, a_z, a_x, m_cameraRoll);
+	}
+
 } // namespace Hooks

@@ -47,13 +47,13 @@ translationPoints:
 rotationPoints:
   - time: 0
     type: camera
-    offset: [0, 0]
+    offset: [0, 0, 0]
     interpolationMode: cubicHermite
     easeIn: true
     easeOut: true
   - time: 0.5
     type: reference
-    offset: [0, 0]
+    offset: [0, 0, 0]
     reference:
       plugin: Skyrim.esm
       formID: 0xD8C58
@@ -63,7 +63,7 @@ rotationPoints:
     easeOut: true
   - time: 1.5
     type: reference
-    offset: [0, 0]
+    offset: [0, 0, 0]
     reference:
       plugin: Skyrim.esm
       formID: 0xD8C58
@@ -73,7 +73,7 @@ rotationPoints:
     easeOut: true
   - time: 2
     type: reference
-    offset: [0, 0]
+    offset: [0, 0, 0]
     reference:
       plugin: Skyrim.esm
       formID: 0xD8C58
@@ -83,7 +83,7 @@ rotationPoints:
     easeOut: true
   - time: 8
     type: reference
-    offset: [0, 0]
+    offset: [0, 0, 0]
     reference:
       plugin: Skyrim.esm
       formID: 0xD8C58
@@ -93,7 +93,7 @@ rotationPoints:
     easeOut: true
   - time: 9
     type: reference
-    offset: [0, 0]
+    offset: [0, 0, 0]
     reference:
       formID: 0x14
     isOffsetRelative: false
@@ -102,7 +102,7 @@ rotationPoints:
     easeOut: true
   - time: 10
     type: camera
-    offset: [0, 0]
+    offset: [0, 0, 0]
     interpolationMode: cubicHermite
     easeIn: true
     easeOut: true

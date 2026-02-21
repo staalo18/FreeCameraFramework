@@ -3,6 +3,7 @@
 #include "CameraTypes.h"
 #include "_ts_SKSEFunctions.h"
 #include "FCFW_Utils.h"
+#include "Hooks.h"
 #include <stdexcept>
 
 
@@ -182,28 +183,30 @@ namespace FCFW {
         RotationPoint(
             const Transition& a_transition = Transition(0.0f, InterpolationMode::kCubicHermite, false, false),
             PointType a_pointType = PointType::kWorld,
-            const RE::BSTPoint2<float>& a_point = {0.f, 0.f},
-            const RE::BSTPoint2<float>& a_offset = {0.f, 0.f},
+            const RE::NiPoint3& a_point = {0.f, 0.f, 0.f},
+            const RE::NiPoint3& a_offset = {0.f, 0.f, 0.f},
             RE::TESObjectREFR* a_reference = nullptr,
             bool a_isOffsetRelative = false,
             BodyPart a_bodyPart = BodyPart::kNone)
             : m_transition(a_transition)
-            , m_point(a_point)           // rotation (kWorld and kCamera(baked))
+            , m_point(a_point)           // rotation (kWorld and kCamera(baked)) - pitch=x, roll=y, yaw=z
             , m_pointType(a_pointType)   // kWorld, kReference, kCamera
             , m_reference(a_reference)   // used for kReference type
             , m_offset(a_offset)         // offset for kReference and kCamera types
             , m_isOffsetRelative(a_isOffsetRelative) // unused for kWorld type
             , m_bodyPart(a_bodyPart) {}     // Body part to extract rotation from (kReference only, requires m_isOffsetRelative=true)
 
-        RE::BSTPoint2<float> GetPointAtCamera() const {
+        RE::NiPoint3 GetPointAtCamera() const {
             auto rotation = _ts_SKSEFunctions::GetCameraRotation();
-            return RE::BSTPoint2<float>{rotation.x + m_offset.x, rotation.z + m_offset.y};  // Pitch + offsetPitch, Yaw + offsetYaw
+            float cameraRoll = Hooks::FreeCameraRollHook::GetFreeCameraRoll();
+            return RE::NiPoint3{rotation.x + m_offset.x, cameraRoll + m_offset.y, rotation.z + m_offset.z};  // Pitch + offsetPitch, offsetRoll, Yaw + offsetYaw
         }
 
-        RE::BSTPoint2<float> GetPoint() const {
+        RE::NiPoint3 GetPoint() const {
             if (m_pointType == PointType::kReference && m_reference && m_reference->Is3DLoaded()) {
                 if (m_isOffsetRelative) { // If offset is relative to reference heading, use reference's facing direction
                     float pitch = 0.0f;
+                    float roll = 0.0f;
                     float yaw = 0.0f;
                     RE::Actor* actor = m_reference->As<RE::Actor>();
                     
@@ -214,6 +217,7 @@ namespace FCFW {
                             // Extract rotation from body part node
                             auto rotation = _ts_SKSEFunctions::GetBodyPartRotation(actor, BodyPartToLimbEnum(m_bodyPart));
                             pitch = rotation.x;
+                            roll = rotation.y;
                             yaw = rotation.z;
                         } else {
                             // Fallback to actor root rotation
@@ -225,13 +229,15 @@ namespace FCFW {
                     } else {
                         // Not an actor, use reference angles
                         pitch = m_reference->GetAngleX();
+                        roll = m_reference->GetAngleY();
                         yaw = m_reference->GetAngleZ();
                     }
                     
-                    // Apply offset to reference's base orientation and cache
-                    m_point = RE::BSTPoint2<float>{
+                    // Apply offset to reference's base orientation and cache (pitch, roll, yaw)
+                    m_point = RE::NiPoint3{
                         _ts_SKSEFunctions::NormalRelativeAngle(pitch + m_offset.x),
-                        _ts_SKSEFunctions::NormalRelativeAngle(yaw + m_offset.y)};
+                        _ts_SKSEFunctions::NormalRelativeAngle(roll + m_offset.y),
+                        _ts_SKSEFunctions::NormalRelativeAngle(yaw + m_offset.z)};
                     return m_point;
                 } else { // camera looks at reference with offset
                     // Get target position (body part if specified for actors, otherwise root position)
@@ -266,9 +272,10 @@ namespace FCFW {
                     float baseYaw = std::atan2(toRef.x, toRef.y);
                                         
                     // If offsets are zero (or very small), just use base direction
-                    if (std::abs(m_offset.x) <EPSILON_COMPARISON && std::abs(m_offset.y) < EPSILON_COMPARISON) {
-                        m_point = RE::BSTPoint2<float>{
+                    if (std::abs(m_offset.x) < EPSILON_COMPARISON && std::abs(m_offset.y) < EPSILON_COMPARISON && std::abs(m_offset.z) < EPSILON_COMPARISON) {
+                        m_point = RE::NiPoint3{
                             _ts_SKSEFunctions::NormalRelativeAngle(basePitch),
+                            0.0f,
                             _ts_SKSEFunctions::NormalRelativeAngle(baseYaw)};
                         return m_point;
                     }
@@ -277,8 +284,8 @@ namespace FCFW {
                     // Convert offset to direction in local frame (where base direction is forward)
                     float cosPitchLocal = std::cos(m_offset.x);
                     float sinPitchLocal = std::sin(m_offset.x);
-                    float cosYawLocal = std::cos(m_offset.y);
-                    float sinYawLocal = std::sin(m_offset.y);
+                    float cosYawLocal = std::cos(m_offset.z);
+                    float sinYawLocal = std::sin(m_offset.z);
                     
                     // Direction in local frame (forward along base direction)
                     RE::NiPoint3 localDir;
@@ -317,12 +324,13 @@ namespace FCFW {
                     worldDir.y = localDir.x * right.y + localDir.y * forward.y + localDir.z * up.y;
                     worldDir.z = localDir.x * right.z + localDir.y * forward.z + localDir.z * up.z;
                     
-                    // Convert world direction back to pitch/yaw angles and cache
+                    // Convert world direction back to pitch/yaw angles and cache (roll from offset)
                     float worldPitch = -std::asin(worldDir.z);
                     float worldYaw = std::atan2(worldDir.x, worldDir.y);
                     
-                    m_point = RE::BSTPoint2<float>{
+                    m_point = RE::NiPoint3{
                         _ts_SKSEFunctions::NormalRelativeAngle(worldPitch),
+                        _ts_SKSEFunctions::NormalRelativeAngle(m_offset.y),
                         _ts_SKSEFunctions::NormalRelativeAngle(worldYaw)};
                     return m_point;
                 }
@@ -331,10 +339,11 @@ namespace FCFW {
         }
        
         bool IsNearlyEqual(const RotationPoint& other) const {
-            RE::BSTPoint2<float> rot = GetPoint();
-            RE::BSTPoint2<float> otherRot = other.GetPoint();
+            RE::NiPoint3 rot = GetPoint();
+            RE::NiPoint3 otherRot = other.GetPoint();
             return std::abs(rot.x - otherRot.x) < EPSILON_COMPARISON &&
-                   std::abs(rot.y - otherRot.y) < EPSILON_COMPARISON;
+                   std::abs(rot.y - otherRot.y) < EPSILON_COMPARISON &&
+                   std::abs(rot.z - otherRot.z) < EPSILON_COMPARISON;
         }
 
         RotationPoint LinearInterpolate(const RotationPoint& p1, const RotationPoint& p2, float t) const {
@@ -344,13 +353,15 @@ namespace FCFW {
             auto pt1 = p1.GetPoint();
             auto pt2 = p2.GetPoint();
             
-            // Calculate angular deltas with wrapping
+            // Calculate angular deltas with wrapping (pitch, roll, yaw)
             float pitchDelta = _ts_SKSEFunctions::NormalRelativeAngle(pt2.x - pt1.x);
-            float yawDelta = _ts_SKSEFunctions::NormalRelativeAngle(pt2.y - pt1.y);
+            float rollDelta = _ts_SKSEFunctions::NormalRelativeAngle(pt2.y - pt1.y);
+            float yawDelta = _ts_SKSEFunctions::NormalRelativeAngle(pt2.z - pt1.z);
             
             // Interpolate and normalize result
             result.m_point.x = _ts_SKSEFunctions::NormalRelativeAngle(pt1.x + t * pitchDelta);
-            result.m_point.y = _ts_SKSEFunctions::NormalRelativeAngle(pt1.y + t * yawDelta);
+            result.m_point.y = _ts_SKSEFunctions::NormalRelativeAngle(pt1.y + t * rollDelta);
+            result.m_point.z = _ts_SKSEFunctions::NormalRelativeAngle(pt1.z + t * yawDelta);
             
             return result;
         }
@@ -367,37 +378,41 @@ namespace FCFW {
 
             result.m_point.x = CubicHermiteInterpolateAngular(pt0.x, pt1.x, pt2.x, pt3.x, t);
             result.m_point.y = CubicHermiteInterpolateAngular(pt0.y, pt1.y, pt2.y, pt3.y, t);
+            result.m_point.z = CubicHermiteInterpolateAngular(pt0.z, pt1.z, pt2.z, pt3.z, t);
 
             return result;
         }
 
         // Raw arithmetic operators - DO NOT wrap (needed for unwrapped space calculations)
         RotationPoint operator+(const RotationPoint& other) const {
-            RE::BSTPoint2<float> result;
+            RE::NiPoint3 result;
             result.x = GetPoint().x + other.GetPoint().x;
             result.y = GetPoint().y + other.GetPoint().y;
-            return RotationPoint(m_transition, PointType::kWorld, result, RE::BSTPoint2<float>{});
+            result.z = GetPoint().z + other.GetPoint().z;
+            return RotationPoint(m_transition, PointType::kWorld, result, RE::NiPoint3{});
         }
         
         RotationPoint operator-(const RotationPoint& other) const {
-            RE::BSTPoint2<float> result;
+            RE::NiPoint3 result;
             result.x = GetPoint().x - other.GetPoint().x;
             result.y = GetPoint().y - other.GetPoint().y;
-            return RotationPoint(m_transition, PointType::kWorld, result, RE::BSTPoint2<float>{});
+            result.z = GetPoint().z - other.GetPoint().z;
+            return RotationPoint(m_transition, PointType::kWorld, result, RE::NiPoint3{});
         }
         
         RotationPoint operator*(float scalar) const {
-            RE::BSTPoint2<float> result;
+            RE::NiPoint3 result;
             result.x = GetPoint().x * scalar;
             result.y = GetPoint().y * scalar;
-            return RotationPoint(m_transition, PointType::kWorld, result, RE::BSTPoint2<float>{});
+            result.z = GetPoint().z * scalar;
+            return RotationPoint(m_transition, PointType::kWorld, result, RE::NiPoint3{});
         }
        
         Transition m_transition;
-        mutable RE::BSTPoint2<float> m_point;  // Direct rotation (used when m_pointType is kWorld), mutable for reference updates
+        mutable RE::NiPoint3 m_point;  // Direct rotation (used when m_pointType is kWorld), mutable for reference updates - pitch=x, roll=y, yaw=z
         PointType m_pointType;                 // Type of point: kWorld, kReference, or kCamera
         RE::TESObjectREFR* m_reference;        // Reference object for dynamic rotation (kReference only)
-        RE::BSTPoint2<float> m_offset;         // Offset from camera-to-reference direction (kReference and kCamera)
+        RE::NiPoint3 m_offset;         // Offset from camera-to-reference direction (kReference and kCamera) - pitch=x, roll=y, yaw=z
         bool m_isOffsetRelative;               // If true, offset is relative to reference's facing direction (kReference only)
         BodyPart m_bodyPart;                   // Body part to extract rotation from (kReference only, requires m_isOffsetRelative=true)
     };
@@ -546,7 +561,7 @@ namespace FCFW {
     class RotationPath : public CameraPath<RotationPoint> {
     public:
         using TransitionPoint = RotationPoint;
-        using ValueType = RE::BSTPoint2<float>;  // Type returned by GetPoint()
+        using ValueType = RE::NiPoint3;  // Type returned by GetPoint() - pitch=x, roll=y, yaw=z
         
         RotationPoint GetPointAtCamera(float a_time, bool a_easeIn, bool a_easeOut) const override;
         

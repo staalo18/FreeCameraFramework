@@ -75,7 +75,7 @@ namespace FCFW
 		return m_translationTrack.GetPointAtTime(a_time);
 	}
 
-	RE::BSTPoint2<float> Timeline::GetRotation(float a_time) const
+	RE::NiPoint3 Timeline::GetRotation(float a_time) const
 	{
 		return m_rotationTrack.GetPointAtTime(a_time);
 	}
@@ -215,7 +215,7 @@ namespace FCFW
 		return m_translationTrack.GetPoint(a_index).m_point;
 	}
 
-	RE::BSTPoint2<float> Timeline::GetRotationPoint(size_t a_index) const
+	RE::NiPoint3 Timeline::GetRotationPoint(size_t a_index) const
 	{
 		return m_rotationTrack.GetPoint(a_index).m_point;
 	}

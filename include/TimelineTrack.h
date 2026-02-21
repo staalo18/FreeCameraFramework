@@ -231,7 +231,6 @@ namespace FCFW
 	template <typename PathType>
 	void TimelineTrack<PathType>::SetPlaybackMode(PlaybackMode a_mode)
 	{
-log::info("{}: Setting playbackMode: {}", __FUNCTION__, static_cast<int>(a_mode));
 		m_playbackMode = a_mode;
 	}
 

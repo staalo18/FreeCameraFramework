@@ -136,11 +136,11 @@ FCFW_SKSEFunctions.AddTranslationPointAtCamera(modName, timelineID, 10.0)
 
 **Rotation Points** specify where the camera is looking:
 ```papyrus
-; Look at specific pitch/yaw at time 0.0 (world coords, in degrees)
-FCFW_SKSEFunctions.AddRotationPoint(modName, timelineID, 0.0, pitch, yaw)
+; Look at specific pitch/roll/yaw at time 0.0 (world coords, in degrees)
+FCFW_SKSEFunctions.AddRotationPoint(modName, timelineID, 0.0, pitch, roll, yaw)
 
 ; Look directly at actor at time 5.0 (bodyPart defaults to 0=kNone, offsets in degrees default to 0.0)
-FCFW_SKSEFunctions.AddRotationPointAtRef(modName, timelineID, 5.0, actorRef, bodyPart=0, offsetPitch=0.0, offsetYaw=0.0)
+FCFW_SKSEFunctions.AddRotationPointAtRef(modName, timelineID, 5.0, actorRef, bodyPart=0, offsetPitch=0.0, offsetRoll=0.0, offsetYaw=0.0)
 
 ; Camera point capturing camera rotation at the start of playback. Camera rotates to this angle at time 10.0
 FCFW_SKSEFunctions.AddRotationPointAtCamera(modName, timelineID, 10.0)
@@ -163,7 +163,10 @@ FCFW_SKSEFunctions.AddFOVPoint(modName, timelineID, 10.0, 120.0)
 - Default: 80 degrees
 
 **Rotation Values (Papyrus API):**
-- **Pitch and Yaw**: Specified in **degrees**
+- **Pitch, Roll, and Yaw**: Specified in **degrees**
+  - **Pitch**: Vertical rotation (positive = looking up, negative = looking down)
+  - **Roll**: Camera tilt/banking (positive = clockwise rotation, negative = counter-clockwise)
+  - **Yaw**: Horizontal rotation (0° = north, 90° = east, 180° = south, 270° = west)
 - **Offsets**: Also in **degrees**
 - Note: C++ API uses radians; Papyrus API automatically converts degrees to radians
 
@@ -462,13 +465,14 @@ FCFW_SKSEFunctions.AddRotationPoint(
     timelineID,
     time = 0.0,
     pitch = 5,         ; Pitch in degrees
+    roll = 0.0,          ; Roll in degrees
     yaw = 90.0,          ; Yaw in degrees
     easeIn = false,
     easeOut = false,
     interpolationMode = 2
 )
 ```
-**Note:** Papyrus API uses **degrees** for rotation angles (pitch, yaw, offsets). C++ API uses **radians**.
+**Note:** Papyrus API uses **degrees** for rotation angles (pitch, roll, yaw, offsets). C++ API uses **radians**.
 
 
 **Use world points when:**
@@ -507,6 +511,7 @@ FCFW_SKSEFunctions.AddRotationPointAtRef(
     reference = targetActor,
     bodyPart = 0,        ; kNone = use root rotation (0=kNone, 1=kHead, 2=kTorso)
     offsetPitch = 0.0,   ; No pitch offset in degrees (optional, defaults to 0.0)
+    offsetRoll = 0.0,    ; No roll offset in degrees (optional, defaults to 0.0)
     offsetYaw = 0.0,     ; No yaw offset in degrees - look straight at target (optional, defaults to 0.0)
     isOffsetRelative = false,  ; Offset from camera-to-ref direction
     easeIn = false,
@@ -514,7 +519,7 @@ FCFW_SKSEFunctions.AddRotationPointAtRef(
     interpolationMode = 2
 )
 ```
-**Note:** Papyrus API uses **degrees** for rotation angles (pitch, yaw, offsets). C++ API uses **radians**.
+**Note:** Papyrus API uses **degrees** for rotation angles (pitch, roll, yaw, offsets). C++ API uses **radians**.
 
 **Offset Modes:**
 
@@ -531,13 +536,15 @@ FCFW_SKSEFunctions.AddRotationPointAtRef(
 - Camera looks in the direction reference is facing + offset (in degrees)
 - `offsetYaw = 0` means "look where actor looks"
 - `offsetYaw = 180` means "look opposite direction of where the actor looks"
+- `offsetRoll` tilts the camera around its forward axis
 
 **Rotation with `isOffsetRelative = false`:**
 - Camera looks at reference + offset (in degrees)
 - `offsetYaw = 0` means "look directly at reference"
 - `offsetPitch = 20` means "look slightly above reference"
+- `offsetRoll` tilts the camera around the look-at direction
 
-**Note:** Papyrus API uses **degrees** for rotation angles (pitch, yaw, offsets). C++ API uses **radians**.
+**Note:** Papyrus API uses **degrees** for rotation angles (pitch, roll, yaw, offsets). C++ API uses **radians**.
 
 ### Camera Points
 
@@ -650,7 +657,7 @@ Function BuildCircularPath(ObjectReference center, float radius, int numPoints, 
     FCFW_SKSEFunctions.AddRotationPointAtRef(
         ModName, timelineID, 0.0,
         center, 0,           ; bodyPart = 0 (kNone, default)
-        0.0, 0.0,           ; offsetPitch, offsetYaw
+        0.0, 0.0, 0.0,      ; offsetPitch, offsetRoll, offsetYaw
         isOffsetRelative = false
     )
 EndFunction

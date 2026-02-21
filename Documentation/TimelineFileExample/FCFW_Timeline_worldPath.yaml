@@ -75,61 +75,61 @@ translationPoints:
 rotationPoints:
   - time: 0
     type: world
-    rotation: [24.5928669, -73.9171066]
+    rotation: [24.5928669, 0, -73.9171066]
     interpolationMode: cubicHermite
     easeIn: true
     easeOut: false
   - time: 0.0278333295
     type: world
-    rotation: [24.5928669, -73.9171066]
+    rotation: [24.5928669, 0, -73.9171066]
     interpolationMode: cubicHermite
     easeIn: false
     easeOut: false
   - time: 1.0418334
     type: world
-    rotation: [8.07487202, 271.964539]
+    rotation: [8.07487202, 0, 271.964539]
     interpolationMode: cubicHermite
     easeIn: false
     easeOut: false
   - time: 2.05333424
     type: world
-    rotation: [354.901733, 190.588623]
+    rotation: [354.901733, 0, 190.588623]
     interpolationMode: cubicHermite
     easeIn: false
     easeOut: false
   - time: 3.05716825
     type: world
-    rotation: [341.242188, 116.836433]
+    rotation: [341.242188, 0, 116.836433]
     interpolationMode: cubicHermite
     easeIn: false
     easeOut: false
   - time: 4.07133532
     type: world
-    rotation: [354.766876, 50.9390984]
+    rotation: [354.766876, 0, 50.9390984]
     interpolationMode: cubicHermite
     easeIn: false
     easeOut: false
   - time: 5.08416557
     type: world
-    rotation: [8.61877155, 321.709503]
+    rotation: [8.61877155, 0, 321.709503]
     interpolationMode: cubicHermite
     easeIn: false
     easeOut: false
   - time: 6.10866785
     type: world
-    rotation: [15.8375378, 253.263214]
+    rotation: [15.8375378, 0, 253.263214]
     interpolationMode: cubicHermite
     easeIn: false
     easeOut: false
   - time: 7.1086688
     type: world
-    rotation: [19.2174149, 242.771927]
+    rotation: [19.2174149, 0, 242.771927]
     interpolationMode: cubicHermite
     easeIn: false
     easeOut: false
   - time: 7.16150188
     type: world
-    rotation: [19.2174149, 242.771927]
+    rotation: [19.2174149, 0, 242.771927]
     interpolationMode: cubicHermite
     easeIn: false
     easeOut: true
