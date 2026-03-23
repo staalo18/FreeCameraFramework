@@ -7,11 +7,6 @@ namespace FCFW {
         kCubicHermite
     };
     
-    enum class TimelineType {
-        kTranslation,
-        kRotation
-    };
-
     enum struct PointType {
         kWorld = 0,      // Static world point
         kReference = 1,  // Dynamic reference-based point

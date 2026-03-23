@@ -209,8 +209,6 @@ namespace FCFW {
                 // FreeCameraState::rotation is NiPoint2 where .x=pitch, .y=yaw
                 freeCamState->rotation.x = preSwitchRotation.x;  // pitch
                 freeCamState->rotation.y = preSwitchRotation.z;  // yaw (from NiPoint3.z)
-                log::info("{}: Initialized free camera rotation for recording to pitch={}, yaw={}", 
-                         __FUNCTION__, preSwitchRotation.x, preSwitchRotation.z);
             }
         }
 
@@ -511,20 +509,18 @@ namespace FCFW {
         state->m_timeline.RemoveFOVPoint(a_index);
         return true;
     }
-/* Experimentation for handling camera movements across multiple cells
 
-    std::int32_t m_currentCellX = 0;
-    std::int32_t m_currentCellY = 0;
-    std::int32_t m_initialCellX = 0;
-    std::int32_t m_initialCellY = 0;
-    RE::NiPoint3 m_initialPlayerPosition;
-    bool m_isPlayerAtInitialPosition = true;
-
-    void TimelineManager::RecenterGridAroundCameraIfNeeded()
+    void TimelineManager::PropagatePlayerIfNeeded(bool a_resetPosition)
     {
         auto tes = RE::TES::GetSingleton();
-        if (!tes || !tes->gridCells) {
-            log::error("{}: TES or gridCells not available", __FUNCTION__);
+        if (!tes) {
+            log::error("{}: TES not available", __FUNCTION__);
+            return;
+        }
+        auto* worldspace = tes->GetRuntimeData2().worldSpace;
+
+        if (!worldspace) {
+            log::error("{}: WorldSpace not available", __FUNCTION__);
             return;
         }
 
@@ -535,38 +531,122 @@ namespace FCFW {
         }
 
         auto cameraPos = _ts_SKSEFunctions::GetCameraPos();
-        // Calculate cell coordinates manually (Skyrim cells are 4096 units)
-        constexpr float CELL_SIZE = 4096.0f;
-        std::int32_t cameraCellX = static_cast<std::int32_t>(std::floor(cameraPos.x / CELL_SIZE));
-        std::int32_t cameraCellY = static_cast<std::int32_t>(std::floor(cameraPos.y / CELL_SIZE));
 
-        float distanceToInitial = cameraPos.GetDistance(m_initialPlayerPosition);
-        float distanceToPlayer = cameraPos.GetDistance(player->GetPosition());
+        cameraPos.z = _ts_SKSEFunctions::GetLandHeightWithWater(cameraPos, true);
 
-        if ((cameraCellX  == m_initialCellX && cameraCellY == m_initialCellY) || distanceToInitial < CELL_SIZE) {
-            if (!m_isPlayerAtInitialPosition) {
-log::info("{}: Resetting player position to initial position", __FUNCTION__);
-                player->SetPosition(m_initialPlayerPosition, true);
-                
-//                player->Enable(true);
-                m_isPlayerAtInitialPosition = true;
+		float dx = m_initialPlayerPosition.x - cameraPos.x;
+	    float dy = m_initialPlayerPosition.y - cameraPos.y;
+		float horizontalDist = std::sqrtf(dx * dx + dy * dy);
+
+        if (a_resetPosition || horizontalDist < 1.5f * CELL_SIZE) {
+            if (m_isPlayerMoved) {
+                DisablePlayerSim(false);
+                Hooks::PlayerGhostHook::SetPlayerGhost(false);
+                Hooks::CalculateDetectionHook::DisablePlayerDetection(false);
+                HidePlayer(false);
+                m_isPlayerMoved = false;
             }
-            m_currentCellX = cameraCellX;
-            m_currentCellY = cameraCellY;
-        } else if ((cameraCellX != m_currentCellX || cameraCellY != m_currentCellY) && distanceToPlayer > CELL_SIZE) {
-log::info("{}: Recentering grid to cell ({}, {})", __FUNCTION__, cameraCellX, cameraCellY);
-//            float landHeight = _ts_SKSEFunctions::GetLandHeightWithWater(cameraPos);
-//            cameraPos.z = landHeight + 10.0f;
-            
-            player->SetPosition(cameraPos, true);
-                        
-//            player->Disable();    
-            m_isPlayerAtInitialPosition = false;
-            m_currentCellX = cameraCellX;
-            m_currentCellY = cameraCellY;
+            UpdatePlayerCell(m_initialPlayerPosition);
+        } else {
+            if (!m_isPlayerMoved) {          
+                DisablePlayerSim(true);
+                Hooks::PlayerGhostHook::SetPlayerGhost(true);
+                Hooks::CalculateDetectionHook::DisablePlayerDetection(true);
+                HidePlayer(true);
+                m_isPlayerMoved = true;
+            }
+            UpdatePlayerCell(cameraPos);
+        }       
+    }
+
+    void TimelineManager::DisablePlayerSim(bool a_disable) {
+        auto player = RE::PlayerCharacter::GetSingleton();
+        if (!player) {
+            log::error("{}: PlayerCharacter not available", __FUNCTION__);
+            return;
+        }
+
+        auto* charController = player->GetCharController(); 
+        if (!charController) {
+            log::error("{}: PlayerCharacter's CharacterController not available", __FUNCTION__);
+            return;
+        }
+
+        if (a_disable) {
+            charController->flags.set(RE::CHARACTER_FLAGS::kNoSim);
+        } else {
+            charController->flags.reset(RE::CHARACTER_FLAGS::kNoSim);
         }
     }
-*/
+
+
+    void TimelineManager::UpdatePlayerCell(RE::NiPoint3& a_position) {        
+        auto* player = RE::PlayerCharacter::GetSingleton();
+        if (!player) {
+            log::warn("{}: Cannot access player character", __FUNCTION__);
+            return;
+        } 
+
+        auto* tes = RE::TES::GetSingleton();
+        if (!tes) {
+            log::warn("{}: Cannot access TES", __FUNCTION__);
+            return;
+        }
+
+        auto* worldspace = tes->GetRuntimeData2().worldSpace;
+        if (!worldspace) {
+            log::warn("{}: Cannot access worldspace", __FUNCTION__);
+            return;
+        }
+        
+        // Calculate cell coordinates from position
+        std::int16_t targetCellX = static_cast<std::int16_t>(std::floor(a_position.x / CELL_SIZE));
+        std::int16_t targetCellY = static_cast<std::int16_t>(std::floor(a_position.y / CELL_SIZE));
+        
+        RE::CellID cellID(targetCellY, targetCellX);
+        RE::TESObjectCELL* cell = nullptr;
+
+        // First check if cell is already in the cellMap
+        const auto& map = worldspace->cellMap;
+        const auto it = map.find(cellID);
+        if (it != map.end()) {
+            cell = it->second;
+        }
+
+        // If not in map, load it using TESWorldSpace_LoadCell
+        if (!cell) {
+            bool loadFromDisk;
+            cell = _ts_SKSEFunctions::GetCell(targetCellX, targetCellY, worldspace, loadFromDisk);
+        }
+
+        // Center player on the loaded cell
+        if (cell) {
+            player->SetParentCell(cell);
+            player->SetPosition(a_position, true);
+        } else {
+            log::error("{}: Failed to load cell ({}, {})", __FUNCTION__, targetCellX, targetCellY);
+        }
+    }
+
+    void TimelineManager::HidePlayer(bool a_hide) {
+		auto player = RE::PlayerCharacter::GetSingleton();
+		if (player && player->Get3D(0)) {
+			auto thirdpersonNode = player->Get3D(0)->AsNode();
+			if (thirdpersonNode) {
+                if (a_hide) {
+                    thirdpersonNode->CullNode(true);
+                } else {
+                    thirdpersonNode->CullNode(false);
+                }	
+			} else {
+                log::warn("{}: Could not get thirdpersonNode", __FUNCTION__);
+            }
+ 		} else {
+            log::warn("{}: Could not get player", __FUNCTION__);
+        }
+    }
+
+
     void TimelineManager::PlayTimeline(TimelineState* a_state) {
         if (!a_state || !a_state->m_isPlaybackRunning) {
             return;
@@ -615,10 +695,6 @@ log::info("{}: Recentering grid to cell ({}, {})", __FUNCTION__, cameraCellX, ca
         float deltaTime = _ts_SKSEFunctions::GetRealTimeDeltaTime() * a_state->m_playbackSpeed;
         a_state->m_timeline.UpdatePlayback(deltaTime);
 
-//        RecenterGridAroundCameraIfNeeded();
-        // re-center audio to current camera position
-        CorrectAudioListener();
-
         // Apply global easing
         float sampleTime = a_state->m_timeline.GetPlaybackTime();
         if (a_state->m_globalEaseIn || a_state->m_globalEaseOut) {
@@ -641,7 +717,7 @@ log::info("{}: Recentering grid to cell ({}, {})", __FUNCTION__, cameraCellX, ca
 
         // Apply ground-following if enabled
         if (a_state->m_followGround) {
-            float landHeight = _ts_SKSEFunctions::GetLandHeightWithWater(cameraPos);
+            float landHeight = _ts_SKSEFunctions::GetLandHeightWithWater(cameraPos, false);
             float cameraHeight = cameraPos.z - landHeight;
             if (cameraHeight < a_state->m_minHeightAboveGround) {
                 cameraPos.z = landHeight + a_state->m_minHeightAboveGround;
@@ -649,6 +725,11 @@ log::info("{}: Recentering grid to cell ({}, {})", __FUNCTION__, cameraCellX, ca
         }
         
         cameraState->translation = cameraPos;
+
+        PropagatePlayerIfNeeded();
+
+        // re-center audio to current camera position
+        CorrectAudioListener();
         
         RE::NiPoint3 rotation = a_state->m_timeline.GetRotation(sampleTime);
         
@@ -812,8 +893,7 @@ log::info("{}: Recentering grid to cell ({}, {})", __FUNCTION__, cameraCellX, ca
             m_isShowingMenus = ui->IsShowingMenus();
             ui->ShowMenus(state->m_showMenusDuringPlayback);
         }
-/* Experimentation for handling camera movements across multiple cells
-        // store initial player position
+
         auto player = RE::PlayerCharacter::GetSingleton();
         if (!player) {
             log::error("{}: PlayerCharacter not available", __FUNCTION__);
@@ -821,17 +901,9 @@ log::info("{}: Recentering grid to cell ({}, {})", __FUNCTION__, cameraCellX, ca
         }
 
         m_initialPlayerPosition = player->GetPosition();
-        auto cameraPos = _ts_SKSEFunctions::GetCameraPos();
-        // Calculate cell coordinates manually (Skyrim cells are 4096 units)
-        constexpr float CELL_SIZE = 4096.0f;
-        m_initialCellX = static_cast<std::int32_t>(std::floor(cameraPos.x / CELL_SIZE));
-        m_initialCellY = static_cast<std::int32_t>(std::floor(cameraPos.y / CELL_SIZE));
-        m_currentCellX = m_initialCellX;
-        m_currentCellY = m_initialCellY;
-*/        
+
         // Capture camera rotation before entering free camera mode
-        // This ensures free camera inherits the correct rotation even if the game doesn't do it automatically
-        RE::NiPoint3 preSwitchRotation = _ts_SKSEFunctions::GetCameraRotation();
+        RE::NiPoint3 initialRotation = _ts_SKSEFunctions::GetCameraRotation();
         
         // Enter free camera mode
         ToggleFreeCameraNotHooked();
@@ -842,10 +914,8 @@ log::info("{}: Recentering grid to cell ({}, {})", __FUNCTION__, cameraCellX, ca
             if (freeCamState) {
                 // Set free camera rotation to match pre-switch camera state
                 // FreeCameraState::rotation is NiPoint2 where .x=pitch, .y=yaw
-                freeCamState->rotation.x = preSwitchRotation.x;  // pitch
-                freeCamState->rotation.y = preSwitchRotation.z;  // yaw (from NiPoint3.z)
-                log::info("{}: Initialized free camera rotation to pitch={}, yaw={}", 
-                         __FUNCTION__, preSwitchRotation.x, preSwitchRotation.z);
+                freeCamState->rotation.x = initialRotation.x;  // pitch
+                freeCamState->rotation.y = initialRotation.z;  // yaw
             }
         }
         
@@ -913,6 +983,7 @@ log::info("{}: Recentering grid to cell ({}, {})", __FUNCTION__, cameraCellX, ca
         
         auto* playerCamera = RE::PlayerCamera::GetSingleton();
         if (playerCamera && playerCamera->IsInFreeCameraMode()) {
+            PropagatePlayerIfNeeded(true);
             ToggleFreeCameraNotHooked();
             
             auto* ui = RE::UI::GetSingleton();
@@ -1659,4 +1730,314 @@ log::info("{}: Recentering grid to cell ({}, {})", __FUNCTION__, cameraCellX, ca
         }
     }
 
+
+
+
+
+
+
+/* Unused functions below */
+/**************************/
+
+    void TimelineManager::DisableTerrainOcclusion() {
+        if (m_tvdtActive) {
+//            return; // Already active
+        }
+        
+        auto* player = RE::PlayerCharacter::GetSingleton();
+        if (!player) {
+            log::warn("{}: Player not available", __FUNCTION__);
+            return;
+        }
+        
+        // Get the cell where the player is located
+        m_playerCell = player->GetParentCell();
+        if (!m_playerCell || m_playerCell->IsInteriorCell()) {
+            log::warn("{}: Player not in valid exterior cell", __FUNCTION__);
+            return;
+        }
+        
+        // Get the exterior data which contains TVDT
+        auto* exteriorData = m_playerCell->GetCoordinates();
+        if (!exteriorData || !exteriorData->lodVisData || !exteriorData->lodVisData->visData) {
+            log::warn("{}: Player cell has no TVDT data", __FUNCTION__);
+            return;
+        }
+        
+        auto* visData = exteriorData->lodVisData->visData;
+        std::uint32_t numDWords = visData->size;
+        std::uint32_t* dataPtr = (numDWords > 1) ? visData->buffer.heap : &visData->buffer.local;
+        
+        // Save the player cell's original TVDT
+        m_savedPlayerTVDT.clear();
+        m_savedPlayerTVDT.reserve(numDWords);
+        for (std::uint32_t i = 0; i < numDWords; ++i) {
+            m_savedPlayerTVDT.push_back(dataPtr[i]);
+            // Set all bits to 1 (all visible) - this makes ALL LOD chunks visible from this cell
+            dataPtr[i] = 0xFFFFFFFF;        
+        }
+
+        m_initialPlayerPosition = player->GetPosition();
+        
+        m_lastCameraCell = nullptr;
+        m_tvdtActive = true;
+        
+        log::info("{}: Started TVDT swapping - saved player cell ({}, {}) original TVDT ({} DWORDs)",
+                  __FUNCTION__, exteriorData->cellX, exteriorData->cellY, numDWords);
+    }
+
+    void TimelineManager::RestoreTerrainOcclusion() {
+        if (!m_tvdtActive) {
+            return; // Not active, nothing to restore
+        }
+        
+        if (!m_playerCell) {
+            log::warn("{}: Player cell reference lost", __FUNCTION__);
+            m_tvdtActive = false;
+            return;
+        }
+        
+//        auto* exteriorData = m_playerCell->GetCoordinates();
+        auto* exteriorData = RE::PlayerCharacter::GetSingleton()->GetParentCell()->GetCoordinates();
+        if (!exteriorData) {
+            log::warn("{}: Cannot restore TVDT - exteriorData no longer valid", __FUNCTION__);
+            m_tvdtActive = false;
+            return;
+        }
+        if (!exteriorData->lodVisData) {
+            log::warn("{}: Cannot restore TVDT - lodVisData no longer valid", __FUNCTION__);
+            m_tvdtActive = false;
+            return;
+        }
+        if (!exteriorData->lodVisData->visData) {
+            log::warn("{}: Cannot restore TVDT - visData no longer valid", __FUNCTION__);
+            m_tvdtActive = false;
+            return;
+        }
+        
+        auto* visData = exteriorData->lodVisData->visData;
+        std::uint32_t* dataPtr = (visData->size > 1) ? visData->buffer.heap : &visData->buffer.local;
+        
+        // Restore player cell's original TVDT
+        for (std::uint32_t i = 0; i < m_savedPlayerTVDT.size() && i < visData->size; ++i) {
+            dataPtr[i] = m_savedPlayerTVDT[i];
+        }
+        
+        log::info("{}: Restored player cell ({}, {}) original TVDT",
+                  __FUNCTION__, exteriorData->cellX, exteriorData->cellY);
+
+        m_savedPlayerTVDT.clear();
+        m_playerCell = nullptr;
+        m_lastCameraCell = nullptr;
+        m_tvdtActive = false;
+    }
+
+    void TimelineManager::UpdateTerrainOcclusionForCamera() {
+        if (!m_tvdtActive || !m_playerCell) {
+log::warn("{}: Cannot update TVDT - (1)", __FUNCTION__);
+            return; // TVDT swapping not active
+        }
+        
+        auto* tes = RE::TES::GetSingleton();
+        if (!tes) {
+log::warn("{}: Cannot update TVDT - (2)", __FUNCTION__);
+            return;
+        }
+        
+        RE::NiPoint3 cameraPos = _ts_SKSEFunctions::GetCameraPos();
+
+        auto* cameraCell = tes->GetCell(cameraPos);;
+        if (!cameraCell || cameraCell->IsInteriorCell()) {
+log::warn("{}: Cannot update TVDT - (4)", __FUNCTION__);
+            return; // Camera not in loaded exterior cell
+        }
+        
+        // If camera is in same cell as before, nothing to do
+        if (cameraCell == m_lastCameraCell) {
+log::info("{}: Did not change cell", __FUNCTION__);
+            return;
+        }
+
+        // Get camera cell's TVDT data
+        auto* cameraExteriorData = cameraCell->GetCoordinates();
+        if (!cameraExteriorData || !cameraExteriorData->lodVisData || !cameraExteriorData->lodVisData->visData) {
+log::warn("{}: Cannot update TVDT - (6)", __FUNCTION__);
+            return; // Camera cell has no TVDT
+        }
+        
+        auto* cameraVisData = cameraExteriorData->lodVisData->visData;
+        std::uint32_t* cameraDataPtr = (cameraVisData->size > 1) ? cameraVisData->buffer.heap : &cameraVisData->buffer.local;
+
+        auto* player = RE::PlayerCharacter::GetSingleton();
+        if (!player) {
+            log::warn("{}: Player not available", __FUNCTION__);
+            return;
+        }        
+        // Get player cell's TVDT data
+//        auto* playerExteriorData = m_playerCell->GetCoordinates();
+        auto* playerExteriorData = player->GetParentCell()->GetCoordinates();
+        if (!playerExteriorData || !playerExteriorData->lodVisData || !playerExteriorData->lodVisData->visData) {
+log::warn("{}: Cannot update TVDT - (7)", __FUNCTION__);
+            return; // Player cell has no TVDT
+        }
+        
+        auto* playerVisData = playerExteriorData->lodVisData->visData;
+        if (!playerVisData) {
+log::warn("{}: Cannot update TVDT - (8)", __FUNCTION__);
+            return; // Player cell has no TVDT
+        }
+
+        std::uint32_t* playerDataPtr = (playerVisData->size > 1) ? playerVisData->buffer.heap : &playerVisData->buffer.local;
+        if (!playerDataPtr) {
+log::warn("{}: Cannot update TVDT - (9)", __FUNCTION__);
+            return; // Player cell TVDT data pointer invalid
+        }
+
+                
+        // Copy camera cell's TVDT to player cell's TVDT
+        std::uint32_t numDWords = std::min(cameraVisData->size, playerVisData->size);
+        for (std::uint32_t i = 0; i < numDWords; ++i) {
+            playerDataPtr[i] = cameraDataPtr[i];
+// Set all bits to 1 (all visible) - this makes ALL LOD chunks visible from this cell
+//playerDataPtr[i] = 0xFFFFFFFF;        
+        }
+        
+        m_lastCameraCell = cameraCell;
+        
+        log::info("{}: Copied TVDT from camera cell ({}, {}) to player cell ({}, {}) - camera at ({:.1f}, {:.1f}, {:.1f})",
+                  __FUNCTION__,
+                  cameraExteriorData->cellX, cameraExteriorData->cellY,
+                  playerExteriorData->cellX, playerExteriorData->cellY,
+                  cameraPos.x, cameraPos.y, cameraPos.z);
+    }
+
+    void TimelineManager::UpdatePlayerParentCell() {
+        auto* tes = RE::TES::GetSingleton();
+        if (!tes) {
+            log::warn("{}: Cannot access TES", __FUNCTION__);
+            return ;
+        }
+
+        auto* worldspace = tes->GetRuntimeData2().worldSpace;
+        if (!worldspace) {
+            log::warn("{}: Cannot access worldspace", __FUNCTION__);
+            return ;
+        }
+        auto player = RE::PlayerCharacter::GetSingleton();
+        if (!player) {
+            log::error("{}: PlayerCharacter not available", __FUNCTION__);
+            return ;
+        }
+
+        bool loadedFromDisk = false;
+        if (!player->GetParentCell()) {
+            log::info("{}: Player has no parent cell, attempting to assign based on player position", __FUNCTION__);
+        auto playerPos = player->GetPosition();
+        RE::TESObjectCELL* playerCell =  _ts_SKSEFunctions::GetCell(m_initialPlayerPosition, worldspace, loadedFromDisk);
+//        RE::TESObjectCELL* playerCell =  _ts_SKSEFunctions::GetCell(playerPos, worldspace, loadedFromDisk);
+        if (!playerCell) {
+                log::warn("{}: Player has no parent cell after Re-opening cell", __FUNCTION__);
+                return ;
+            }
+        player->SetParentCell(playerCell);
+        }        
+    }
+
+    void TimelineManager::LogTESGridCells() {
+        auto* tes = RE::TES::GetSingleton();
+        if (!tes) {
+            log::warn("{}: Cannot access TES", __FUNCTION__);
+            return ;
+        }
+
+        auto player = RE::PlayerCharacter::GetSingleton();
+        if (!player) {
+            log::error("{}: PlayerCharacter not available", __FUNCTION__);
+            return ;
+        }
+
+        auto* gridCells = tes->gridCells;
+        log::info("{}: Grid length: {}", __FUNCTION__, gridCells->length);
+        log::info("{}: World center: ({:.1f}, {:.1f}, {:.1f})", __FUNCTION__, 
+                gridCells->worldCenter.x, gridCells->worldCenter.y, gridCells->worldCenter.z);
+        log::info("{}: Land3D attached: {}", __FUNCTION__, gridCells->land3DAttached);
+        // Log all cells in the grid
+        if (gridCells) {
+            log::info("{}: Cells array contents:", __FUNCTION__);
+            for (std::uint32_t x = 0; x < gridCells->length; x++) {
+                for (std::uint32_t y = 0; y < gridCells->length; y++) {
+                    auto* gridCell = gridCells->cells[(x * gridCells->length) + y];
+                    if (gridCell) {
+                        auto* coords = gridCell->GetCoordinates();
+                        if (coords) {
+                            log::info("{}:   Grid[{},{}] -> Cell({},{}) [ptr=0x{:X}]", 
+                                    __FUNCTION__, x, y, coords->cellX, coords->cellY, 
+                                    reinterpret_cast<uintptr_t>(gridCell));
+                        } else {
+                            log::info("{}:   Grid[{},{}] -> Cell(no coords) [ptr=0x{:X}]", 
+                                    __FUNCTION__, x, y, reinterpret_cast<uintptr_t>(gridCell));
+                        }
+                    } else {
+                        log::info("{}:   Grid[{},{}] -> nullptr", __FUNCTION__, x, y);
+                    }
+                }
+            }
+        } else {
+            log::error("{}: Cells array is NULL!", __FUNCTION__);
+        }
+
+    }
+/*
+    void TimelineManager::InitializeXMarker() {
+        if (m_marker) {
+            log::info("{}: XMarkerHeading already initialized", __FUNCTION__);
+            return;
+        }
+
+        auto* dataHandler = RE::TESDataHandler::GetSingleton();
+        if (!dataHandler) {
+            log::error("{}: Cannot access TESDataHandler", __FUNCTION__);
+            return;
+        }
+
+        constexpr RE::FormID xMarkerFormID = 0x00000034;
+        auto* xMarkerBase = dataHandler->LookupForm<RE::TESObjectSTAT>(xMarkerFormID, "Skyrim.esm");
+        
+        if (!xMarkerBase) {
+            log::error("{}: Cannot find XMarkerHeading base form (0x{:X})", __FUNCTION__, xMarkerFormID);
+            return;
+        }
+
+        auto* player = RE::PlayerCharacter::GetSingleton();
+        if (!player) {
+            log::error("{}: Cannot access player", __FUNCTION__);
+            return;
+        }
+
+        auto* playerCell = player->GetParentCell();
+        if (!playerCell) {
+            log::error("{}: Player parent cell is null", __FUNCTION__);
+            return;
+        }
+
+        RE::NiPoint3 position = player->GetPosition();
+        RE::NiPoint3 rotation{ 0.0f, 0.0f, 0.0f };
+
+        auto refr = player->PlaceObjectAtMe(xMarkerBase, true);
+
+        if (!refr) {
+            log::error("{}: Failed to create XMarkerHeading reference", __FUNCTION__);
+            return;
+        }
+
+        m_marker = refr.get();
+        
+        if (m_marker) {
+            log::info("{}: XMarkerHeading initialized at position ({:.1f}, {:.1f}, {:.1f})", 
+                     __FUNCTION__, position.x, position.y, position.z);
+        } else {
+            log::error("{}: XMarkerHeading reference is null after creation", __FUNCTION__);
+        }
+    }
+*/
 } // namespace FCFW

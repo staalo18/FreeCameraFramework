@@ -175,7 +175,19 @@ namespace FCFW {
             
             void CleanupPluginTimelines(SKSE::PluginHandle a_pluginHandle);
 
-            void RecenterGridAroundCameraIfNeeded();
+            void PropagatePlayerIfNeeded(bool a_resetPosition = false);
+            void DisablePlayerSim(bool a_disable);
+            void HidePlayer(bool a_hide);
+            void UpdatePlayerCell(RE::NiPoint3& a_position);
+
+/* UNUSED: */
+            void LogTESGridCells();
+            //void InitializeXMarker();
+            void UpdatePlayerParentCell();
+            void DisableTerrainOcclusion();
+            void RestoreTerrainOcclusion();
+            void UpdateTerrainOcclusionForCamera(); // Update TVDT if camera moved to different cell
+/* END UNUSED */
 
             std::unordered_set<SKSE::PluginHandle> m_registeredPlugins;
             std::unordered_map<size_t, TimelineState> m_timelines;
@@ -187,7 +199,18 @@ namespace FCFW {
             bool m_isShowingMenus = true;         // Whether menus were showing before playback started
             bool m_userTurning = false;           // Whether user is manually controlling camera during playback
             RE::NiPoint2 m_lastFreeRotation;      // camera free rotation before playback started (third-person only)
-            
+            RE::NiPoint3 m_initialPlayerPosition; // Player position at start of playback
+            bool m_isPlayerMoved = false;   // Whether player is moved to camera position during playback
+
+/* UNUSED: */
+            // TVDT (TerrainVisibilityData) management for LOD occlusion
+            std::unordered_map<RE::TESObjectCELL*, std::vector<std::uint32_t>> m_savedTVDTData; // Map of cells to their original TVDT data
+            std::vector<std::uint32_t> m_savedPlayerTVDT; // Saved player cell's original TVDT
+            RE::TESObjectCELL* m_playerCell = nullptr;    // Player's cell (where we write camera cell's TVDT)
+            RE::TESObjectCELL* m_lastCameraCell = nullptr; // Last camera cell we copied TVDT from
+            bool m_tvdtActive = false;                    // Whether TVDT swapping is active
+/* END UNUSED */
+
             // Papyrus event registration
             std::vector<RE::TESForm*> m_eventReceivers;  // Forms registered for timeline events
             

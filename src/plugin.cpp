@@ -818,7 +818,7 @@ extern "C" DLLEXPORT bool SKSEAPI SKSEPlugin_Load(const SKSE::LoadInterface* sks
         log::info("{}: Registered Papyrus functions", __FUNCTION__);
     }
 
-    SKSE::AllocTrampoline(64);
+    SKSE::AllocTrampoline(192);
         
     log::info("{}: Calling Install Hooks", __FUNCTION__);
 

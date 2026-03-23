@@ -2,6 +2,8 @@
 
 #include "CameraTypes.h"
 
+constexpr float CELL_SIZE = 4096.0f;
+
 namespace FCFW {
     constexpr float EPSILON_COMPARISON = 0.0001f;
     
