@@ -54,7 +54,8 @@ namespace FCFW_API {
 
 	// Available FCFW interface versions
 	enum class InterfaceVersion : uint8_t {
-		V1
+		V1,
+		V2
 	};
 
 	// FCFW's modder interface
@@ -529,6 +530,51 @@ namespace FCFW_API {
 		[[nodiscard]] virtual bool ExportTimeline(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, const char* a_filePath) const noexcept = 0;
 	};
 
+	class IVFCFW2 : public IVFCFW1 {
+	public:
+		/// <summary>
+		/// Add a worldspace point to the timeline.
+		/// At the specified time during playback the camera is moved to the given
+		/// worldspace (exterior) or cell (interior) at the camera's current position and rotation.
+		/// </summary>
+		/// <param name="a_pluginHandle">Plugin handle of the calling plugin (use SKSE::GetPluginHandle())</param>
+		/// <param name="a_timelineID">Timeline ID to add the point to</param>
+		/// <param name="a_time">Time in seconds when the worldspace change occurs</param>
+		/// <param name="a_editorID">EditorID of the destination worldspace or cell</param>
+		/// <param name="a_isInterior">true if a_editorID refers to a cell (interior), false if it refers to a worldspace (exterior)</param>
+		/// <returns>Index of the added point, or -1 on failure</returns>
+		[[nodiscard]] virtual int AddWorldspacePoint(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, float a_time, const char* a_editorID, bool a_isInterior) const noexcept = 0;
+
+		/// <summary>
+		/// Remove a worldspace point from a timeline.
+		/// </summary>
+		/// <param name="a_pluginHandle">Plugin handle of the calling plugin (use SKSE::GetPluginHandle())</param>
+		/// <param name="a_timelineID">Timeline ID to remove the point from</param>
+		/// <param name="a_index">Index of the point to remove</param>
+		/// <returns>true if the point was removed, false on failure</returns>
+		[[nodiscard]] virtual bool RemoveWorldspacePoint(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, size_t a_index) const noexcept = 0;
+
+		/// <summary>
+		/// Get the number of worldspace points in the timeline.
+		/// </summary>
+		/// <param name="a_pluginHandle">Plugin handle for ownership validation</param>
+		/// <param name="a_timelineID">Timeline ID to query</param>
+		/// <returns>Number of worldspace points, or -1 if timeline not found or not owned</returns>
+		[[nodiscard]] virtual int GetWorldspacePointCount(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID) const noexcept = 0;
+
+		/// <summary>
+		/// Get the EditorID of the destination form of a worldspace point by index.
+		/// The destination is either a worldspace (exterior) or a cell (interior) — exactly one will be set.
+		/// The caller can determine the type using RE::TESDataHandler or by examining the form type.
+		/// The returned pointer is stable for the lifetime of the game session.
+		/// </summary>
+		/// <param name="a_pluginHandle">Plugin handle for ownership validation</param>
+		/// <param name="a_timelineID">Timeline ID to query</param>
+		/// <param name="a_index">Index of the worldspace point (0-based)</param>
+		/// <returns>EditorID as a null-terminated string, or "" on failure</returns>
+		[[nodiscard]] virtual const char* GetWorldspacePointEditorID(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, size_t a_index) const noexcept = 0;
+	};
+
 	typedef void* (*_RequestPluginAPI)(const InterfaceVersion interfaceVersion);
 
 	/// <summary>
@@ -537,7 +583,7 @@ namespace FCFW_API {
 	/// </summary>
 	/// <param name="a_interfaceVersion">The interface version to request</param>
 	/// <returns>The pointer to the API singleton, or nullptr if request failed</returns>
-	[[nodiscard]] inline void* RequestPluginAPI(const InterfaceVersion a_interfaceVersion = InterfaceVersion::V1) {
+	[[nodiscard]] inline void* RequestPluginAPI(const InterfaceVersion a_interfaceVersion = InterfaceVersion::V2) {
 		auto pluginHandle = GetModuleHandleA("FreeCameraFramework.dll");
 		_RequestPluginAPI requestAPIFunction = (_RequestPluginAPI)GetProcAddress(pluginHandle, "RequestPluginAPI");
 		if (requestAPIFunction) {

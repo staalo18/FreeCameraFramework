@@ -447,4 +447,100 @@ namespace FCFW {
         }
     }
 
+    // ===== WorldspacePath implementations =====
+
+    bool WorldspacePath::AddPathFromFile(const std::string& a_filePath, float a_timeOffset, float a_conversionFactor) {
+        try {
+            YAML::Node root = YAML::LoadFile(a_filePath);
+
+            if (!root["worldspacePoints"]) {
+                log::info("{}: No 'worldspacePoints' section in YAML file", __FUNCTION__);
+                return true;
+            }
+
+            for (const auto& pointNode : root["worldspacePoints"]) {
+                if (!pointNode["time"]) {
+                    log::warn("{}: Skipping worldspace point without 'time' field", __FUNCTION__);
+                    continue;
+                }
+
+                if (!pointNode["editorID"] || pointNode["editorID"].as<std::string>().empty()) {
+                    log::error("{}: Worldspace point at time {} missing or empty 'editorID' — skipping",
+                               __FUNCTION__, pointNode["time"].as<float>());
+                    continue;
+                }
+
+                if (!pointNode["isInterior"]) {
+                    log::error("{}: Worldspace point at time {} missing 'isInterior' field — skipping",
+                               __FUNCTION__, pointNode["time"].as<float>());
+                    continue;
+                }
+
+                float time = pointNode["time"].as<float>() + a_timeOffset;
+                std::string editorID = pointNode["editorID"].as<std::string>();
+                bool isInterior = pointNode["isInterior"].as<bool>();
+                Transition transition(time, InterpolationMode::kNone, false, false);
+                RE::TESWorldSpace* worldspace = nullptr;
+                RE::TESObjectCELL* cell = nullptr;
+
+                if (isInterior) {
+                    cell = RE::TESForm::LookupByEditorID<RE::TESObjectCELL>(editorID);
+                    if (!cell) {
+                        log::error("{}: Failed to resolve cell EditorID '{}' at time {} — skipping",
+                                   __FUNCTION__, editorID, time);
+                        continue;
+                    }
+                } else {
+                    worldspace = RE::TESForm::LookupByEditorID<RE::TESWorldSpace>(editorID);
+                    if (!worldspace) {
+                        log::error("{}: Failed to resolve worldspace EditorID '{}' at time {} — skipping",
+                                   __FUNCTION__, editorID, time);
+                        continue;
+                    }
+                }
+
+                WorldspacePoint point(transition, worldspace, cell);
+                AddPoint(point);
+            }
+
+            return true;
+
+        } catch (const YAML::Exception& e) {
+            log::error("{}: YAML parsing error: {}", __FUNCTION__, e.what());
+            return false;
+        } catch (const std::exception& e) {
+            log::error("{}: Error loading YAML file: {}", __FUNCTION__, e.what());
+            return false;
+        }
+    }
+
+    bool WorldspacePath::ExportPath(std::ofstream& a_file, float a_conversionFactor) const {
+        if (!a_file.is_open()) {
+            log::error("{}: File is not open", __FUNCTION__);
+            return false;
+        }
+
+        if (m_points.empty()) {
+            return true;
+        }
+
+        try {
+            a_file << "worldspacePoints:\n";
+            for (const auto& pt : m_points) {
+                a_file << "  - time: " << pt.m_transition.m_time << "\n";
+                if (pt.m_worldspace) {
+                    a_file << "    editorID: \"" << pt.m_worldspace->GetFormEditorID() << "\"\n";
+                    a_file << "    isInterior: false\n";
+                } else if (pt.m_cell) {
+                    a_file << "    editorID: \"" << pt.m_cell->GetFormEditorID() << "\"\n";
+                    a_file << "    isInterior: true\n";
+                }
+            }
+            return true;
+        } catch (const std::exception& e) {
+            log::error("{}: Error exporting worldspace points: {}", __FUNCTION__, e.what());
+            return false;
+        }
+    }
+
 } // namespace FCFW

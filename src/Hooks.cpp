@@ -1,5 +1,6 @@
 #include "Hooks.h"
 #include "TimelineManager.h"
+#include "FCFW_Utils.h"
 #include <_ts_SKSEFunctions.h>
 #include <DbgHelp.h>
 
@@ -17,22 +18,9 @@ namespace Hooks
 		PlayerGhostHook::Hook();
 		CalculateDetectionHook::Hook();
 		UpdateLODHook::Hook();
+		ExecuteTeleportHook::Hook();
 
-//		PlayerSetParentCellHook::Hook();
-//		StreamingQueueHook::Hook();
-//		RequestDetectionLevelHook::Hook();
-//		IsHostileToPlayerHook::Hook();
-//		UpdateCellGridHook::Hook();
-
-//		UpdateGridLandObjectsHook::Hook();
-//		UpdateCellLandstateHook::Hook();
-
-//		TerrainManagerIncrementalUpdateHook::Hook();
-//		PostTeleportUpdateHook::Hook();
-//		ActivateLoadedGridCellsHook::Hook();
-//		ActivateCellRefs3DHook::Hook();
-		
-//      GridCellArrayHook::Hook();
+		TeleportHook::Hook();
 		
 		log::info("...success");
 	}
@@ -51,7 +39,8 @@ namespace Hooks
 	void MainUpdateHook::LogPlayerCellInfo()
 	{
 		auto playerPos = RE::PlayerCharacter::GetSingleton()->GetPosition();
-log::info("{}: player pos: ({}, {}, {})", __FUNCTION__, playerPos.x, playerPos.y, playerPos.z);
+		auto* playerWorldspace = RE::PlayerCharacter::GetSingleton()->GetWorldspace();
+log::info("{}: player pos: ({}, {}, {}), worldspace: {}", __FUNCTION__, playerPos.x, playerPos.y, playerPos.z, playerWorldspace ? playerWorldspace->GetFullName() : "null");
 		auto tes = RE::TES::GetSingleton();
 		if (!tes || !tes->gridCells) {
 log::info("{}: no gridcells", __FUNCTION__);
@@ -69,8 +58,25 @@ log::info("{}: no targetCell", __FUNCTION__);
 log::info("{}: no coords", __FUNCTION__);
 			return;
 		}
-		log::info("{}: player coords: ({}, {}), currentGrid: ({}, {})", __FUNCTION__, 
-		coords->cellX, coords->cellY, tes->currentGridX, tes->currentGridY);           
+        auto* worldspace = tes->GetRuntimeData2().worldSpace;
+        if (!worldspace) {
+            log::warn("{}: Cannot access worldspace", __FUNCTION__);
+            return;
+        }
+		log::info("{}: worldspace: {}, player coords: ({}, {}), currentGrid: ({}, {})", __FUNCTION__, 
+		worldspace->GetFullName(), coords->cellX, coords->cellY, tes->currentGridX, tes->currentGridY);  
+		auto* player = RE::PlayerCharacter::GetSingleton();
+
+		if (player) {
+			auto* parentWorldspace = player->GetWorldspace();
+			auto* parentCell = player->GetParentCell();
+			log::info("{}: parentWorldspace: {}, parentCell: ({}, {})", __FUNCTION__, 
+				parentWorldspace ? parentWorldspace->GetFullName(): "null",
+				parentCell ? parentCell->GetCoordinates()->cellX : -9999,
+				parentCell ? parentCell->GetCoordinates()->cellY : -9999);
+		} else {
+			log::error("{}: no player!", __FUNCTION__);
+		}
 	}
 
 	void LookHook::ProcessThumbstick(RE::LookHandler* a_this, RE::ThumbstickEvent* a_event, RE::PlayerControlsData* a_data)
@@ -292,6 +298,319 @@ log::info("{}: no coords", __FUNCTION__);
 		reinterpret_cast<FuncType>(_CalculateDetection)(a_this, a_other, a_detectionValue, a_detectedFlag, a_stealthFlag, a_stealthMult, a_targetPos, a_unk1, a_unk2, a_unk3);
 	}
 
+	
+	void ExecuteTeleportHook::Hook() {
+		_ExecuteTeleport = _ts_SKSEFunctions::WriteFunctionHook(
+			REL::VariantID(39366, 40438, 0),
+			5,
+			reinterpret_cast<std::uintptr_t>(ExecuteTeleport)
+		);
+	}
+
+	bool ExecuteTeleportHook::ExecuteTeleport(
+		RE::PlayerCharacter* a_this)
+	{
+		if (_ExecuteTeleport == 0) {
+			log::error("{}: trampoline not initialized!", __FUNCTION__);
+			return false;
+		}
+
+		if (m_blockExecuteTeleport) {
+log::info("{}: ExecuteTeleport called - blocking", __FUNCTION__);
+			if (auto* loc = FCFW::GetQueuedTargetLoc(a_this); loc->isValid) {
+				loc->isValid = false;
+//				a_this->playerFlags.returnToLastKnownGoodPosition = 0;
+
+				m_blockExecuteTeleport = false;
+			}
+		}
+
+log::info("{}: calling original ExecuteTeleport", __FUNCTION__);
+		using FuncType = bool(*)(RE::PlayerCharacter*);
+		bool result = reinterpret_cast<FuncType>(_ExecuteTeleport)(a_this);
+log::info("{}: ExecuteTeleport called, result: {}, teleportPending: {}", __FUNCTION__, result, m_teleportPending);
+		if (m_teleportPending && result) {
+			m_teleportPending = false;
+log::info("{}: Finalizing pending teleport after ExecuteTeleport", __FUNCTION__);
+			FCFW::TimelineManager::GetSingleton().FinalizeTeleport();
+		}
+		return result;
+	}
+
+
+/**************************************************************************************************/
+/* Below: Unused hooks                                                                            */
+/**************************************************************************************************/
+
+
+	void TeleportPlayertoCellHook::Hook() {
+		_TeleportPlayerToCell = _ts_SKSEFunctions::WriteFunctionHook(
+			REL::VariantID(35629, 36642, 0),
+			5,
+			reinterpret_cast<std::uintptr_t>(TeleportPlayerToCell)
+		);
+	}
+
+	void TeleportPlayertoCellHook::TeleportPlayerToCell(
+		RE::TESObjectCELL* a_this)
+	{
+		if (_TeleportPlayerToCell == 0) {
+			log::error("{}: trampoline not initialized!", __FUNCTION__);
+			return;
+
+		}
+log::info("{}: TeleportPlayerToCell called for cell: {}", __FUNCTION__, a_this ? a_this->GetFullName() : "null");
+		using FuncType = void(*)(RE::TESObjectCELL*);
+		reinterpret_cast<FuncType>(_TeleportPlayerToCell)(a_this);
+	}
+
+
+	void TeleportHook::Hook() {
+		_TeleportToWorldspacePosition = _ts_SKSEFunctions::WriteFunctionHook(
+			REL::VariantID(39658, 40745, 0),
+			9,
+			reinterpret_cast<std::uintptr_t>(TeleportToWorldspacePosition)
+		);
+
+		_TeleportToCell = _ts_SKSEFunctions::WriteFunctionHook(
+			REL::VariantID(39657, 40744, 0),
+			5,
+			reinterpret_cast<std::uintptr_t>(TeleportToCell)
+		);
+	}
+
+	void TeleportHook::TeleportToWorldspacePosition(
+		RE::PlayerCharacter* a_this,
+		RE::NiPoint3*        a_position,
+		RE::NiPoint3*        a_rotation,
+		RE::TESWorldSpace*   a_worldspace,
+		bool                 a_updateSky)
+	{
+		if (_TeleportToWorldspacePosition == 0) {
+			log::error("{}: trampoline not initialized!", __FUNCTION__);
+			return;
+		}
+log::info("{}: TeleportToWorldspacePosition called with pos ({}, {}, {})", __FUNCTION__, a_position->x, a_position->y, a_position->z);
+		using FuncType = void(*)(RE::PlayerCharacter*, RE::NiPoint3*, RE::NiPoint3*, RE::TESWorldSpace*, bool);
+		reinterpret_cast<FuncType>(_TeleportToWorldspacePosition)(a_this, a_position, a_rotation, a_worldspace, a_updateSky);
+	}
+
+	void TeleportHook::TeleportToCell(
+		RE::PlayerCharacter* a_this,
+		RE::NiPoint3*        a_position,
+		RE::NiPoint3*        a_rotation,
+		RE::TESObjectCELL*   a_targetCell,
+		bool                 a_updateSky)
+	{
+		if (_TeleportToCell == 0) {
+			log::error("{}: trampoline not initialized!", __FUNCTION__);
+			return;
+		}
+log::info("{}: TeleportToCell called with pos ({}, {}, {})", __FUNCTION__, a_position->x, a_position->y, a_position->z);
+		using FuncType = void(*)(RE::PlayerCharacter*, RE::NiPoint3*, RE::NiPoint3*, RE::TESObjectCELL*, bool);
+		reinterpret_cast<FuncType>(_TeleportToCell)(a_this, a_position, a_rotation, a_targetCell, a_updateSky);
+	}
+
+	
+	void SwitchToCellHook::Hook() {
+		_SwitchToWorldspace = _ts_SKSEFunctions::WriteFunctionHook(
+			REL::VariantID(13170, 13315, 0),
+			9,
+			reinterpret_cast<std::uintptr_t>(SwitchToWorldspace)
+		);
+
+		_SwitchToInteriorCell = _ts_SKSEFunctions::WriteFunctionHook(
+			REL::VariantID(13171, 13316, 0),
+			6,
+			reinterpret_cast<std::uintptr_t>(SwitchToInteriorCell)
+		);
+
+		_SwitchToExteriorCell = _ts_SKSEFunctions::WriteFunctionHook(
+			REL::VariantID(13172, 13317, 0),
+			5,
+			reinterpret_cast<std::uintptr_t>(SwitchToExteriorCell)
+		);
+	}
+
+	void SwitchToCellHook::SwitchToWorldspace(
+		RE::TES* a_tes,
+		RE::TESWorldSpace* a_newWorldspace,
+		bool a_forceGridReset)
+	{
+		if (_SwitchToWorldspace == 0) {
+			log::error("{}: trampoline not initialized!", __FUNCTION__);
+			return;
+		}
+log::info("{}: SwitchWorldspace called with new worldspace: {}", __FUNCTION__, a_newWorldspace->GetFullName());
+		using FuncType = void(*)(RE::TES*, RE::TESWorldSpace*, bool);
+		reinterpret_cast<FuncType>(_SwitchToWorldspace)(a_tes, a_newWorldspace, a_forceGridReset);
+	}
+
+	void SwitchToCellHook::SwitchToInteriorCell(
+		RE::TES* a_tes,
+		RE::TESObjectCELL* a_targetCell,
+		RE::NiPoint3* a_targetPosition)
+	{
+		if (_SwitchToInteriorCell == 0) {
+			log::error("{}: trampoline not initialized!", __FUNCTION__);
+			return;
+		}
+log::info("{}: SwitchToInteriorCell called with target cell: {}", __FUNCTION__, a_targetCell ? a_targetCell->GetFullName() : "null");
+		using FuncType = void(*)(RE::TES*, RE::TESObjectCELL*, RE::NiPoint3*);
+		reinterpret_cast<FuncType>(_SwitchToInteriorCell)(a_tes, a_targetCell, a_targetPosition);
+	}
+
+	void SwitchToCellHook::SwitchToExteriorCell(
+		RE::TES* a_tes,
+		RE::NiPoint3* a_targetPosition)
+	{
+		if (_SwitchToExteriorCell == 0) {
+			log::error("{}: trampoline not initialized!", __FUNCTION__);
+			return;
+		}
+log::info("{}: SwitchToExteriorCell called with target position: ({}, {}, {})", __FUNCTION__, a_targetPosition->x, a_targetPosition->y, a_targetPosition->z);
+		using FuncType = void(*)(RE::TES*, RE::NiPoint3*);
+		reinterpret_cast<FuncType>(_SwitchToExteriorCell)(a_tes, a_targetPosition);
+	}
+
+/*
+	void CenterOnCellHook::Hook() {
+		_CenterOnCell = _ts_SKSEFunctions::WriteFunctionHook(
+			REL::VariantID(39365, 40437, 0),
+			5,
+			reinterpret_cast<std::uintptr_t>(CenterOnCell)
+		);
+	}
+
+	bool CenterOnCellHook::CenterOnCell(
+		RE::PlayerCharacter* a_this,
+		char* a_cellName,
+		RE::TESObjectCELL* a_targetCell)
+	{
+		if (_CenterOnCell == 0) {
+			log::error("{}: trampoline not initialized!", __FUNCTION__);
+			return false;
+
+		}
+log::info("{}: CenterOnCell called for cell: {}", __FUNCTION__, a_targetCell ? a_targetCell->GetFullName() : "null");
+		using FuncType = bool(*)(RE::PlayerCharacter*, char*, RE::TESObjectCELL*);
+		return reinterpret_cast<FuncType>(_CenterOnCell)(a_this, a_cellName, a_targetCell);
+	}
+
+
+	void LoadingScreenManagerHook::Hook() {
+		log::info("{}: Hooking LoadingScreenManager...", __FUNCTION__);
+		_LoadingScreenManager = _ts_SKSEFunctions::WriteFunctionHook(
+			REL::VariantID(13214, 13363, 0),
+			6,
+			reinterpret_cast<std::uintptr_t>(LoadingScreenManager)
+		);
+		log::info("{}: ...success", __FUNCTION__);
+	}
+
+	void LoadingScreenManagerHook::LoadingScreenManager(
+		bool a_show,
+		RE::BGSLocation* a_targetLocation,
+		bool a_loadCellImmediate,
+		bool a_finalize)
+	{
+		if (_LoadingScreenManager == 0) {
+			log::error("{}: trampoline not initialized!", __FUNCTION__);
+			return;
+		}
+
+		if (FCFW::TimelineManager::GetSingleton().GetActiveTimelineID() > 0) {
+			if (!m_blockLoadingScreenManager) {
+				if (a_show) {
+//					log::info("{}: Blocking original LoadingScreenManager call", __FUNCTION__);
+//					return;
+				}
+			}	
+		}
+		m_blockLoadingScreenManager = false;
+
+log::info("{}: LoadingScreenManager called show: {}, target location: {}, loadCellImmediate: {}, finalize: {}", 
+__FUNCTION__, a_show, a_targetLocation ? a_targetLocation->GetFullName() : "null", a_loadCellImmediate, a_finalize);
+		using FuncType = void(*)(bool, RE::BGSLocation*, bool, bool);
+		reinterpret_cast<FuncType>(_LoadingScreenManager)(a_show, a_targetLocation, a_loadCellImmediate, a_finalize);
+	}
+
+
+	void AsyncOperationHook::Hook() {
+		_BeginAsyncOperation = REL::Relocation<std::uintptr_t>{ REL::VariantID(13188, 13333, 0) }.address();
+		_EndAsyncOperation   = REL::Relocation<std::uintptr_t>{ REL::VariantID(13189, 13334, 0) }.address();
+	}
+
+	void AsyncOperationHook::BeginAsyncOperation()
+	{
+		if (_BeginAsyncOperation == 0) {
+			log::error("{}: trampoline not initialized!", __FUNCTION__);
+			return;
+		}
+log::info("{}: BeginAsyncOperation called", __FUNCTION__);
+		using FuncType = void(*)(void);
+		reinterpret_cast<FuncType>(_BeginAsyncOperation)();
+	}
+
+	void AsyncOperationHook::EndAsyncOperation()
+	{
+		if (_EndAsyncOperation == 0) {
+			log::error("{}: trampoline not initialized!", __FUNCTION__);
+			return;
+		}
+log::info("{}: EndAsyncOperation called", __FUNCTION__);
+		using FuncType = void(*)(void);
+		reinterpret_cast<FuncType>(_EndAsyncOperation)();
+	}
+
+	void SetQueuedTargetLocHook::Hook() {
+		_SetQueuedTargetLoc = _ts_SKSEFunctions::WriteFunctionHook(
+			REL::VariantID(39370, 40442, 0),
+			10,
+			reinterpret_cast<std::uintptr_t>(SetQueuedTargetLoc)
+		);
+	}
+
+	void SetQueuedTargetLocHook::SetQueuedTargetLoc(RE::PlayerCharacter* a_player,
+                                                 RE::PLAYER_TARGET_LOC* a_src)
+	{
+		if (_SetQueuedTargetLoc == 0) {
+			log::error("{}: trampoline not initialized!", __FUNCTION__);
+			return;
+		}
+log::info("{}: SetQueuedTargetLoc called", __FUNCTION__);
+		using FuncType = void(*)(RE::PlayerCharacter*, RE::PLAYER_TARGET_LOC*);
+		reinterpret_cast<FuncType>(_SetQueuedTargetLoc)(a_player, a_src);
+	}
+
+
+	void ObjectCellAttachDetachHook::Hook() {
+		_DetachReference = REL::Relocation<std::uintptr_t>{ REL::VariantID(18568, 19032, 0) }.address();
+		_AttachReference   = REL::Relocation<std::uintptr_t>{ REL::VariantID(19000, 19411, 0) }.address();
+
+	}
+
+	void ObjectCellAttachDetachHook::DetachReference(RE::TESObjectCELL* a_this, RE::Actor* a_ref) {
+		if (_DetachReference == 0) {
+			log::error("{}: trampoline not initialized!", __FUNCTION__);
+			return;
+		}
+log::info("{}: DetachReference called for cell {}, ref {}", __FUNCTION__, a_this ? a_this->GetFullName() : "null", a_ref ? a_ref->GetName() : "null");
+		using FuncType = void(*)(RE::TESObjectCELL*, RE::Actor*);
+		reinterpret_cast<FuncType>(_DetachReference)(a_this, a_ref);
+	}
+
+	void ObjectCellAttachDetachHook::AttachReference(RE::TESObjectCELL* a_this, RE::Actor* a_ref, std::uint64_t a_p3) {
+		if (_AttachReference == 0) {
+			log::error("{}: trampoline not initialized!", __FUNCTION__);
+			return;
+		}
+log::info("{}: AttachReference called for cell {}, ref {}", __FUNCTION__, a_this ? a_this->GetFullName() : "null", a_ref ? a_ref->GetName() : "null");
+		using FuncType = void(*)(RE::TESObjectCELL*, RE::Actor*, std::uint64_t);
+		reinterpret_cast<FuncType>(_AttachReference)(a_this, a_ref, a_p3);
+	}
+
+
 	void PlayerSetParentCellHook::Hook()
 	{
 		_SetParentCell = _ts_SKSEFunctions::WriteFunctionHook(
@@ -312,15 +631,8 @@ log::info("{}: no coords", __FUNCTION__);
 		}
 log::info("{}: PlayerSetParentCellHook called", __FUNCTION__);
 
-
 		using FuncType = void(*)(RE::PlayerCharacter*, RE::TESObjectCELL*, std::uint64_t, std::uint64_t);
 		reinterpret_cast<FuncType>(_SetParentCell)(a_this, a_newCell, a_p3, a_p4);
-		
-		if (m_playbackInProgress) {
-log::info("{}: modifying SetParentCell", __FUNCTION__);
-            *reinterpret_cast<std::uint8_t*>(
-                reinterpret_cast<std::uintptr_t>(a_this) + 0xBDA) &= ~0x10u;
-		}
 	}
 
 	void StreamingQueueHook::Hook() {
@@ -358,8 +670,6 @@ log::info("{}: StreamingQueuePendingCount: {}", __FUNCTION__, result);
 		return m_streamingQueue;
 	}
 
-/* Below: Unused hooks */
-/***********************/
 
 
 	bool GridCellArrayHook::SetCenter(RE::GridCellArray* a_this, std::int32_t a_x, std::int32_t a_y)
@@ -504,7 +814,7 @@ return result;
 //		return true;
 		
 		// Call original
-		return _SetCenter(a_this, a_x, a_y); */
+		return _SetCenter(a_this, a_x, a_y); */ /*
 	}
 /*
 
@@ -646,7 +956,7 @@ bool GridCellArrayHook::SetCenter(RE::GridCellArray* a_this, std::int32_t a_x, s
     return result;
 }
 */
-
+/*
 	void UpdateCellGridHook::Hook()
 	{
 log::info("{}: Hooking UpdateCellGrid...", __FUNCTION__);
@@ -673,11 +983,13 @@ a_position ? a_position->z : 0.0f);
 		auto func = reinterpret_cast<FuncType>(_UpdateCellGrid);
 
 		if (m_blockUpdates) {
+log::info("{}: Blocking UpdateCellGrid call", __FUNCTION__);
+			return true;
 		}
 
 		return func(a_this, a_position, a_smoothHavok);
 	}
-
+*/
 
 /*
 	bool UpdateCellGridHook::UpdateCellGridNotHooked(RE::TES* a_this, RE::NiPoint3* a_position, bool a_smoothHavok)
@@ -693,6 +1005,7 @@ a_position ? a_position->z : 0.0f);
 	}
 
 */
+/*
 	void UpdateGridLandObjectsHook::Hook()
 	{
 log::info("{}: Hooking UpdateGridLandObjects...", __FUNCTION__);
@@ -1003,5 +1316,5 @@ log::info("{}: Calling original ActivateLoadedGridCells", __FUNCTION__);
 		using FuncType = bool(*)(RE::Actor*, RE::Actor*);
 		return reinterpret_cast<FuncType>(_CheckValidTarget)(a_this, a_other);
 	}
-
+*/
 } // namespace Hooks

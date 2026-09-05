@@ -2,6 +2,8 @@
 
 namespace Hooks
 {
+	void Install();
+
 	class MainUpdateHook
 	{
 	public:
@@ -10,7 +12,7 @@ namespace Hooks
 			auto& trampoline = SKSE::GetTrampoline();
 			REL::Relocation<uintptr_t> hook{ RELOCATION_ID(35565, 36564) };  // 5B2FF0, 5D9F50, main update
 			
-			_Nullsub = trampoline.write_call<5>(hook.address() + RELOCATION_OFFSET(0x748, 0xC26), Nullsub);  // 5B3738, 5DAB76
+			_Nullsub = trampoline.write_call<5>(hook.address() + RELOCATION_OFFSET1799(0x748, 0xC26, 0xC38), Nullsub);  // 5B3738, 5DAB76		
 		}
 
 	private:
@@ -25,8 +27,9 @@ namespace Hooks
 		static void Hook()
 		{
 			REL::Relocation<std::uintptr_t> LookHandlerVtbl{ RE::VTABLE_LookHandler[0] };
-			_ProcessThumbstick = LookHandlerVtbl.write_vfunc(0x2, ProcessThumbstick);
-			_ProcessMouseMove = LookHandlerVtbl.write_vfunc(0x3, ProcessMouseMove);
+			auto vtblShift = REL::Module::IsAtLeast(SKSE::RUNTIME_SSE_1_7_99) ? 2 : 0;
+			_ProcessThumbstick = LookHandlerVtbl.write_vfunc(0x2 + vtblShift, ProcessThumbstick);
+			_ProcessMouseMove = LookHandlerVtbl.write_vfunc(0x3 + vtblShift, ProcessMouseMove);
 		}
 
 	private:
@@ -43,8 +46,9 @@ namespace Hooks
 		static void Hook()
 		{
 			REL::Relocation<std::uintptr_t> MovementHandlerVtbl{ RE::VTABLE_MovementHandler[0] };
-			_ProcessThumbstick = MovementHandlerVtbl.write_vfunc(0x2, ProcessThumbstick);
-			_ProcessButton = MovementHandlerVtbl.write_vfunc(0x4, ProcessButton);
+			auto vtblShift = REL::Module::IsAtLeast(SKSE::RUNTIME_SSE_1_7_99) ? 2 : 0;
+			_ProcessThumbstick = MovementHandlerVtbl.write_vfunc(0x2 + vtblShift, ProcessThumbstick);
+			_ProcessButton = MovementHandlerVtbl.write_vfunc(0x4 + vtblShift, ProcessButton);
 		}
 
 	private:
@@ -135,22 +139,176 @@ namespace Hooks
 		static inline bool m_disablePlayerDetection{ false };
 	};
 
+	class ExecuteTeleportHook
+	{
+	public:
+		static void Hook();
+		static bool ExecuteTeleport(RE::PlayerCharacter* a_this);
+		static void BlockNextExecuteTeleport(bool a_block) { m_blockExecuteTeleport = a_block; }
+		static void SetTeleportPending(bool a_pending) { m_teleportPending = a_pending; }
+	private:
+		static inline std::uintptr_t _ExecuteTeleport{ 0 };
+		static inline bool m_blockExecuteTeleport{ false };
+		static inline bool m_teleportPending{ false };
+	};
 
-/* Below: Unused hooks */
-/***********************/
+
+/* Skyrim function call hierarchy:
+
+	[game startup / BGS load path]
+	TeleportPlayerToCell (TeleportPlayertoCellHook)
+	└─ ExecuteTeleport (ExecuteTeleportHook) (called once per frame, fires if queuedTargetLoc is valid)
+			├─ TeleportToCell  (TeleportHook)              ← queuedTargetLoc has interior cell
+			│    └─ SwitchToInteriorCell (SwitchToCellHook)
+			└─ TeleportToWorldspacePosition (TeleportHook) ← queuedTargetLoc has worldspace
+				└─ TeleportToCell (TeleportHook)
+					├─ SwitchToInteriorCell (SwitchToCellHook)  (if target is interior; N/A on this path)
+					├─ SwitchToWorldspace (SwitchToCellHook)    (if worldspace differs from current)
+					└─ SwitchToExteriorCell (SwitchToCellHook)   (if target is exterior)
+						└─ SwitchToWorldspace (SwitchToCellHook)  (conditional: interior-surplus purge path)
+
+	[console: coc <x> <y>]
+	ConsoleFunc__CenterOnExterior
+	└─ PlayerCharacter__CenterOnCell (CenterOnCellHook)
+		└─ ExecuteTeleport (ExecuteTeleportHook)  (same subtree as above)
+
+*/
+
+/**************************************************************************************************/
+/* Below: Unused hooks                                                                            */
+/**************************************************************************************************/
+
+
+
+	class TeleportPlayertoCellHook
+	{
+	public:
+		static void Hook();
+		static void TeleportPlayerToCell(RE::TESObjectCELL* a_this);
+	private:
+		static inline std::uintptr_t _TeleportPlayerToCell{ 0 };
+	};
+
+
+	class TeleportHook
+	{
+	public:
+		static void Hook();
+		static void TeleportToWorldspacePosition(
+			RE::PlayerCharacter* a_this,
+			RE::NiPoint3*        a_position,
+			RE::NiPoint3*        a_rotation,
+			RE::TESWorldSpace*   a_worldspace,
+			bool                 a_updateSky);
+
+		static void TeleportToCell(
+			RE::PlayerCharacter* a_this,
+			RE::NiPoint3*        a_position,
+			RE::NiPoint3*        a_rotation,
+			RE::TESObjectCELL*   a_targetCell,
+			bool                 a_updateSky);
+	private:
+		static inline std::uintptr_t _TeleportToWorldspacePosition{ 0 };
+		static inline std::uintptr_t _TeleportToCell{ 0 };
+	};
+
+	class SwitchToCellHook
+	{
+	public:
+		static void Hook();
+		static void SwitchToWorldspace(
+				RE::TES* a_tes,
+				RE::TESWorldSpace* a_newWorldspace,
+				bool a_forceGridReset);
+
+		static void SwitchToInteriorCell(
+				RE::TES* a_tes,
+				RE::TESObjectCELL* a_targetCell,
+				RE::NiPoint3* a_targetPosition);
+		static void SwitchToExteriorCell(
+				RE::TES* a_tes,
+				RE::NiPoint3* a_targetPosition);
+	private:
+		static inline std::uintptr_t _SwitchToWorldspace{ 0 };
+		static inline std::uintptr_t _SwitchToInteriorCell{ 0 };
+		static inline std::uintptr_t _SwitchToExteriorCell{ 0 };
+
+	};
+
+/*
+	class CenterOnCellHook
+	{
+	public:
+		static void Hook();
+		static bool CenterOnCell(RE::PlayerCharacter* a_this,
+								char* a_cellName,
+								RE::TESObjectCELL* a_targetCell);
+	private:
+		static inline std::uintptr_t _CenterOnCell{ 0 };
+	};
+
+
+	class LoadingScreenManagerHook
+	{
+	public:
+		static void Hook();
+		static void BlockLoadingScreenManager(bool a_block) { m_blockLoadingScreenManager = a_block; }
+		static void LoadingScreenManager(
+				bool a_show,
+				RE::BGSLocation* a_targetLocation,
+				bool a_loadCellImmediate,
+				bool a_finalize);
+	private:
+		static inline bool m_blockLoadingScreenManager{ false };
+		static inline std::uintptr_t _LoadingScreenManager{ 0 };
+	};
+
+
+	class AsyncOperationHook
+	{
+	public:
+		static void Hook();
+		static void BeginAsyncOperation();
+		static void EndAsyncOperation();
+	private:
+		static inline std::uintptr_t _BeginAsyncOperation{ 0 };
+		static inline std::uintptr_t _EndAsyncOperation{ 0 };
+	};
+
+
+	class SetQueuedTargetLocHook
+	{
+	public:
+		static void Hook();
+		static void SetQueuedTargetLoc(RE::PlayerCharacter* a_player,
+                                        RE::PLAYER_TARGET_LOC* a_src);
+	private:
+		static inline std::uintptr_t _SetQueuedTargetLoc{ 0 };
+	};
+
+
+	class ObjectCellAttachDetachHook
+	{
+	public:
+		static void Hook();
+		static void DetachReference(RE::TESObjectCELL* a_this, RE::Actor* a_ref);
+		static void AttachReference(RE::TESObjectCELL* a_this, RE::Actor* a_ref, std::uint64_t a_p3);
+	private:
+		static inline std::uintptr_t _DetachReference{ 0 };
+		static inline std::uintptr_t _AttachReference{ 0 };
+	};
+	
 
 	class PlayerSetParentCellHook
 	{
 	public:
 		static void Hook();
-		static void SetPlaybackInProgress(bool a_playbackInProgress) { m_playbackInProgress = a_playbackInProgress; }
 		static inline std::uintptr_t _SetParentCell{ 0 };
 	private:
 		static void SetParentCell(RE::PlayerCharacter* a_this,
 									RE::TESObjectCELL*   a_newCell,
 									std::uint64_t        a_p3,
 									std::uint64_t        a_p4);
-		static inline bool m_playbackInProgress{ false };		
 	};
 
 
@@ -195,9 +353,9 @@ namespace Hooks
             REL::Relocation<std::uintptr_t> GridCellArrayVtbl{ RE::VTABLE_GridCellArray[0] };
             _SetCenter = GridCellArrayVtbl.write_vfunc(0x3, SetCenter);
         }
+        static bool SetCenter(RE::GridCellArray* a_this, std::int32_t a_x, std::int32_t a_y);
 
     private:
-        static bool SetCenter(RE::GridCellArray* a_this, std::int32_t a_x, std::int32_t a_y);
         static inline REL::Relocation<decltype(SetCenter)> _SetCenter;
     };
 
@@ -206,7 +364,7 @@ namespace Hooks
     {
     public:
         static void Hook();
-
+        static bool UpdateCellGridNotHooked(RE::TES* a_this, RE::NiPoint3* a_position, bool a_smoothHavok);
         static void SetBlockUpdates(bool a_block) { m_blockUpdates = a_block; }
         static inline std::uintptr_t _UpdateCellGrid{ 0 };
 
@@ -343,7 +501,6 @@ namespace Hooks
 		static bool CheckValidTarget(RE::Actor* a_this, RE::Actor* a_other);
 		static inline bool m_disableCheckValidTarget{ false };
 	};
-
-	void Install();
+*/
 } // namespace Hooks	
 

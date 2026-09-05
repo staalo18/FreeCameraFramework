@@ -4,8 +4,9 @@
 namespace Messaging
 {
 	using InterfaceVersion1 = ::FCFW_API::IVFCFW1;
+	using InterfaceVersion2 = ::FCFW_API::IVFCFW2;
 
-	class FCFWInterface : public InterfaceVersion1
+	class FCFWInterface : public InterfaceVersion2
 	{
 	private:
 		FCFWInterface() noexcept;
@@ -63,6 +64,12 @@ namespace Messaging
 		virtual bool SetPlaybackMode(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, FCFW_API::PlaybackMode a_playbackMode, float a_loopTimeOffset = 0.0f) const noexcept override;
 		virtual bool AddTimelineFromFile(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, const char* a_filePath, float a_timeOffset = 0.0f) const noexcept override;
 		virtual bool ExportTimeline(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, const char* a_filePath) const noexcept override;
+
+		// InterfaceVersion2
+		virtual int AddWorldspacePoint(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, float a_time, const char* a_editorID, bool a_isInterior) const noexcept override;
+		virtual bool RemoveWorldspacePoint(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, size_t a_index) const noexcept override;
+		virtual int GetWorldspacePointCount(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID) const noexcept override;
+		virtual const char* GetWorldspacePointEditorID(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, size_t a_index) const noexcept override;
 
 	private:
 		unsigned long apiTID = 0;

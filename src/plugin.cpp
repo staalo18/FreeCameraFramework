@@ -395,6 +395,63 @@ log::error("{}: Invalid mod name '{}' or timeline ID {}", __FUNCTION__, a_modNam
             return FCFW::TimelineManager::GetSingleton().GetFOVPoint(handle, static_cast<size_t>(a_timelineID), static_cast<size_t>(a_index));
         }
 
+        int AddWorldspacePoint(RE::StaticFunctionTag*, RE::BSFixedString a_modName, int a_timelineID, float a_time, RE::BSFixedString a_editorID, bool a_isInterior) {
+            if (a_modName.empty() || a_timelineID <= 0 || a_editorID.empty()) {
+                return -1;
+            }
+
+            SKSE::PluginHandle handle = FCFW::ModNameToHandle(a_modName.c_str());
+            if (handle == 0) {
+                log::error("{}: Invalid mod name '{}' - mod not loaded or doesn't exist", __FUNCTION__, a_modName.c_str());
+                return -1;
+            }
+
+            return FCFW::TimelineManager::GetSingleton().AddWorldspacePoint(handle, static_cast<size_t>(a_timelineID), a_time, a_editorID.c_str(), a_isInterior);
+        }
+
+        bool RemoveWorldspacePoint(RE::StaticFunctionTag*, RE::BSFixedString a_modName, int a_timelineID, int a_index) {
+            if (a_modName.empty() || a_timelineID <= 0 || a_index < 0) {
+                return false;
+            }
+
+            SKSE::PluginHandle handle = FCFW::ModNameToHandle(a_modName.c_str());
+            if (handle == 0) {
+                log::error("{}: Invalid mod name '{}' - mod not loaded or doesn't exist", __FUNCTION__, a_modName.c_str());
+                return false;
+            }
+
+            return FCFW::TimelineManager::GetSingleton().RemoveWorldspacePoint(handle, static_cast<size_t>(a_timelineID), static_cast<size_t>(a_index));
+        }
+
+        int GetWorldspacePointCount(RE::StaticFunctionTag*, RE::BSFixedString a_modName, int a_timelineID) {
+            if (a_modName.empty() || a_timelineID <= 0) {
+                return 0;
+            }
+
+            SKSE::PluginHandle handle = FCFW::ModNameToHandle(a_modName.c_str());
+            if (handle == 0) {
+                log::error("{}: Invalid mod name '{}' - mod not loaded or doesn't exist", __FUNCTION__, a_modName.c_str());
+                return 0;
+            }
+
+            return FCFW::TimelineManager::GetSingleton().GetWorldspacePointCount(handle, static_cast<size_t>(a_timelineID));
+        }
+
+        RE::BSFixedString GetWorldspacePointEditorID(RE::StaticFunctionTag*, RE::BSFixedString a_modName, int a_timelineID, int a_index) {
+            if (a_modName.empty() || a_timelineID <= 0 || a_index < 0) {
+                return "";
+            }
+
+            SKSE::PluginHandle handle = FCFW::ModNameToHandle(a_modName.c_str());
+            if (handle == 0) {
+                log::error("{}: Invalid mod name '{}' - mod not loaded or doesn't exist", __FUNCTION__, a_modName.c_str());
+                return "";
+            }
+
+            const char* editorID = FCFW::TimelineManager::GetSingleton().GetWorldspacePointEditorID(handle, static_cast<size_t>(a_timelineID), static_cast<size_t>(a_index));
+            return editorID ? editorID : "";
+        }
+
         bool StartPlayback(RE::StaticFunctionTag*, RE::BSFixedString a_modName, int a_timelineID, float a_speed, bool a_globalEaseIn, bool a_globalEaseOut, bool a_useDuration, float a_duration, float a_startTime) {
             if (a_modName.empty() || a_timelineID <= 0) {
                 return false;
@@ -751,6 +808,10 @@ log::error("{}: Invalid mod name '{}' or timeline ID {}", __FUNCTION__, a_modNam
             a_vm->RegisterFunction("GetRotationPointYaw", "FCFW_SKSEFunctions", GetRotationPointYaw);
             a_vm->RegisterFunction("GetRotationPointRoll", "FCFW_SKSEFunctions", GetRotationPointRoll);
             a_vm->RegisterFunction("GetFOVPoint", "FCFW_SKSEFunctions", GetFOVPoint);
+            a_vm->RegisterFunction("AddWorldspacePoint", "FCFW_SKSEFunctions", AddWorldspacePoint);
+            a_vm->RegisterFunction("RemoveWorldspacePoint", "FCFW_SKSEFunctions", RemoveWorldspacePoint);
+            a_vm->RegisterFunction("GetWorldspacePointCount", "FCFW_SKSEFunctions", GetWorldspacePointCount);
+            a_vm->RegisterFunction("GetWorldspacePointEditorID", "FCFW_SKSEFunctions", GetWorldspacePointEditorID);
             a_vm->RegisterFunction("StartPlayback", "FCFW_SKSEFunctions", StartPlayback);
             a_vm->RegisterFunction("StopPlayback", "FCFW_SKSEFunctions", StopPlayback);
             a_vm->RegisterFunction("SwitchPlayback", "FCFW_SKSEFunctions", SwitchPlayback);
@@ -818,7 +879,8 @@ extern "C" DLLEXPORT bool SKSEAPI SKSEPlugin_Load(const SKSE::LoadInterface* sks
         log::info("{}: Registered Papyrus functions", __FUNCTION__);
     }
 
-    SKSE::AllocTrampoline(192);
+//    SKSE::AllocTrampoline(256);
+    SKSE::AllocTrampoline(512);
         
     log::info("{}: Calling Install Hooks", __FUNCTION__);
 
@@ -868,6 +930,8 @@ extern "C" DLLEXPORT void* SKSEAPI RequestPluginAPI(const FCFW_API::InterfaceVer
 
 	switch (a_interfaceVersion) {
 	case FCFW_API::InterfaceVersion::V1:
+		[[fallthrough]];
+    case FCFW_API::InterfaceVersion::V2:
 		log::info("{} returned the API singleton", __FUNCTION__);
 		return static_cast<void*>(api);
 	}

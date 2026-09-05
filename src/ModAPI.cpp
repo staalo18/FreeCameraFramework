@@ -187,3 +187,20 @@ bool Messaging::FCFWInterface::ExportTimeline(SKSE::PluginHandle a_pluginHandle,
     return FCFW::TimelineManager::GetSingleton().ExportTimeline(a_pluginHandle, a_timelineID, a_filePath);
 }
 
+// InterfaceVersion2
+
+int Messaging::FCFWInterface::AddWorldspacePoint(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, float a_time, const char* a_editorID, bool a_isInterior) const noexcept {
+    return FCFW::TimelineManager::GetSingleton().AddWorldspacePoint(a_pluginHandle, a_timelineID, a_time, a_editorID, a_isInterior);
+}
+
+bool Messaging::FCFWInterface::RemoveWorldspacePoint(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, size_t a_index) const noexcept {
+    return FCFW::TimelineManager::GetSingleton().RemoveWorldspacePoint(a_pluginHandle, a_timelineID, a_index);
+}
+
+int Messaging::FCFWInterface::GetWorldspacePointCount(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID) const noexcept {
+    return FCFW::TimelineManager::GetSingleton().GetWorldspacePointCount(a_pluginHandle, a_timelineID);
+}
+
+const char* Messaging::FCFWInterface::GetWorldspacePointEditorID(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, size_t a_index) const noexcept {
+    return FCFW::TimelineManager::GetSingleton().GetWorldspacePointEditorID(a_pluginHandle, a_timelineID, a_index);
+}

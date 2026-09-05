@@ -122,11 +122,28 @@ namespace FCFW {
         }
     }
 
+//bool toggleFirstSwitch = true;
+//bool toggleSecondSwitch = false;
+
     void TimelineManager::Update() {
         // Hold lock for entire Update() to prevent race conditions
         // This ensures the timeline cannot be deleted/modified while we're using it
         std::lock_guard<std::recursive_mutex> lock(m_timelineMutex);
-        
+/*auto* playerCamera = RE::PlayerCamera::GetSingleton();
+if (!playerCamera) {
+    log::error("{}: PlayerCamera singleton not available", __FUNCTION__);
+    return;
+}
+if (playerCamera->currentState && 
+    (playerCamera->currentState->id == RE::CameraState::kThirdPerson ||
+        playerCamera->currentState->id == RE::CameraState::kMount ||
+        playerCamera->currentState->id == RE::CameraState::kDragon)) {
+    
+    RE::ThirdPersonState* cameraState = static_cast<RE::ThirdPersonState*>(playerCamera->currentState.get());
+    if (cameraState) {
+log::info("{}: Stored player camera rotation to ({:.2f}, {:.2f})", __FUNCTION__, cameraState->freeRotation.x, cameraState->freeRotation.y);
+    }
+} */       
         // for debug/testing: update body part rotation matrix display
         UpdateBodyPartRotationMatrixDisplay(); 
         
@@ -510,7 +527,94 @@ namespace FCFW {
         return true;
     }
 
-    void TimelineManager::PropagatePlayerIfNeeded(bool a_resetPosition)
+    int TimelineManager::AddWorldspacePoint(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, float a_time, const char* a_editorID, bool a_isInterior) {
+        std::lock_guard<std::recursive_mutex> lock(m_timelineMutex);
+
+        if (!a_editorID || a_editorID[0] == '\0') {
+            log::error("{}: editorID must not be empty", __FUNCTION__);
+            return -1;
+        }
+
+        RE::TESWorldSpace* worldspace = nullptr;
+        RE::TESObjectCELL* cell = nullptr;
+
+        if (a_isInterior) {
+            cell = RE::TESForm::LookupByEditorID<RE::TESObjectCELL>(a_editorID);
+            if (!cell) {
+                log::error("{}: Cell '{}' not found", __FUNCTION__, a_editorID);
+                return -1;
+            }
+        } else {
+            worldspace = RE::TESForm::LookupByEditorID<RE::TESWorldSpace>(a_editorID);
+            if (!worldspace) {
+                log::error("{}: Worldspace '{}' not found", __FUNCTION__, a_editorID);
+                return -1;
+            }
+        }
+
+        TimelineState* state = GetTimeline(a_timelineID, a_pluginHandle);
+        if (!state) {
+            return -1;
+        }
+
+        if (state->m_isPlaybackRunning) {
+            log::info("{}: Timeline modified during playback, stopping playback", __FUNCTION__);
+            StopPlayback(a_pluginHandle, a_timelineID);
+        }
+
+        Transition transition(a_time, InterpolationMode::kNone, false, false);
+        WorldspacePoint point(transition, worldspace, cell);
+
+        state->m_timeline.AddWorldspacePoint(point);
+        return static_cast<int>(state->m_timeline.GetWorldspacePointCount());
+    }
+
+    bool TimelineManager::RemoveWorldspacePoint(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, size_t a_index) {
+        std::lock_guard<std::recursive_mutex> lock(m_timelineMutex);
+
+        TimelineState* state = GetTimeline(a_timelineID, a_pluginHandle);
+        if (!state) {
+            return false;
+        }
+
+        if (state->m_isPlaybackRunning) {
+            log::info("{}: Timeline modified during playback, stopping playback", __FUNCTION__);
+            StopPlayback(a_pluginHandle, a_timelineID);
+        }
+
+        state->m_timeline.RemoveWorldspacePoint(a_index);
+        return true;
+    }
+
+    int TimelineManager::GetWorldspacePointCount(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID) const {
+        std::lock_guard<std::recursive_mutex> lock(m_timelineMutex);
+
+        const TimelineState* state = GetTimeline(a_timelineID, a_pluginHandle);
+        if (!state) {
+            return -1;
+        }
+
+        return static_cast<int>(state->m_timeline.GetWorldspacePointCount());
+    }
+
+    const char* TimelineManager::GetWorldspacePointEditorID(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, size_t a_index) const {
+        std::lock_guard<std::recursive_mutex> lock(m_timelineMutex);
+
+        const TimelineState* state = GetTimeline(a_timelineID, a_pluginHandle);
+        if (!state) {
+            log::error("{}: Timeline {} not found or not owned by plugin handle {}", __FUNCTION__, a_timelineID, a_pluginHandle);
+            return "";
+        }
+
+        if (a_index >= state->m_timeline.GetWorldspacePointCount()) {
+            log::error("{}: Index {} out of range (timeline {} has {} worldspace points)", __FUNCTION__, a_index, a_timelineID, state->m_timeline.GetWorldspacePointCount());
+            return "";
+        }
+
+        return state->m_timeline.GetWorldspacePointEditorID(a_index);
+    }
+
+    void TimelineManager::PropagatePlayerIfNeeded()
     {
         auto tes = RE::TES::GetSingleton();
         if (!tes) {
@@ -523,7 +627,7 @@ namespace FCFW {
             log::error("{}: WorldSpace not available", __FUNCTION__);
             return;
         }
-
+log::info("{}: Worldspace={}, interiorCell={}", __FUNCTION__, worldspace->GetName(), tes->interiorCell ? tes->interiorCell->GetName() : "None");
         auto player = RE::PlayerCharacter::GetSingleton();
         if (!player) {
             log::error("{}: PlayerCharacter not available", __FUNCTION__);
@@ -534,11 +638,26 @@ namespace FCFW {
 
         cameraPos.z = _ts_SKSEFunctions::GetLandHeightWithWater(cameraPos, true);
 
-		float dx = m_initialPlayerPosition.x - cameraPos.x;
-	    float dy = m_initialPlayerPosition.y - cameraPos.y;
-		float horizontalDist = std::sqrtf(dx * dx + dy * dy);
+        bool resetPosition;
+        if (m_initialPlayerWorldspace) { // playback started in exterior
+            float dx = m_initialPlayerPosition.x - cameraPos.x;
+            float dy = m_initialPlayerPosition.y - cameraPos.y;
+            float horizontalDist = std::sqrtf(dx * dx + dy * dy);
 
-        if (a_resetPosition || horizontalDist < 1.5f * CELL_SIZE) {
+            if (!tes->interiorCell && (worldspace == m_initialPlayerWorldspace) && horizontalDist < 1.5f * CELL_SIZE) {
+                resetPosition = true;
+            } else {
+                resetPosition = false;
+            }
+        } else { // playback started in interior cell
+            if (tes->interiorCell && (tes->interiorCell == m_initialPlayerCell)) {
+                resetPosition = true;
+            } else {
+                resetPosition = false;
+            }
+        }
+log::info("{}: resetPosition={}, m_isPlayerMoved={}", __FUNCTION__, resetPosition, m_isPlayerMoved);
+        if (resetPosition) {
             if (m_isPlayerMoved) {
                 DisablePlayerSim(false);
                 Hooks::PlayerGhostHook::SetPlayerGhost(false);
@@ -581,6 +700,11 @@ namespace FCFW {
 
 
     void TimelineManager::UpdatePlayerCell(RE::NiPoint3& a_position) {        
+        if (m_teleportPending) {
+log::info("{}: Teleport pending, skipping cell update", __FUNCTION__);
+            return;
+        }
+
         auto* player = RE::PlayerCharacter::GetSingleton();
         if (!player) {
             log::warn("{}: Cannot access player character", __FUNCTION__);
@@ -593,38 +717,42 @@ namespace FCFW {
             return;
         }
 
-        auto* worldspace = tes->GetRuntimeData2().worldSpace;
-        if (!worldspace) {
-            log::warn("{}: Cannot access worldspace", __FUNCTION__);
-            return;
-        }
-        
-        // Calculate cell coordinates from position
-        std::int16_t targetCellX = static_cast<std::int16_t>(std::floor(a_position.x / CELL_SIZE));
-        std::int16_t targetCellY = static_cast<std::int16_t>(std::floor(a_position.y / CELL_SIZE));
-        
-        RE::CellID cellID(targetCellY, targetCellX);
         RE::TESObjectCELL* cell = nullptr;
+        if (tes->interiorCell) {
+            cell = tes->interiorCell;
+        } else { // exterior
+            auto* worldspace = tes->GetRuntimeData2().worldSpace;
+            if (!worldspace) {
+                log::warn("{}: Cannot access worldspace", __FUNCTION__);
+                return;
+            }
 
-        // First check if cell is already in the cellMap
-        const auto& map = worldspace->cellMap;
-        const auto it = map.find(cellID);
-        if (it != map.end()) {
-            cell = it->second;
+            // Calculate cell coordinates from position
+            std::int16_t targetCellX = static_cast<std::int16_t>(std::floor(a_position.x / CELL_SIZE));
+            std::int16_t targetCellY = static_cast<std::int16_t>(std::floor(a_position.y / CELL_SIZE));
+            
+            RE::CellID cellID(targetCellY, targetCellX);
+
+            // First check if cell is already in the cellMap
+            const auto& map = worldspace->cellMap;
+            const auto it = map.find(cellID);
+            if (it != map.end()) {
+                cell = it->second;
+            }
+
+            // If not in map, load it using TESWorldSpace_LoadCell
+            if (!cell) {
+                bool loadFromDisk;
+                cell = _ts_SKSEFunctions::GetCell(targetCellX, targetCellY, worldspace, loadFromDisk);
+            }
         }
 
-        // If not in map, load it using TESWorldSpace_LoadCell
-        if (!cell) {
-            bool loadFromDisk;
-            cell = _ts_SKSEFunctions::GetCell(targetCellX, targetCellY, worldspace, loadFromDisk);
-        }
-
-        // Center player on the loaded cell
         if (cell) {
             player->SetParentCell(cell);
             player->SetPosition(a_position, true);
         } else {
-            log::error("{}: Failed to load cell ({}, {})", __FUNCTION__, targetCellX, targetCellY);
+            log::error("{}: No cell!", __FUNCTION__);
+            return;
         }
     }
 
@@ -644,6 +772,45 @@ namespace FCFW {
  		} else {
             log::warn("{}: Could not get player", __FUNCTION__);
         }
+    }
+
+   
+    void  TimelineManager::QueuePlayerTeleport(RE::TESWorldSpace* a_worldspace,
+                                                RE::TESObjectCELL* a_interior,
+                                                RE::NiPoint3 a_pos,
+                                                RE::NiPoint3 a_rot) {
+
+        auto* player = RE::PlayerCharacter::GetSingleton();
+        if (!player) {
+            log::warn("{}: Could not get player", __FUNCTION__);
+            return;
+        }
+
+        if (!a_worldspace && !a_interior) {
+            log::warn("{}: Invalid teleport request - no worldspace or interior provided", __FUNCTION__);
+            return;
+        }
+
+        RE::TESWorldSpace* worldspace = a_worldspace;
+        if (a_interior) {
+            worldspace = nullptr;
+        }
+log::info("{}: Queuing teleport to worldspace={}, interior={}, pos=({}, {}, {}), rot=({}, {}, {})", __FUNCTION__, worldspace ? worldspace->GetName() : "None", a_interior ? a_interior->GetName() : "None", a_pos.x, a_pos.y, a_pos.z, a_rot.x, a_rot.y, a_rot.z);
+        auto* loc = GetQueuedTargetLoc(player);
+        loc->world         = worldspace;
+        loc->interior      = a_interior;
+        loc->location      = a_pos;
+        loc->angle         = a_rot;
+        loc->arrivalFunc   = nullptr;
+        loc->arrivalFuncData = 0;
+        loc->furnitureRef  = RE::RefHandle{};
+        loc->fastTravelMarker = RE::RefHandle{};
+        loc->resetWeather  = true;
+        loc->allowAutoSave = false;
+        loc->isValid       = true;  // fires the teleport on next per-frame ExecuteTeleport call
+
+        m_teleportPending = true;
+        Hooks::ExecuteTeleportHook::SetTeleportPending(true);
     }
 
 
@@ -690,13 +857,14 @@ namespace FCFW {
             ui->ShowMenus(m_isShowingMenus);
             return;
         }        
-        ui->ShowMenus(a_state->m_showMenusDuringPlayback);
+//        ui->ShowMenus(a_state->m_showMenusDuringPlayback);
 
         float deltaTime = _ts_SKSEFunctions::GetRealTimeDeltaTime() * a_state->m_playbackSpeed;
         a_state->m_timeline.UpdatePlayback(deltaTime);
+        float rawTime = a_state->m_timeline.GetPlaybackTime();
 
         // Apply global easing
-        float sampleTime = a_state->m_timeline.GetPlaybackTime();
+        float sampleTime = rawTime;
         if (a_state->m_globalEaseIn || a_state->m_globalEaseOut) {
             float timelineDuration = a_state->m_timeline.GetDuration();
             
@@ -726,12 +894,69 @@ namespace FCFW {
         
         cameraState->translation = cameraPos;
 
-        PropagatePlayerIfNeeded();
+        RE::NiPoint3 rotation = a_state->m_timeline.GetRotation(sampleTime);
+        WorldspaceDestination currentWorldspaceDest = a_state->m_timeline.GetWorldspaceDestination(rawTime);
+        if (currentWorldspaceDest.IsValid() &&
+            (currentWorldspaceDest.m_worldspace != a_state->m_lastActiveWorldspaceDestination.m_worldspace ||
+             currentWorldspaceDest.m_cell != a_state->m_lastActiveWorldspaceDestination.m_cell)) {
+            a_state->m_lastActiveWorldspaceDestination = currentWorldspaceDest;
+            QueuePlayerTeleport(currentWorldspaceDest.m_worldspace, currentWorldspaceDest.m_cell, cameraPos, rotation);
+            return;
+        }
+        a_state->m_lastActiveWorldspaceDestination = currentWorldspaceDest;
+/*
+if (sampleTime > 3.0f && toggleFirstSwitch) {
+//if (toggleFirstSwitch) {
+    toggleFirstSwitch = false;
+    RE::TESWorldSpace* worldspace = RE::TESForm::LookupByEditorID<RE::TESWorldSpace>("DLC2SolstheimWorld");
+    RE::TESObjectCELL* cell = RE::TESForm::LookupByEditorID<RE::TESObjectCELL>("Skuldafn01");
+//    RE::NiPoint3 teleportPosition = { 29000.0f, 33500.0f, 500.0f }; 
+    RE::NiPoint3 teleportPosition = { 100.0f, 7100.0f, 900.0f };
+    RE::NiPoint3 teleportRotation = {0.0f, 0.0f, 0.0f}; 
+    if (cell) {
+        log::info("{}: Triggering TeleportPlayerToCell to ({}, {}, {}) in cell {}", __FUNCTION__, teleportPosition.x, teleportPosition.y, teleportPosition.z, cell->GetFullName());
+//        TeleportPlayerToCell(&teleportPosition, &teleportRotation, cell);
+        QueuePlayerTeleport(nullptr, cell, teleportPosition, teleportRotation);
+        return;        
+    }
+else
+    if (worldspace) {
+    log::info("{}: Triggering TeleportPlayerToWorldspace to ({}, {}, {}) in {}", __FUNCTION__, teleportPosition.x, teleportPosition.y, teleportPosition.z, worldspace->GetFullName());
+//        TeleportPlayerToWorldspace(&teleportPosition, &teleportRotation, worldspace);
+        QueuePlayerTeleport(worldspace, nullptr, teleportPosition, teleportRotation);
+        return;
+    } else {
+        log::info("{}: Failed to find Solstheim worldspace", __FUNCTION__);
+    }
+}
+
+if (sampleTime > 9.0f && toggleSecondSwitch) {
+    toggleSecondSwitch = false;
+log::info("{}: Timeline sample time {:.2f} exceeds 2 seconds, queuing worldspace teleport", __FUNCTION__, sampleTime);
+    RE::TESWorldSpace* worldspace = RE::TESForm::LookupByEditorID<RE::TESWorldSpace>("DLC2SolstheimWorld");
+    RE::NiPoint3 teleportPosition = { 29000.0f, 33500.0f, 500.0f }; 
+    RE::NiPoint3 teleportRotation = {0.0f, 0.0f, 0.0f}; 
+    if (worldspace) {
+//    log::info("{}: Triggering TeleportPlayerToWorldspace to ({}, {}, {}) in {}", __FUNCTION__, teleportPosition.x, teleportPosition.y, teleportPosition.z, worldspace->GetFullName());
+//        TeleportPlayerToWorldspace(&teleportPosition, &teleportRotation, worldspace);
+
+    log::info("{}: Triggering TeleportPlayerToCell to ({}, {}, {}) in {}", __FUNCTION__, teleportPosition.x, teleportPosition.y, teleportPosition.z, worldspace->GetFullName());
+        std::int16_t targetCellX = static_cast<std::int16_t>(std::floor(teleportPosition.x / CELL_SIZE));
+        std::int16_t targetCellY = static_cast<std::int16_t>(std::floor(teleportPosition.y / CELL_SIZE));
+        bool loadFromDisk;
+        [[maybe_unused]] RE::TESObjectCELL* targetCell = _ts_SKSEFunctions::GetCell(targetCellX, targetCellY, worldspace, loadFromDisk);
+//        TeleportPlayerToCell(&teleportPosition, &teleportRotation, targetCell);    
+        QueuePlayerTeleport(worldspace, nullptr, teleportPosition, teleportRotation);
+        return;
+    } else {
+        log::info("{}: Failed to find Solstheim worldspace", __FUNCTION__);
+    }
+}
+*/
+// THERE WAS SOME FUNCTION CALL HERE I CANT REMEMBER WHAT        ƒ();
 
         // re-center audio to current camera position
         CorrectAudioListener();
-        
-        RE::NiPoint3 rotation = a_state->m_timeline.GetRotation(sampleTime);
         
         // Handle user rotation
         if (m_userTurning && a_state->m_allowUserRotation) {
@@ -759,6 +984,7 @@ namespace FCFW {
         } else if (!a_state->m_timeline.IsPlaying()) {
             size_t timelineID = a_state->m_id;
             SKSE::PluginHandle ownerHandle = a_state->m_ownerHandle;
+log::info("{}: stopping playback...", __FUNCTION__);
             StopPlayback(ownerHandle, timelineID);
         }
     }
@@ -866,7 +1092,10 @@ namespace FCFW {
             
             RE::ThirdPersonState* cameraState = static_cast<RE::ThirdPersonState*>(playerCamera->currentState.get());
             if (cameraState) {
-                m_lastFreeRotation = cameraState->freeRotation;
+                m_initialPlayerRotation.x = cameraState->freeRotation.x;
+                m_initialPlayerRotation.y = 0.0f;
+                m_initialPlayerRotation.z = cameraState->freeRotation.y;
+log::info("{}: Stored player camera rotation to ({:.2f}, {:.2f})", __FUNCTION__, cameraState->freeRotation.x, cameraState->freeRotation.y);
             }
         }
         
@@ -876,6 +1105,7 @@ namespace FCFW {
         // Initialize timeline playback
         state->m_timeline.ResetPlayback();
         state->m_timeline.StartPlayback();
+        state->m_lastActiveWorldspaceDestination = WorldspaceDestination{};
         
         // Set start time if specified (for save/load resume)
         if (a_startTime > 0.0f) {
@@ -891,7 +1121,7 @@ namespace FCFW {
         auto* ui = RE::UI::GetSingleton();
         if (ui) {
             m_isShowingMenus = ui->IsShowingMenus();
-            ui->ShowMenus(state->m_showMenusDuringPlayback);
+//            ui->ShowMenus(state->m_showMenusDuringPlayback);
         }
 
         auto player = RE::PlayerCharacter::GetSingleton();
@@ -901,10 +1131,19 @@ namespace FCFW {
         }
 
         m_initialPlayerPosition = player->GetPosition();
+        m_initialPlayerWorldspace = player->GetWorldspace();
+        auto* tes = RE::TES::GetSingleton();
+        if (tes && tes->interiorCell) {
+            m_initialPlayerWorldspace = nullptr; // should already by nullptr, set explicitly to be safe
+        }
+        m_initialPlayerCell = player->GetParentCell();
 
         // Capture camera rotation before entering free camera mode
         RE::NiPoint3 initialRotation = _ts_SKSEFunctions::GetCameraRotation();
-        
+
+//toggleFirstSwitch = false;
+//toggleSecondSwitch = false;
+
         // Enter free camera mode
         ToggleFreeCameraNotHooked();
         
@@ -961,11 +1200,52 @@ namespace FCFW {
         return static_cast<int>(state->m_timeline.GetFOVPointCount());
     }
 
-    
+    void TimelineManager::FinalizeTeleport() {
+        PropagatePlayerIfNeeded();
+        m_teleportPending = false;
+
+        if (m_finalizeStopPlayback) {
+log::info("{}: Finalizing teleport - stopping pending timeline playback if applicable", __FUNCTION__);
+            FinalizeStopPlayback(m_pendingPluginHandle, m_pendingTimelineID);
+log::info("{}: Cleared pending timeline playback state", __FUNCTION__);
+            m_pendingPluginHandle = 0;
+            m_pendingTimelineID = 0;
+            m_finalizeStopPlayback = false;
+        }
+    }
 
     bool TimelineManager::StopPlayback(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID) {
         std::lock_guard<std::recursive_mutex> lock(m_timelineMutex);
-        
+
+        auto* player = RE::PlayerCharacter::GetSingleton();
+        if (!player) {
+            log::warn("{}: Cannot access player character", __FUNCTION__);
+            return false;
+        }
+
+        if (m_initialPlayerWorldspace) {  // playback started in exterior
+            if (player->GetWorldspace() != m_initialPlayerWorldspace) {
+                QueuePlayerTeleport(m_initialPlayerWorldspace, nullptr, m_initialPlayerPosition, m_initialPlayerRotation);
+                m_pendingPluginHandle = a_pluginHandle;
+                m_pendingTimelineID = a_timelineID;
+                m_finalizeStopPlayback = true;
+                return true;
+            }
+        } else { // playback started in interior
+            if (player->GetParentCell() != m_initialPlayerCell) {
+                QueuePlayerTeleport(nullptr, m_initialPlayerCell, m_initialPlayerPosition, m_initialPlayerRotation);
+                m_pendingPluginHandle = a_pluginHandle;
+                m_pendingTimelineID = a_timelineID;
+                m_finalizeStopPlayback = true;
+                return true;
+            }
+        }
+
+        return FinalizeStopPlayback(a_pluginHandle, a_timelineID);
+    }
+
+    bool TimelineManager::FinalizeStopPlayback(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID) {
+        std::lock_guard<std::recursive_mutex> lock(m_timelineMutex);
         TimelineState* state = GetTimeline(a_timelineID, a_pluginHandle);
         if (!state) {
             return false;
@@ -983,7 +1263,9 @@ namespace FCFW {
         
         auto* playerCamera = RE::PlayerCamera::GetSingleton();
         if (playerCamera && playerCamera->IsInFreeCameraMode()) {
-            PropagatePlayerIfNeeded(true);
+//Hooks::ExecuteTeleportHook::BlockNextExecuteTeleport(true);
+
+            PropagatePlayerIfNeeded();
             ToggleFreeCameraNotHooked();
             
             auto* ui = RE::UI::GetSingleton();
@@ -998,7 +1280,9 @@ namespace FCFW {
                 
                 RE::ThirdPersonState* cameraState = static_cast<RE::ThirdPersonState*>(playerCamera->currentState.get());
                 if (cameraState) {
-                    cameraState->freeRotation = m_lastFreeRotation;
+                    cameraState->freeRotation.x = m_initialPlayerRotation.x;
+                    cameraState->freeRotation.y = m_initialPlayerRotation.z;
+log::info("{}: Restored player camera rotation to ({:.2f}, {:.2f})", __FUNCTION__, cameraState->freeRotation.x, cameraState->freeRotation.y);
                 }
             }
             
@@ -1007,6 +1291,9 @@ namespace FCFW {
 
             // Reset camera roll
             Hooks::FreeCameraRollHook::SetFreeCameraRoll(0.0f);
+        } else {
+            log::warn("{}: Not in free camera mode during StopPlayback", __FUNCTION__);
+            return false;
         }
         
         // Clear active state
@@ -1125,6 +1412,8 @@ namespace FCFW {
         } else {
             a_toState->m_rotationOffset = RE::NiPoint3{ 0.0f, 0.0f, 0.0f };
         }
+
+        a_toState->m_lastActiveWorldspaceDestination = a_fromState->m_lastActiveWorldspaceDestination;
     }
 
     bool TimelineManager::PausePlayback(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID) {
@@ -1434,6 +1723,7 @@ namespace FCFW {
         bool importTranslationSuccess = state->m_timeline.AddTranslationPathFromFile(fullPath.string(), a_timeOffset);
         bool importRotationSuccess = state->m_timeline.AddRotationPathFromFile(fullPath.string(), a_timeOffset, rotationConversionFactor);
         bool importFOVSuccess = state->m_timeline.AddFOVPathFromFile(fullPath.string(), a_timeOffset);
+        bool importWorldspaceSuccess = state->m_timeline.AddWorldspacePathFromFile(fullPath.string(), a_timeOffset);
         
         if (!importTranslationSuccess) {
             log::error("{}: Failed to import translation points from YAML file: {}", __FUNCTION__, a_filePath);
@@ -1447,6 +1737,11 @@ namespace FCFW {
         
         if (!importFOVSuccess) {
             log::error("{}: Failed to import FOV points from YAML file: {}", __FUNCTION__, a_filePath);
+            return false;
+        }
+        
+        if (!importWorldspaceSuccess) {
+            log::error("{}: Failed to import worldspace points from YAML file: {}", __FUNCTION__, a_filePath);
             return false;
         }
         
@@ -1490,10 +1785,12 @@ namespace FCFW {
 		bool exportRotationSuccess = state->m_timeline.ExportRotationPath(file, 180.0f / PI);
 		file << "\n";  // Separate the sections
 		bool exportFOVSuccess = state->m_timeline.ExportFOVPath(file);
+		file << "\n";  // Separate the sections
+		bool exportWorldspaceSuccess = state->m_timeline.ExportWorldspacePath(file);
 		
 		file.close();
 		
-		if (!exportTranslationSuccess || !exportRotationSuccess || !exportFOVSuccess) {
+		if (!exportTranslationSuccess || !exportRotationSuccess || !exportFOVSuccess || !exportWorldspaceSuccess) {
 			log::error("{}: Failed to export timeline to YAML file: {}", __FUNCTION__, a_filePath);
 			return false;
 		}
@@ -1911,37 +2208,6 @@ log::warn("{}: Cannot update TVDT - (9)", __FUNCTION__);
                   cameraPos.x, cameraPos.y, cameraPos.z);
     }
 
-    void TimelineManager::UpdatePlayerParentCell() {
-        auto* tes = RE::TES::GetSingleton();
-        if (!tes) {
-            log::warn("{}: Cannot access TES", __FUNCTION__);
-            return ;
-        }
-
-        auto* worldspace = tes->GetRuntimeData2().worldSpace;
-        if (!worldspace) {
-            log::warn("{}: Cannot access worldspace", __FUNCTION__);
-            return ;
-        }
-        auto player = RE::PlayerCharacter::GetSingleton();
-        if (!player) {
-            log::error("{}: PlayerCharacter not available", __FUNCTION__);
-            return ;
-        }
-
-        bool loadedFromDisk = false;
-        if (!player->GetParentCell()) {
-            log::info("{}: Player has no parent cell, attempting to assign based on player position", __FUNCTION__);
-        auto playerPos = player->GetPosition();
-        RE::TESObjectCELL* playerCell =  _ts_SKSEFunctions::GetCell(m_initialPlayerPosition, worldspace, loadedFromDisk);
-//        RE::TESObjectCELL* playerCell =  _ts_SKSEFunctions::GetCell(playerPos, worldspace, loadedFromDisk);
-        if (!playerCell) {
-                log::warn("{}: Player has no parent cell after Re-opening cell", __FUNCTION__);
-                return ;
-            }
-        player->SetParentCell(playerCell);
-        }        
-    }
 
     void TimelineManager::LogTESGridCells() {
         auto* tes = RE::TES::GetSingleton();
@@ -1987,6 +2253,84 @@ log::warn("{}: Cannot update TVDT - (9)", __FUNCTION__);
         }
 
     }
+
+/*
+    void TimelineManager::TeleportPlayerToWorldspace(RE::NiPoint3* a_position, RE::NiPoint3* a_rotation, RE::TESWorldSpace* a_worldspace) {
+        if (!a_position || !a_rotation) {
+            log::error("{}: Target position or rotation is null", __FUNCTION__);
+            return;
+        }
+
+        if (!a_worldspace) {
+            log::error("{}: Target worldspace is null", __FUNCTION__);
+            return;
+        }
+
+        auto* player = RE::PlayerCharacter::GetSingleton();
+        if (!player) {
+            log::error("{}: PlayerCharacter not available", __FUNCTION__);
+            return;
+        }
+
+        if (player->GetWorldspace() == a_worldspace) {
+log::info("{}: Player is already in target worldspace, skipping teleport", __FUNCTION__);
+            return;
+        }
+
+//        std::int16_t targetCellX = static_cast<std::int16_t>(std::floor(a_position->x / CELL_SIZE));
+//        std::int16_t targetCellY = static_cast<std::int16_t>(std::floor(a_position->y / CELL_SIZE));
+//        bool loadFromDisk;
+//        RE::TESObjectCELL* targetCell = _ts_SKSEFunctions::GetCell(targetCellX, targetCellY, a_worldspace, loadFromDisk);
+//        TeleportPlayerToCell(a_position, a_rotation, targetCell);        
+
+
+RE::UI::GetSingleton()->ShowMenus(true);
+
+        Hooks::TeleportHook::TeleportToWorldspacePosition(player, a_position, a_rotation, a_worldspace, true);
+        
+//RE::Sky::GetSingleton()->flags.set(RE::Sky::Flags::kFastTravel);
+
+        m_teleportPending  = true;
+        
+        UpdatePlayerCell(*a_position);
+    }
+
+
+    void TimelineManager::TeleportPlayerToCell(RE::NiPoint3* a_position, RE::NiPoint3* a_rotation, RE::TESObjectCELL* a_cell) {
+        if (!a_position || !a_rotation) {
+            log::error("{}: Target position or rotation is null", __FUNCTION__);
+            return;
+        }
+
+        if (!a_cell) {
+            log::error("{}: Target cell is null", __FUNCTION__);
+            return;
+        }
+
+        auto* player = RE::PlayerCharacter::GetSingleton();
+        if (!player) {
+            log::error("{}: PlayerCharacter not available", __FUNCTION__);
+            return;
+        }
+
+        if (a_cell == player->GetParentCell()) {
+log::info("{}: Player is already in target cell, skipping teleport", __FUNCTION__);
+            return;
+        }
+
+RE::UI::GetSingleton()->ShowMenus(true);
+        
+        Hooks::TeleportHook::TeleportToCell(player, a_position, a_rotation, a_cell, true);
+        
+//RE::Sky::GetSingleton()->flags.set(RE::Sky::Flags::kFastTravel);
+
+        m_teleportPending  = true;
+        
+        UpdatePlayerCell(*a_position);
+    }
+
+*/
+
 /*
     void TimelineManager::InitializeXMarker() {
         if (m_marker) {

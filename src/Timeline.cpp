@@ -150,6 +150,7 @@ namespace FCFW
 		m_translationTrack.ClearPoints();
 		m_rotationTrack.ClearPoints();
 		m_fovTrack.ClearPoints();
+		m_worldspaceTrack.ClearPoints();
 	}
 
 	void Timeline::Reset()
@@ -223,6 +224,46 @@ namespace FCFW
 	float Timeline::GetFOVPoint(size_t a_index) const
 	{
 		return m_fovTrack.GetPoint(a_index).m_point;
+	}
+
+	bool Timeline::AddWorldspacePathFromFile(const std::string& a_filePath, float a_timeOffset)
+	{
+		return m_worldspaceTrack.AddPathFromFile(a_filePath, a_timeOffset);
+	}
+
+	bool Timeline::ExportWorldspacePath(std::ofstream& a_file) const
+	{
+		return m_worldspaceTrack.ExportPath(a_file);
+	}
+
+	size_t Timeline::AddWorldspacePoint(const WorldspacePoint& a_point)
+	{
+		m_worldspaceTrack.AddPoint(a_point);
+		return m_worldspaceTrack.GetPointCount();
+	}
+
+	void Timeline::RemoveWorldspacePoint(size_t a_index)
+	{
+		m_worldspaceTrack.RemovePoint(a_index);
+	}
+
+	size_t Timeline::GetWorldspacePointCount() const
+	{
+		return m_worldspaceTrack.GetPointCount();
+	}
+
+	const char* Timeline::GetWorldspacePointEditorID(size_t a_index) const
+	{
+		const WorldspacePoint& point = m_worldspaceTrack.GetPoint(a_index);
+		WorldspaceDestination dest = point.GetPoint();
+		if (dest.m_worldspace) return dest.m_worldspace->GetFormEditorID();
+		if (dest.m_cell) return dest.m_cell->GetFormEditorID();
+		return "";
+	}
+
+	WorldspaceDestination Timeline::GetWorldspaceDestination(float a_time) const
+	{
+		return m_worldspaceTrack.GetPath().GetWorldspaceDestination(a_time);
 	}
 
 }  // namespace FCFW

@@ -51,11 +51,20 @@ namespace FCFW
 	bool ExportTranslationPath(std::ofstream& a_file) const;
 	bool ExportRotationPath(std::ofstream& a_file, float a_conversionFactor = 1.0f) const;
 	bool ExportFOVPath(std::ofstream& a_file) const;
+	bool AddWorldspacePathFromFile(const std::string& a_filePath, float a_timeOffset = 0.0f);
+	bool ExportWorldspacePath(std::ofstream& a_file) const;
+	size_t AddWorldspacePoint(const WorldspacePoint& a_point);
+	void RemoveWorldspacePoint(size_t a_index);
+	size_t GetWorldspacePointCount() const;
+	const char* GetWorldspacePointEditorID(size_t a_index) const;
+	WorldspaceDestination GetWorldspaceDestination(float a_time) const;
 
 	RE::NiPoint3 GetTranslationPoint(size_t a_index) const;
 	RE::NiPoint3 GetRotationPoint(size_t a_index) const;
-	float GetFOVPoint(size_t a_index) const;private:
+	float GetFOVPoint(size_t a_index) const;
+private:
 	TranslationTrack m_translationTrack;  // Position keyframes
 	RotationTrack m_rotationTrack;        // Rotation keyframes
 	FOVTrack m_fovTrack;                  // FOV keyframes
+	WorldspaceTrack m_worldspaceTrack;     // Worldspace change event points
 };}  // namespace FCFW

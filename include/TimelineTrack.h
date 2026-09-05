@@ -48,6 +48,8 @@ namespace FCFW
 		bool AddPathFromFile(const std::string& a_filePath, float a_timeOffset = 0.0f, float a_conversionFactor = 1.0f);
 		bool ExportPath(std::ofstream& a_file, float a_conversionFactor = 1.0f) const;
 
+		const PathType& GetPath() const { return m_path; }
+
 	private:
 		typename PathType::ValueType GetInterpolatedPoint(size_t a_index, float a_progress) const;
 		typename PathType::ValueType GetPointLinear(size_t a_index, float a_progress) const;
@@ -64,6 +66,7 @@ namespace FCFW
 	using TranslationTrack = TimelineTrack<TranslationPath>;
 	using RotationTrack = TimelineTrack<RotationPath>;
 	using FOVTrack = TimelineTrack<FOVPath>;
+	using WorldspaceTrack = TimelineTrack<WorldspacePath>;
 
 	template <typename PathType>
 	void TimelineTrack<PathType>::AddPoint(const TransitionPoint& a_point)

@@ -36,6 +36,7 @@ namespace FCFW {
         float m_minHeightAboveGround{ 0.0f }; // Minimum height above ground when following ground (runtime only)
         RE::NiPoint3 m_rotationOffset{ 0.0f, 0.0f, 0.0f }; // Accumulated user rotation (runtime only) - pitch=x, roll=y, yaw=z
         float m_savedFOV{ 80.0f };             // FOV before playback starts
+        WorldspaceDestination m_lastActiveWorldspaceDestination;  // Last fired worldspace destination (runtime only)
         
         void Initialize(size_t a_id, SKSE::PluginHandle a_ownerHandle) {
             m_id = a_id;
@@ -66,6 +67,7 @@ namespace FCFW {
             m_minHeightAboveGround = 0.0f;
             m_rotationOffset = { 0.0f, 0.0f, 0.0f };
             m_savedFOV = 80.0f;
+            m_lastActiveWorldspaceDestination = WorldspaceDestination{};
         }
     };
 
@@ -96,18 +98,22 @@ namespace FCFW {
             int AddRotationPoint(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, float a_time, const RE::NiPoint3& a_rotation, bool a_easeIn, bool a_easeOut, InterpolationMode a_interpolationMode);
             int AddRotationPointAtRef(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, float a_time, RE::TESObjectREFR* a_reference, BodyPart a_bodyPart, const RE::NiPoint3& a_offset, bool a_isOffsetRelative, bool a_easeIn, bool a_easeOut, InterpolationMode a_interpolationMode);
             int AddFOVPoint(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, float a_time, float a_fov, bool a_easeIn, bool a_easeOut, InterpolationMode a_interpolationMode);
+            int AddWorldspacePoint(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, float a_time, const char* a_editorID, bool a_isInterior);
             
             bool RemoveTranslationPoint(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, size_t a_index);
             bool RemoveRotationPoint(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, size_t a_index);
             bool RemoveFOVPoint(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, size_t a_index);
+            bool RemoveWorldspacePoint(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, size_t a_index);
 
             int GetTranslationPointCount(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID) const;
             int GetRotationPointCount(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID) const;
             int GetFOVPointCount(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID) const;
+            int GetWorldspacePointCount(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID) const;
             
             RE::NiPoint3 GetTranslationPoint(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, size_t a_index) const;
             RE::NiPoint3 GetRotationPoint(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, size_t a_index) const;
             float GetFOVPoint(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, size_t a_index) const;
+            const char* GetWorldspacePointEditorID(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, size_t a_index) const;
             
             // playback / recording
             bool StartRecording(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID, float a_recordingInterval = 1.0f, bool a_append = false, float a_timeOffset = 0.0f);
@@ -145,7 +151,8 @@ namespace FCFW {
             void Update();
 
             void SetUserTurning(bool a_turning);
-            
+            void FinalizeTeleport();
+
             // Overloads for internal use (no ownership validation - for hooks)
             bool IsPlaybackRunning(size_t a_timelineID) const;
             bool IsUserRotationAllowed(size_t a_timelineID) const;
@@ -162,8 +169,10 @@ namespace FCFW {
             TimelineManager() = default;
             ~TimelineManager() = default;
             
-           void DispatchTimelineEvent(uint32_t a_messageType, size_t a_timelineID);
-           void DispatchTimelineEventPapyrus(const char* a_eventName, size_t a_timelineID);
+            bool FinalizeStopPlayback(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID);
+
+            void DispatchTimelineEvent(uint32_t a_messageType, size_t a_timelineID);
+            void DispatchTimelineEventPapyrus(const char* a_eventName, size_t a_timelineID);
 
             void RecordTimeline(TimelineState* a_state);
             void PlayTimeline(TimelineState* a_state);
@@ -175,15 +184,21 @@ namespace FCFW {
             
             void CleanupPluginTimelines(SKSE::PluginHandle a_pluginHandle);
 
-            void PropagatePlayerIfNeeded(bool a_resetPosition = false);
+            void PropagatePlayerIfNeeded();
             void DisablePlayerSim(bool a_disable);
             void HidePlayer(bool a_hide);
             void UpdatePlayerCell(RE::NiPoint3& a_position);
+            void QueuePlayerTeleport(RE::TESWorldSpace* a_worldspace,
+                                    RE::TESObjectCELL* a_interior,
+                                    RE::NiPoint3 a_pos,
+                                    RE::NiPoint3 a_rot);
+
 
 /* UNUSED: */
+//            void TeleportPlayerToWorldspace(RE::NiPoint3* a_position, RE::NiPoint3* a_rotation, RE::TESWorldSpace* a_worldspace);
+//            void TeleportPlayerToCell(RE::NiPoint3* a_position, RE::NiPoint3* a_rotation, RE::TESObjectCELL* a_cell);
             void LogTESGridCells();
             //void InitializeXMarker();
-            void UpdatePlayerParentCell();
             void DisableTerrainOcclusion();
             void RestoreTerrainOcclusion();
             void UpdateTerrainOcclusionForCamera(); // Update TVDT if camera moved to different cell
@@ -198,9 +213,15 @@ namespace FCFW {
             // Playback
             bool m_isShowingMenus = true;         // Whether menus were showing before playback started
             bool m_userTurning = false;           // Whether user is manually controlling camera during playback
-            RE::NiPoint2 m_lastFreeRotation;      // camera free rotation before playback started (third-person only)
+            RE::NiPoint3 m_initialPlayerRotation;      // camera free rotation before playback started (third-person only)
             RE::NiPoint3 m_initialPlayerPosition; // Player position at start of playback
             bool m_isPlayerMoved = false;   // Whether player is moved to camera position during playback
+            RE::TESWorldSpace* m_initialPlayerWorldspace; // Player worldspace at start of playback
+            RE::TESObjectCELL* m_initialPlayerCell; // Player cell at start of playback
+            SKSE::PluginHandle m_pendingPluginHandle = 0; // Plugin handle for pending teleport on StopPlayback
+            size_t m_pendingTimelineID = 0; // Timeline ID for pending teleport on StopPlayback
+            bool m_finalizeStopPlayback = false; // Whether to finalize pending teleport on StopPlayback
+            bool m_teleportPending = false; // Whether a teleport is currently pending
 
 /* UNUSED: */
             // TVDT (TerrainVisibilityData) management for LOD occlusion

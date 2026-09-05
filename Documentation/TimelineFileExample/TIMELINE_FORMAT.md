@@ -44,6 +44,11 @@ fovPoints:
     interpolationMode: cubicHermite
     easeIn: false
     easeOut: false
+
+worldspacePoints:
+  - time: 0.0
+    editorID: ""
+    isInterior: false
 ```
 
 ---
@@ -388,6 +393,39 @@ fovPoints:
     interpolationMode: linear
     easeIn: false
     easeOut: false
+```
+
+---
+
+## Worldspace Points
+
+Worldspace points define worldspace (exterior) and cell (interior) changes triggered during playback. Array: `worldspacePoints`
+
+When playback reaches a worldspace point's time, the camera is instantly moved to the specified destination (a worldspace for exterior locations, or a cell for interior locations). The camera's current position and rotation at that moment are preserved.
+
+**Constraint:** `editorID` must be non-empty. Use `isInterior` to indicate whether it refers to a cell or worldspace.
+
+**Required Fields:**
+- `time` - Time in seconds when the worldspace change is triggered
+- `editorID` - EditorID of the destination worldspace or cell
+- `isInterior` - `true` if `editorID` refers to a cell (interior), `false` if it refers to a worldspace (exterior)
+
+**Note:** Worldspace points are purely event-based (no interpolation). The camera is moved at the exact time specified and playback continues uninterrupted from the new location.
+
+**Example (Exterior worldspace change):**
+```yaml
+worldspacePoints:
+  - time: 5.0
+    editorID: "DLC2SolstheimWorld"    # Solstheim worldspace
+    isInterior: false
+```
+
+**Example (Interior cell change):**
+```yaml
+worldspacePoints:
+  - time: 5.0
+    editorID: "Skuldafn01"
+    isInterior: true
 ```
 
 ---

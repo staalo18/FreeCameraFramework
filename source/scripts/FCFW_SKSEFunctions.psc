@@ -253,6 +253,40 @@ float Function GetRotationPointRoll(string modName, int timelineID, int index) g
 ; Returns: FOV in degrees, or 80.0 if timeline not found or index out of range
 float Function GetFOVPoint(string modName, int timelineID, int index) global native
 
+; ===== Worldspace Points =====
+
+; Add a worldspace point to the timeline
+; At the specified time during playback, the camera is moved to the given worldspace (exterior)
+; or cell (interior) at the camera's current position and rotation.
+; modName: name of your mod's ESP/ESL file (e.g., "MyMod.esp")
+; timelineID: timeline ID to add the point to
+; time: time in seconds when the worldspace change occurs
+; editorID: EditorID of the destination worldspace or cell
+; isInterior: true if editorID refers to a cell (interior), false if it refers to a worldspace (exterior)
+; Returns: index of the added point, or -1 on failure
+int Function AddWorldspacePoint(string modName, int timelineID, float time, string editorID, bool isInterior) global native
+
+; Remove a worldspace point from the timeline
+; modName: name of your mod's ESP/ESL file
+; timelineID: timeline ID to remove the point from
+; index: index of the point to remove
+; Returns: true if removed, false on failure
+bool Function RemoveWorldspacePoint(string modName, int timelineID, int index) global native
+
+; Get the number of worldspace points in the timeline
+; modName: name of your mod's ESP/ESL file (e.g., "MyMod.esp")
+; timelineID: timeline ID to query
+; Returns: number of worldspace points, or -1 if timeline not found
+int Function GetWorldspacePointCount(string modName, int timelineID) global native
+
+; Get the EditorID of the destination form of a worldspace point by index
+; The destination is either a worldspace (exterior) or a cell (interior) - exactly one will be set
+; modName: name of your mod's ESP/ESL file (e.g., "MyMod.esp")
+; timelineID: timeline ID to query
+; index: 0-based index of the point
+; Returns: EditorID string, or "" if timeline not found or index out of range
+string Function GetWorldspacePointEditorID(string modName, int timelineID, int index) global native
+
 ; Start playback of a camera path timeline
 ; modName: name of your mod's ESP/ESL file (e.g., "MyMod.esp")
 ; timelineID: timeline ID to play

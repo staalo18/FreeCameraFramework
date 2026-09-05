@@ -1,0 +1,160 @@
+# FreeCameraFramework Timeline (YAML format)
+formatVersion: 1
+
+playbackMode: end
+loopTimeOffset: 0
+globalEaseIn: false
+globalEaseOut: false
+showMenusDuringPlayback: false
+allowUserRotation: true
+followGround: true
+minHeightAboveGround: 0
+useDegrees: true
+
+translationPoints:
+  - time: 0
+    type: world
+    position: [5408.34668, -15127.415, -4877.28613]
+    interpolationMode: cubicHermite
+    easeIn: true
+    easeOut: false
+  - time: 0.0278333295
+    type: world
+    position: [5408.34668, -15127.415, -4877.28613]
+    interpolationMode: cubicHermite
+    easeIn: false
+    easeOut: false
+  - time: 1.0418334
+    type: world
+    position: [4913.82227, -15019.9443, -5051.08887]
+    interpolationMode: cubicHermite
+    easeIn: false
+    easeOut: false
+  - time: 2.05333424
+    type: world
+    position: [4446.24951, -15359.8643, -5089.03662]
+    interpolationMode: cubicHermite
+    easeIn: false
+    easeOut: false
+  - time: 3.05716825
+    type: world
+    position: [4707.44824, -15841.6562, -4923.51611]
+    interpolationMode: cubicHermite
+    easeIn: false
+    easeOut: false
+  - time: 4.07133532
+    type: world
+    position: [5286.43604, -15659.4785, -4853.13086]
+    interpolationMode: cubicHermite
+    easeIn: false
+    easeOut: false
+  - time: 5.08416557
+    type: world
+    position: [5513.76074, -14945.209, -4846.46045]
+    interpolationMode: cubicHermite
+    easeIn: false
+    easeOut: false
+  - time: 6.10866785
+    type: world
+    position: [4905.10742, -14773.9531, -4977.41748]
+    interpolationMode: cubicHermite
+    easeIn: false
+    easeOut: false
+  - time: 6.999
+    type: world
+    position: [4663.43457, -14883.5254, -5064.97119]
+    interpolationMode: cubicHermite
+    easeIn: false
+    easeOut: false
+  - time: 7.001
+    type: world
+    position: [100.0, 7100.0, 900.0]
+    interpolationMode: cubicHermite
+    easeIn: false
+    easeOut: true
+  - time: 11.999
+    type: world
+    position: [100.0, 7100.0, 900.0]
+    interpolationMode: cubicHermite
+    easeIn: false
+    easeOut: true
+  - time: 12.001
+    type: world
+    position: [0.0, 0.0, 0.0]
+    interpolationMode: cubicHermite
+    easeIn: false
+    easeOut: true
+  - time: 20.0
+    type: world
+    position: [0.0, 0.0, 0.0]
+    interpolationMode: cubicHermite
+    easeIn: false
+    easeOut: true
+rotationPoints:
+  - time: 0
+    type: world
+    rotation: [24.5928669, 0, -73.9171066]
+    interpolationMode: cubicHermite
+    easeIn: true
+    easeOut: false
+  - time: 0.0278333295
+    type: world
+    rotation: [24.5928669, 0, -73.9171066]
+    interpolationMode: cubicHermite
+    easeIn: false
+    easeOut: false
+  - time: 1.0418334
+    type: world
+    rotation: [8.07487202, 0, 271.964539]
+    interpolationMode: cubicHermite
+    easeIn: false
+    easeOut: false
+  - time: 2.05333424
+    type: world
+    rotation: [354.901733, 0, 190.588623]
+    interpolationMode: cubicHermite
+    easeIn: false
+    easeOut: false
+  - time: 3.05716825
+    type: world
+    rotation: [341.242188, 0, 116.836433]
+    interpolationMode: cubicHermite
+    easeIn: false
+    easeOut: false
+  - time: 4.07133532
+    type: world
+    rotation: [354.766876, 0, 50.9390984]
+    interpolationMode: cubicHermite
+    easeIn: false
+    easeOut: false
+  - time: 5.08416557
+    type: world
+    rotation: [8.61877155, 0, 321.709503]
+    interpolationMode: cubicHermite
+    easeIn: false
+    easeOut: false
+  - time: 6.10866785
+    type: world
+    rotation: [15.8375378, 0, 253.263214]
+    interpolationMode: cubicHermite
+    easeIn: false
+    easeOut: false
+  - time: 7.1086688
+    type: world
+    rotation: [19.2174149, 0, 242.771927]
+    interpolationMode: cubicHermite
+    easeIn: false
+    easeOut: false
+  - time: 7.16150188
+    type: world
+    rotation: [19.2174149, 0, 242.771927]
+    interpolationMode: cubicHermite
+    easeIn: false
+    easeOut: true
+worldspacePoints:
+  - time: 7.0
+    editorID: "DLC2SolstheimWorld"
+    isInterior: false
+  - time: 12.0
+    editorID: "Skuldafn01"
+    isInterior: true

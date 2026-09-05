@@ -72,7 +72,8 @@ int togglePlayback1_Key = 2 ; "1"
 int togglePlayback2_Key = 3 ; "2"
 int toggleRecording_Key = 4 ; "3"
 int exportTimeline_Key = 5 ; "4"
-int importTimeline_Key = 6 ; "5"
+int importTimeline_Key = 6 ; "5
+int toggleDollyZoom_Key = 7 ; "6"
 
 ; timeline configuration
 float CircleRadius = 2000.0 ; radius of orbit around marker
@@ -87,6 +88,7 @@ int timeline2ID = -1
 int timeline3ID = -1
 int timeline4ID = -1
 int timeline5ID = -1
+int dollyZoomTimelineID = -1
 int currentTimelineID = -1
 
 ; ===== Save/Load State Preservation =====
@@ -114,6 +116,7 @@ Function InitializeKeys()
     RegisterForKey(toggleRecording_Key)
     RegisterForKey(exportTimeline_Key)
     RegisterForKey(importTimeline_Key)
+    RegisterForKey(toggleDollyZoom_Key)
 endFunction
 
 
@@ -128,6 +131,7 @@ Function IntializeTimelines()
     timeline3ID = RegisterTimeline()
     timeline4ID = RegisterTimeline()
     timeline5ID = RegisterTimeline()
+    dollyZoomTimelineID = RegisterTimeline()
 
     FCFW_SKSEFunctions.RegisterForTimelineEvents(self as Form)
 EndFunction
@@ -450,6 +454,15 @@ Event OnKeyDown(int keyCode)
             Debug.Trace("FCFW_EXAMPLE: ERROR - Failed to import timeline from " + TimelineFilename)
             Debug.Notification("FCFW Example: Failed to import timeline!")
         endif
+    elseif keyCode == toggleDollyZoom_Key
+        ; Trigger a dolly zoom effect in front of the player
+
+        float offsetStart = 1000.0
+        float offsetEnd = 100.0
+        float FOVStart = 15.0
+        float zoomTime = 10.0
+
+        DollyZoom(offsetStart, offsetEnd, FOVStart, zoomTime)   
     endif
 EndEvent
 
@@ -457,7 +470,7 @@ EndEvent
 Event OnPlaybackStart(int eventtimelineID)
     if eventtimelineID == timeline1ID || eventtimelineID == timeline2ID || \
        eventtimelineID == timeline3ID || eventtimelineID == timeline4ID || \
-       eventtimelineID == timeline5ID
+       eventtimelineID == timeline5ID || eventtimelineID == dollyZoomTimelineID
         
         currentTimelineID = eventtimelineID
         Debug.Trace("FCFW_EXAMPLE: Playback started for timeline " + eventtimelineID)
@@ -473,7 +486,7 @@ EndEvent
 Event OnPlaybackStop(int eventtimelineID)
     if eventtimelineID == timeline1ID || eventtimelineID == timeline2ID || \
        eventtimelineID == timeline3ID || eventtimelineID == timeline4ID || \
-       eventtimelineID == timeline5ID
+       eventtimelineID == timeline5ID || eventtimelineID == dollyZoomTimelineID
        
         Debug.Trace("FCFW_EXAMPLE: Playback stopped for timeline " + eventtimelineID)
         
@@ -552,12 +565,130 @@ Function UpdatePlaybackState()
         elseif currentTimelineID == timeline5ID
             savedActiveTimeline = 5
             savedMinHeightAboveGround = 0.0
+        elseif currentTimelineID == dollyZoomTimelineID
+            savedActiveTimeline = 6
+            savedMinHeightAboveGround = 0.0
         else 
             Debug.Trace("FCFW_EXAMPLE: ERROR - Unknown active timeline ID " + currentTimelineID)
             return
         endif
         
         savedPlaybackTime = FCFW_SKSEFunctions.GetPlaybackTime(ModName, currentTimelineID)
+    endif
+EndFunction
+
+; ============================================================================
+; Dolly Zoom
+; ============================================================================
+; Performs a dolly zoom camera movement facing the player.
+;
+; The dolly zoom (aka "Hitchcock zoom") moves the camera toward or away from
+; the player while simultaneously adjusting the FOV so that the player's
+; apparent size stays constant. This creates a striking depth-compression or
+; depth-expansion effect on the background.
+;
+; Parameters:
+;   offsetStart  - starting distance of camera from player (Skyrim units)
+;   offsetEnd    - ending distance of camera from player (Skyrim units, must not be 0)
+;   FOVStart     - starting field of view in degrees
+;   zoomTime     - duration of the zoom in seconds
+;
+; The invariant maintained throughout: offset = width / (2 * tan(0.5 * FOV))
+; where width = 2 * offsetStart * tan(0.5 * FOVStart) is constant.
+;
+; The camera is placed in front of the player (in the direction the player
+; faces) and looks back at the player throughout the animation.
+; ============================================================================
+
+Function DollyZoom(float offsetStart, float offsetEnd, float FOVStart, float zoomTime)
+    if dollyZoomTimelineID <= 0
+        Debug.Trace("FCFW_EXAMPLE: DollyZoom - timeline not registered!")
+        Debug.Notification("FCFW Example: DollyZoom failed - timeline not registered!")
+        return
+    endif
+
+    if offsetEnd <= 0.0
+        Debug.Trace("FCFW_EXAMPLE: DollyZoom - offsetEnd must be greater than 0!")
+        Debug.Notification("FCFW Example: DollyZoom failed - offsetEnd must be greater than 0!")
+        return
+    endif
+
+    ; Compute the invariant 'width' from the initial conditions.
+    ; Relation: offset = width / (2 * tan(0.5 * FOV))
+    ; => width = 2 * offsetStart * tan(0.5 * FOVStart)
+    ; Note: Papyrus Math.Tan() takes degrees, Math.Atan() returns degrees.
+    float width = 2.0 * offsetStart * Math.Tan(FOVStart * 0.5)
+
+    FCFW_SKSEFunctions.ClearTimeline(ModName, dollyZoomTimelineID)
+
+    FCFW_SKSEFunctions.SetFollowGround(ModName, dollyZoomTimelineID, follow = true)
+
+    ObjectReference player = Game.GetPlayer()
+
+    if FCFW_SKSEFunctions.AddTranslationPointAtRef(ModName, dollyZoomTimelineID, 0, \
+            player, bodyPart = 0, offsetY = offsetStart, offsetz = 100.0, isOffsetRelative = true, \
+            interpolationMode = 2) < 0
+        Debug.Trace("FCFW_EXAMPLE: DollyZoom - failed to add translation point " + i)
+    endif
+
+    if FCFW_SKSEFunctions.AddFOVPoint(ModName, dollyZoomTimelineID, 0, FOVStart, \
+            interpolationMode = 2) < 0
+        Debug.Trace("FCFW_EXAMPLE: DollyZoom - failed to add FOV point " + i)
+    endif
+
+    ; Sample the dolly zoom curve at evenly spaced time steps.
+    ; Linear interpolation between samples faithfully represents the
+    ; non-linear FOV curve without cubic overshoot.
+    int n = 20
+    int i = 0
+    while i <= n
+        float alpha = i as float / n as float
+        float t = alpha * zoomTime + 2.0
+        float offset = offsetStart + (offsetEnd - offsetStart) * alpha
+
+        ; FOV at this offset: FOV = 2 * atan(width / (2 * offset))
+        float fov = 2.0 * Math.Atan(width / (2.0 * offset))
+
+        ; Camera placed 'offset' units ahead of the player (in player's facing direction)
+        if FCFW_SKSEFunctions.AddTranslationPointAtRef(ModName, dollyZoomTimelineID, t, \
+                player, bodyPart = 0, offsetY = offset, offsetz = 100.0, isOffsetRelative = true, \
+                interpolationMode = 2) < 0
+            Debug.Trace("FCFW_EXAMPLE: DollyZoom - failed to add translation point " + i)
+        endif
+
+        if FCFW_SKSEFunctions.AddFOVPoint(ModName, dollyZoomTimelineID, t, fov, \
+                interpolationMode = 2) < 0
+            Debug.Trace("FCFW_EXAMPLE: DollyZoom - failed to add FOV point " + i)
+        endif
+
+        i += 1
+    endWhile
+
+
+    if FCFW_SKSEFunctions.AddTranslationPointAtRef(ModName, dollyZoomTimelineID, zoomTime + 4.0, \
+            player, bodyPart = 0, offsetY = offsetEnd, offsetz = 100.0, isOffsetRelative = true, \
+            interpolationMode = 2) < 0
+        Debug.Trace("FCFW_EXAMPLE: DollyZoom - failed to add translation point " + i)
+    endif
+
+    float FOVEnd = 2.0 * Math.Atan(width / (2.0 * offsetEnd))
+    if FCFW_SKSEFunctions.AddFOVPoint(ModName, dollyZoomTimelineID, zoomTime + 4.0, FOVEnd, \
+            interpolationMode = 2) < 0
+        Debug.Trace("FCFW_EXAMPLE: DollyZoom - failed to add FOV point " + i)
+    endif
+
+
+    ; Single rotation point: look directly at the player throughout the zoom.
+    ; isOffsetRelative = false means "look at the reference" (offsetYaw = 0 = look straight at player).
+    if FCFW_SKSEFunctions.AddRotationPointAtRef(ModName, dollyZoomTimelineID, 0.0, \
+            player, bodyPart = 1, offsetPitch = 0.0, offsetYaw = 0.0, \
+            isOffsetRelative = false, interpolationMode = 1) < 0
+        Debug.Trace("FCFW_EXAMPLE: DollyZoom - failed to add rotation point")
+    endif
+
+    if !FCFW_SKSEFunctions.StartPlayback(ModName, dollyZoomTimelineID)
+        Debug.Trace("FCFW_EXAMPLE: DollyZoom - failed to start playback")
+        Debug.Notification("FCFW Example: DollyZoom failed to start!")
     endif
 EndFunction
 
@@ -613,6 +744,16 @@ Function RestorePlaybackState()
         Debug.MessageBox("FCFW Example: Timeline 4/5 playback cannot be restored from save.\n\n" + \
                          "Timeline 4 content (recorded/imported) is not persisted across saves.")
         Debug.Trace("FCFW_EXAMPLE: Timeline 4/5 restoration not supported - timeline content not persisted")
+        
+        ; Clear saved state and return without starting playback
+        savedActiveTimeline = -1
+        savedPlaybackTime = -1.0
+        return
+    elseif savedActiveTimeline == 6
+        ; Dolly zoom timeline is NOT supported for save/load restoration.
+        ; Reason: The zoom parameters (offsetStart, offsetEnd, FOVStart, zoomTime) are
+        ; not persisted, so the timeline content cannot be rebuilt after loading.
+        Debug.Trace("FCFW_EXAMPLE: Dolly zoom restoration not supported - zoom parameters not persisted")
         
         ; Clear saved state and return without starting playback
         savedActiveTimeline = -1

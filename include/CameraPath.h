@@ -533,13 +533,8 @@ namespace FCFW {
         size_t GetPointCount() const { return m_points.size(); }
 
         // Update all camera points - store current camera value into m_point
-        virtual void UpdateCameraPoints() {
-            for (auto& point : m_points) {
-                if (point.m_pointType == PointType::kCamera) {
-                    point.m_point = point.GetPointAtCamera();
-                }
-            }
-        }
+        // Derived classes override this for concrete point types that support kCamera capture
+        virtual void UpdateCameraPoints() {}
 
         virtual TransitionPoint GetPointAtCamera(float a_time, bool a_easeIn, bool a_easeOut) const = 0;
         
@@ -553,7 +548,11 @@ namespace FCFW {
         using ValueType = RE::NiPoint3;  // Type returned by GetPoint()
         
         TranslationPoint GetPointAtCamera(float a_time, bool a_easeIn, bool a_easeOut) const override;
-        
+        void UpdateCameraPoints() override {
+            for (auto& point : m_points)
+                if (point.m_pointType == PointType::kCamera)
+                    point.m_point = point.GetPointAtCamera();
+        }
         bool AddPathFromFile(const std::string& a_filePath, float a_timeOffset = 0.0f, float a_conversionFactor = 1.0f);
         bool ExportPath(std::ofstream& a_file, float a_conversionFactor = 1.0f) const;
     };
@@ -564,7 +563,11 @@ namespace FCFW {
         using ValueType = RE::NiPoint3;  // Type returned by GetPoint() - pitch=x, roll=y, yaw=z
         
         RotationPoint GetPointAtCamera(float a_time, bool a_easeIn, bool a_easeOut) const override;
-        
+        void UpdateCameraPoints() override {
+            for (auto& point : m_points)
+                if (point.m_pointType == PointType::kCamera)
+                    point.m_point = point.GetPointAtCamera();
+        }
         bool AddPathFromFile(const std::string& a_filePath, float a_timeOffset = 0.0f, float a_conversionFactor = 1.0f);
         bool ExportPath(std::ofstream& a_file, float a_conversionFactor = 1.0f) const;
     };
@@ -575,7 +578,94 @@ namespace FCFW {
         using ValueType = float;  // Type returned by GetPoint()
         
         FOVPoint GetPointAtCamera(float a_time, bool a_easeIn, bool a_easeOut) const override;
-        
+        void UpdateCameraPoints() override {
+            for (auto& point : m_points)
+                if (point.m_pointType == PointType::kCamera)
+                    point.m_point = point.GetPointAtCamera();
+        }
+        bool AddPathFromFile(const std::string& a_filePath, float a_timeOffset = 0.0f, float a_conversionFactor = 1.0f);
+        bool ExportPath(std::ofstream& a_file, float a_conversionFactor = 1.0f) const;
+    };
+
+    // ===== Worldspace Point & Path =====
+    // Event-based path: at each authored time, the camera is moved to the specified
+    // worldspace (exterior) or cell (interior) at the camera's current position/rotation.
+    // Detection uses continuous state comparison: PlayTimeline compares the current active
+    // destination against the previously fired one — no per-point trigger flag needed.
+
+    struct WorldspaceDestination {
+        RE::TESWorldSpace* m_worldspace = nullptr;  // non-null → exterior worldspace change
+        RE::TESObjectCELL* m_cell = nullptr;        // non-null → interior cell change
+        // Exactly one of m_worldspace / m_cell must be non-null for a valid destination
+        bool IsValid() const { return (m_worldspace != nullptr) != (m_cell != nullptr); }
+    };
+
+    class WorldspacePoint {
+    public:
+        WorldspacePoint(
+            const Transition& a_transition = Transition(0.0f, InterpolationMode::kNone, false, false),
+            RE::TESWorldSpace* a_worldspace = nullptr,
+            RE::TESObjectCELL* a_cell = nullptr)
+            : m_transition(a_transition)
+            , m_worldspace(a_worldspace)
+            , m_cell(a_cell)
+            , m_pointType(PointType::kWorld)
+            , m_reference(nullptr) {}
+
+        WorldspaceDestination GetPointAtCamera() const { return WorldspaceDestination{}; }  // no camera-capture equivalent
+        WorldspaceDestination GetPoint() const { return WorldspaceDestination{m_worldspace, m_cell}; }
+
+        bool IsNearlyEqual(const WorldspacePoint& other) const {
+            return m_worldspace == other.m_worldspace && m_cell == other.m_cell;
+        }
+
+        // Worldspace destinations cannot be interpolated — hold p1 until t reaches 1.0 (the authored time)
+        WorldspacePoint LinearInterpolate(const WorldspacePoint& p1, const WorldspacePoint& p2, float t) const {
+            return t < 1.0f ? p1 : p2;
+        }
+        WorldspacePoint CubicHermite(const WorldspacePoint& /*p0*/, const WorldspacePoint& p1,
+                                   const WorldspacePoint& p2, const WorldspacePoint& /*p3*/, float t) const {
+            return t < 1.0f ? p1 : p2;
+        }
+
+        // Arithmetic operators defined for template compatibility — not semantically meaningful for worldspace points
+        WorldspacePoint operator+(const WorldspacePoint&) const { return *this; }
+        WorldspacePoint operator-(const WorldspacePoint&) const { return *this; }
+        WorldspacePoint operator*(float) const { return *this; }
+
+        Transition m_transition;
+        RE::TESWorldSpace* m_worldspace = nullptr;  // non-null → exterior worldspace change
+        RE::TESObjectCELL* m_cell = nullptr;        // non-null → interior cell change
+        PointType m_pointType;                      // always kWorld (template compatibility)
+        RE::TESObjectREFR* m_reference;             // always nullptr (template compatibility)
+        mutable WorldspaceDestination m_point;      // template compatibility (never used — m_pointType is always kWorld)
+    };
+
+    class WorldspacePath : public CameraPath<WorldspacePoint> {
+    public:
+        using TransitionPoint = WorldspacePoint;
+        using ValueType = WorldspaceDestination;
+
+        WorldspacePoint GetPointAtCamera(float /*a_time*/, bool /*a_easeIn*/, bool /*a_easeOut*/) const override {
+            return WorldspacePoint{};  // no camera-capture equivalent
+        }
+
+        void UpdateCameraPoints() override {}  // no-op: worldspace points are never kCamera type
+
+        // Returns the destination of the last authored point whose time <= a_time,
+        // or an invalid WorldspaceDestination if no such point has been reached yet.
+        WorldspaceDestination GetWorldspaceDestination(float a_time) const {
+            WorldspaceDestination result;  // invalid by default
+            for (const auto& pt : m_points) {
+                if (pt.m_transition.m_time <= a_time) {
+                    result = pt.GetPoint();
+                } else {
+                    break;  // points are time-sorted
+                }
+            }
+            return result;
+        }
+
         bool AddPathFromFile(const std::string& a_filePath, float a_timeOffset = 0.0f, float a_conversionFactor = 1.0f);
         bool ExportPath(std::ofstream& a_file, float a_conversionFactor = 1.0f) const;
     };

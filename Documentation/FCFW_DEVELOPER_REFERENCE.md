@@ -65,6 +65,7 @@ FCFW Source: https://github.com/staalo18/FreeCameraFramework
 - **Translation points** control camera position (where it moves)
 - **Rotation points** control camera orientation (where it looks)
 - **FOV points** control camera field of view (zoom level)
+- **Worldspace points** trigger player worldspace and interior/exterior changes during playback
 - Three point types for translation and rotation:
   - **World points**: Static coordinates in world space
   - **Reference points**: Follow or look at objects/actors
@@ -111,12 +112,13 @@ A **timeline** is a container for camera movement data. Each timeline has:
 - **Translation points** defining camera positions over time
 - **Rotation points** defining camera orientations over time
 - **FOV points** defining camera zoom levels over time
+- **Worldspace points** defining player worldspace and interior/exterior changes during playback
 - **Playback settings** (mode, loop offset, user rotation, etc.)
 
-**Important**: Translation, rotation, and FOV tracks are independent. You can have:
+**Important**: Translation, rotation, FOV, and worldspace tracks are independent. You can have:
 - Different numbers of points in each track
-- Different time values for translation vs rotation vs FOV points
-- Different interpolation modes per track
+- Different time values for translation vs rotation vs FOV vs worldspace points
+- Different interpolation modes per track (not applicable to worldspace points — they are always instant)
 
 ### Control Points
 
@@ -621,6 +623,52 @@ FCFW_SKSEFunctions.AddFOVPoint(
 - Automatically captured during recording
 
 
+### Worldspace Points
+
+**Worldspace points** trigger an instant player worldspace or interior/exterior change at a specific time during playback. Unlike translation/rotation/FOV points, they are purely event-based — no interpolation. The camera's current position and rotation at the moment of the change are preserved.
+
+```papyrus
+; Move player to the DLC2SolstheimWorld worldspace at t=5s
+FCFW_SKSEFunctions.AddWorldspacePoint(
+    ModName,
+    timelineID,
+    time = 5.0,
+    editorID = "DLC2SolstheimWorld",  ; Solstheim exterior worldspace
+    isInterior = false
+)
+
+; Move player to an interior cell at t=10s
+FCFW_SKSEFunctions.AddWorldspacePoint(
+    ModName,
+    timelineID,
+    time = 10.0,
+    editorID = "Skuldafn01",  ; interior cell EditorID
+    isInterior = true
+)
+```
+
+**Worldspace Point API:**
+```papyrus
+; Add a worldspace point - returns index of added point, or -1 on failure
+int index = FCFW_SKSEFunctions.AddWorldspacePoint(modName, timelineID, time, editorID, isInterior)
+
+; Remove a worldspace point by index
+bool ok = FCFW_SKSEFunctions.RemoveWorldspacePoint(modName, timelineID, index)
+
+; Get number of worldspace points
+int count = FCFW_SKSEFunctions.GetWorldspacePointCount(modName, timelineID)
+
+; Get EditorID of the destination form at the given index (worldspace or cell)
+string editorID = FCFW_SKSEFunctions.GetWorldspacePointEditorID(modName, timelineID, index)
+```
+
+**Worldspace Point Characteristics:**
+- No interpolation — player is moved instantly at the specified time
+- Works across worldspaces (e.g., interior ↔ exterior)
+- The camera continues from the same logical position/rotation after the change
+- EditorIDs are resolved at the time `AddWorldspacePoint` is called; the form must be loaded
+
+
 ### Procedural Path Generation
 
 **Generate paths programmatically** for complex movements. 
@@ -873,3 +921,39 @@ See `Documentation/TimelineFileExample/` for example timelines:
 - `FCFW_Timeline_worldPath.yaml` - Pre-recorded world-space path
 
 ---
+
+## C++ Plugin API
+
+FCFW exposes a versioned C++ API for use in other SKSE plugins. Copy `include/FCFW_API.h` into your project.
+
+### Requesting the API
+
+```cpp
+#include "FCFW_API.h"
+
+FCFW_API::IVFCFW2* g_fcfwAPI = nullptr;
+
+// In your SKSE messaging handler, after kMessage_PostLoad:
+void OnSKSEMessage(SKSE::MessagingInterface::Message* msg) {
+    if (msg->type == SKSE::MessagingInterface::kPostLoad) {
+        auto requestFn = reinterpret_cast<FCFW_API::_RequestPluginAPI>(
+            SKSE::GetMessagingInterface()->QueryPluginInfoFromString("FreeCameraFramework", "RequestPluginAPI"));
+        if (requestFn) {
+            g_fcfwAPI = static_cast<FCFW_API::IVFCFW2*>(requestFn(FCFW_API::InterfaceVersion::V2));
+        }
+    }
+}
+```
+
+### Interface Versions
+
+| Version | Interface | New in this version |
+|---------|-----------|---------------------|
+| V1 | `IVFCFW1` | All original API methods (timeline management, translation, rotation, FOV, playback) |
+| V2 | `IVFCFW2 : IVFCFW1` | `AddWorldspacePoint`, `RemoveWorldspacePoint`, `GetWorldspacePointCount`, `GetWorldspacePointEditorID` |
+
+**Backward compatibility:** `IVFCFW2` extends `IVFCFW1`. Requesting `V2` gives you access to all V1 methods as well.
+
+If you only need V1 methods, request `InterfaceVersion::V1` and cast to `IVFCFW1*`. For worldspace point access, request `InterfaceVersion::V2` and cast to `IVFCFW2*`.
+
+Full XML documentation is in `include/FCFW_API.h`.
