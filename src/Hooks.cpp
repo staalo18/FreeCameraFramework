@@ -15,6 +15,7 @@ namespace Hooks
 		MovementHook::Hook();
 		ToggleFreeCameraHook::Hook();
 		FreeCameraRollHook::Hook();
+		TweenMenuCameraStateHook::Hook();
 		PlayerGhostHook::Hook();
 		CalculateDetectionHook::Hook();
 		UpdateLODHook::Hook();
@@ -140,9 +141,65 @@ log::info("{}: no coords", __FUNCTION__);
 		if (bRelevant && activeID != 0 && timelineManager.IsPlaybackRunning(activeID) && !RE::UI::GetSingleton()->GameIsPaused()) {
 			return; // ignore movement input during playback
 		}
+		if (activeID != 0 && timelineManager.IsPlaybackRunning(activeID) && !RE::UI::GetSingleton()->GameIsPaused()) {
+log::info("Ignoring button event during playback");
+			return; // ignore movement input during playback
+		}
 
 		_ProcessButton(a_this, a_event, a_data);
 	}
+
+	void FreeCameraStateHook::ProcessButton(RE::FreeCameraState* a_this, RE::ButtonEvent* a_event, RE::PlayerControlsData* a_data)
+	{
+		bool bRelevant = false;
+		if (a_event)
+		{
+			log::info("FreeCameraStateHook::ProcessButton called");
+			auto& userEvent = a_event->QUserEvent();
+			auto userEvents = RE::UserEvents::GetSingleton();
+log::info("User event");
+			if (userEvent == userEvents->tweenMenu) {
+				log::info("Tween menu button pressed");
+				bRelevant = a_event->IsPressed();
+			}
+		}
+		auto& timelineManager = FCFW::TimelineManager::GetSingleton();
+		size_t activeID = timelineManager.GetActiveTimelineID();
+		if (bRelevant && activeID != 0 && timelineManager.IsPlaybackRunning(activeID) && !RE::UI::GetSingleton()->GameIsPaused()) {
+log::info("FreeCameraStateHook::ProcessButton called - filtered input during playback");
+			return; // ignore movement input during playback
+		}
+
+
+		_ProcessButton(a_this, a_event, a_data);
+	}
+
+	size_t m_activeID = 0;
+	void TweenMenuCameraStateHook::OnEnterState(RE::TESCameraState* a_this)
+	{
+log::info("TweenMenuCameraStateHook::OnEnterState called");
+		auto& timelineManager = FCFW::TimelineManager::GetSingleton();
+		m_activeID = timelineManager.GetActiveTimelineID();
+		if (m_activeID != 0 && timelineManager.IsPlaybackRunning(m_activeID) && !RE::UI::GetSingleton()->GameIsPaused()) {
+log::info("TweenMenuCameraStateHook::OnEnterState called - pausing playback ID {}", m_activeID);
+			timelineManager.PausePlayback(m_activeID);
+		}
+		_OnEnterState(a_this);
+log::info("TweenMenuCameraStateHook::OnEnterState called - executed original function");
+	}
+
+	void TweenMenuCameraStateHook::OnExitState(RE::TESCameraState* a_this)
+	{
+		_OnExitState(a_this);
+log::info("TweenMenuCameraStateHook::OnExitState called");
+		if (m_activeID != 0) {
+log::info("TweenMenuCameraStateHook::OnExitState called - resuming playback - ID {}", m_activeID);
+			auto& timelineManager = FCFW::TimelineManager::GetSingleton();
+			timelineManager.ResumePlayback(m_activeID);
+			m_activeID = 0;
+		}
+	}
+
 
 	void ToggleFreeCameraHook::Hook()
 	{

@@ -1432,6 +1432,22 @@ log::info("{}: Restored player camera rotation to ({:.2f}, {:.2f})", __FUNCTION_
         return true;
     }
 
+    bool TimelineManager::PausePlayback(size_t a_timelineID) {
+        std::lock_guard<std::recursive_mutex> lock(m_timelineMutex);
+        
+        TimelineState* state = GetTimeline(a_timelineID);
+        if (!state) {
+            return false;
+        }
+        
+        if (!state->m_isPlaybackRunning) {
+            return false;
+        }
+        
+        state->m_timeline.PausePlayback();
+        return true;
+    }
+
     bool TimelineManager::ResumePlayback(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID) {
         std::lock_guard<std::recursive_mutex> lock(m_timelineMutex);
         
@@ -1447,6 +1463,23 @@ log::info("{}: Restored player camera rotation to ({:.2f}, {:.2f})", __FUNCTION_
         state->m_timeline.ResumePlayback();
         return true;
     }
+
+    bool TimelineManager::ResumePlayback(size_t a_timelineID) {
+        std::lock_guard<std::recursive_mutex> lock(m_timelineMutex);
+        
+        TimelineState* state = GetTimeline(a_timelineID);
+        if (!state) {
+            return false;
+        }
+        
+        if (!state->m_isPlaybackRunning) {
+            return false;
+        }
+        
+        state->m_timeline.ResumePlayback();
+        return true;
+    }
+
 
     bool TimelineManager::IsPlaybackRunning(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID) const {
         std::lock_guard<std::recursive_mutex> lock(m_timelineMutex);
@@ -1926,6 +1959,25 @@ log::info("{}: Restored player camera rotation to ({:.2f}, {:.2f})", __FUNCTION_
 
     const TimelineState* TimelineManager::GetTimeline(size_t a_timelineID, SKSE::PluginHandle a_pluginHandle) const {
         return const_cast<TimelineManager*>(this)->GetTimeline(a_timelineID, a_pluginHandle);
+    }
+
+    TimelineState* TimelineManager::GetTimeline(size_t a_timelineID) {
+        if (a_timelineID == 0) {
+            return nullptr;
+        }
+
+        auto it = m_timelines.find(a_timelineID);
+        if (it == m_timelines.end()) {
+            log::error("{}: Timeline {} not found", __FUNCTION__, a_timelineID);
+            return nullptr;
+        }
+        
+        if (it->second.m_ownerHandle == 0) {
+            log::error("{}: Timeline {} has no owner", __FUNCTION__, a_timelineID);
+            return nullptr;
+        }
+        
+        return &it->second;
     }
 
     // Overloads for internal use (no ownership validation)
