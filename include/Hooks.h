@@ -10,7 +10,7 @@ namespace Hooks
 			auto& trampoline = SKSE::GetTrampoline();
 			REL::Relocation<uintptr_t> hook{ RELOCATION_ID(35565, 36564) };  // 5B2FF0, 5D9F50, main update
 			
-			_Nullsub = trampoline.write_call<5>(hook.address() + RELOCATION_OFFSET(0x748, 0xC26), Nullsub);  // 5B3738, 5DAB76
+			_Nullsub = trampoline.write_call<5>(hook.address() + RELOCATION_OFFSET1799(0x748, 0xC26, 0xC38), Nullsub);  // 5B3738, 5DAB76		
 		}
 
 	private:
@@ -25,8 +25,9 @@ namespace Hooks
 		static void Hook()
 		{
 			REL::Relocation<std::uintptr_t> LookHandlerVtbl{ RE::VTABLE_LookHandler[0] };
-			_ProcessThumbstick = LookHandlerVtbl.write_vfunc(0x2, ProcessThumbstick);
-			_ProcessMouseMove = LookHandlerVtbl.write_vfunc(0x3, ProcessMouseMove);
+			auto vtblShift = REL::Module::IsAtLeast(SKSE::RUNTIME_SSE_1_7_99) ? 2 : 0;
+			_ProcessThumbstick = LookHandlerVtbl.write_vfunc(0x2 + vtblShift, ProcessThumbstick);
+			_ProcessMouseMove = LookHandlerVtbl.write_vfunc(0x3 + vtblShift, ProcessMouseMove);
 		}
 
 	private:
@@ -43,8 +44,9 @@ namespace Hooks
 		static void Hook()
 		{
 			REL::Relocation<std::uintptr_t> MovementHandlerVtbl{ RE::VTABLE_MovementHandler[0] };
-			_ProcessThumbstick = MovementHandlerVtbl.write_vfunc(0x2, ProcessThumbstick);
-			_ProcessButton = MovementHandlerVtbl.write_vfunc(0x4, ProcessButton);
+			auto vtblShift = REL::Module::IsAtLeast(SKSE::RUNTIME_SSE_1_7_99) ? 2 : 0;
+			_ProcessThumbstick = MovementHandlerVtbl.write_vfunc(0x2 + vtblShift, ProcessThumbstick);
+			_ProcessButton = MovementHandlerVtbl.write_vfunc(0x4 + vtblShift, ProcessButton);
 		}
 
 	private:
@@ -62,14 +64,39 @@ namespace Hooks
 		static void Hook()
 		{
 			REL::Relocation<std::uintptr_t> FreeCameraStateVtbl{ RE::VTABLE_FreeCameraState[0] };
-			_Update = FreeCameraStateVtbl.write_vfunc(0x3, Update);
+			auto vtblShift = REL::Module::IsAtLeast(SKSE::RUNTIME_SSE_1_7_99) ? 2 : 0;
+			_Update = FreeCameraStateVtbl.write_vfunc(0x3 + vtblShift, Update);
+			REL::Relocation<std::uintptr_t> PlayerInputHandlerVtbl{ RE::VTABLE_FreeCameraState[1] };
+			_ProcessButton = PlayerInputHandlerVtbl.write_vfunc(0x4 + vtblShift, ProcessButton);
 		}
 
 	private:
 		static void Update(RE::FreeCameraState* a_this);
-		
+		static void ProcessButton(RE::FreeCameraState* a_this, RE::ButtonEvent* a_event, RE::PlayerControlsData* a_data);
+
 		static inline REL::Relocation<decltype(Update)> _Update;
+		static inline REL::Relocation<decltype(ProcessButton)> _ProcessButton;
 	};
+
+	class TweenMenuCameraStateHook
+	{
+	public:
+		static void Hook()
+		{
+			REL::Relocation<std::uintptr_t> TweenMenuCameraStateVtbl{ RE::VTABLE_TweenMenuCameraState[0] };
+			_OnEnterState = TweenMenuCameraStateVtbl.write_vfunc(0x1, OnEnterState);
+			_OnExitState = TweenMenuCameraStateVtbl.write_vfunc(0x2, OnExitState);
+		}
+
+	private:
+		static void OnEnterState(RE::TESCameraState* a_this);
+		static void OnExitState(RE::TESCameraState* a_this);
+
+		static inline REL::Relocation<decltype(OnEnterState)> _OnEnterState;
+		static inline REL::Relocation<decltype(OnExitState)> _OnExitState;
+	};
+
+
 
 	class ToggleFreeCameraHook
 	{

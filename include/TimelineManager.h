@@ -118,7 +118,9 @@ namespace FCFW {
             bool IsPlaybackRunning(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID) const;
             bool IsRecording(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID) const;
             bool PausePlayback(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID);
+            bool PausePlayback(size_t a_timelineID);
             bool ResumePlayback(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID);
+            bool ResumePlayback(size_t a_timelineID);
             bool IsPlaybackPaused(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID) const;
             float GetPlaybackTime(SKSE::PluginHandle a_pluginHandle, size_t a_timelineID) const;
             
@@ -158,6 +160,7 @@ namespace FCFW {
             // Debug/testing
             void ToggleBodyPartRotationMatrixDisplay(RE::Actor* a_actor, BodyPart a_bodyPart);
 
+            TimelineState* GetTimeline(size_t a_timelineID);
         private:
             TimelineManager() = default;
             ~TimelineManager() = default;
